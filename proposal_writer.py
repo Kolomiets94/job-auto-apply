@@ -18,8 +18,16 @@ def make_proposal(lead):
     english = lead.get("language") == "en"
 
     if category == "qa":
-        # QA is review-only until the frontend search and its filters are checked.
-        raise ValueError("QA application drafts are paused")
+        name, url = PROJECTS["travel"]
+        if english:
+            return (f"Hello! I'm applying for {title}. "
+                    "I have manually tested my own React web applications, including form validation, navigation, and API error handling. "
+                    f"One project is {name}: {url}. "
+                    "I would be glad to discuss my testing approach and learn your QA process.")
+        return (f"Здравствуйте! Откликаюсь на вакансию «{title}». "
+                "Проводил ручное тестирование собственных веб-приложений на React: проверял формы, навигацию и обработку ошибок API. "
+                f"Пример проекта — {name}: {url}. "
+                "Готов рассказать о проверках и освоить процессы тестирования вашей команды.")
 
     if category == "layout":
         name, url = PROJECTS["travel"]
