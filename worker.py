@@ -190,6 +190,23 @@ def run():
     print(f"[telegram] start notification: {started}", flush=True)
     leads = apply_resume_matching(collect_all())
     ranked = prioritize_actionable_leads(rank_leads(leads))
+    # Diagnose why collected Junior Frontend/layout leads never reach dispatch.
+    from collections import Counter
+    from profit_ranker import rank_lead
+    eligibility = {}
+    for role in ("frontend", "layout", "qa"):
+        relevant = [lead for lead in leads if not is_freelance(lead) and _role_category(lead) == role]
+        rejected = Counter(
+            str(item.get("rank_reason") or "unknown")
+            for item in (rank_lead(lead) for lead in relevant)
+            if not item.get("eligible")
+        )
+        eligibility[role] = {
+            "found": len(relevant),
+            "eligible": sum(_role_category(lead) == role and not is_freelance(lead) for lead in ranked),
+            "rejected_reasons": dict(rejected.most_common(8)),
+        }
+    print(f"[eligibility] {eligibility}", flush=True)
 
     daily_limits = {
         "jobs_submitted": _application_limit("DAILY_JOB_LIMIT"),
@@ -215,6 +232,7 @@ def run():
         "layout_found": sum(_role_category(lead) == "layout" and not is_freelance(lead) for lead in leads),
         "qa_found": sum(_role_category(lead) == "qa" and not is_freelance(lead) for lead in leads),
         "source_counts": source_counts,
+        "eligibility_diagnostics": eligibility,
         "collection_errors": list(COLLECTION_ERRORS),
         "resume_configured": bool(load_resume_text()),
         "found": len(leads),
