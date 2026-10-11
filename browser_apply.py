@@ -543,4 +543,7 @@ def dispatch_browser(lead: Dict, proposal: str) -> Dict[str, str]:
         return apply_hh(lead, proposal)
     if source == "remote_job_ru" or "remote-job.ru/vacancy/" in url:
         return apply_remote_job(lead, proposal)
+    from external_form_apply import apply_external
+    if lead.get("apply_url"):
+        return apply_external(lead, proposal)
     return {"status": "SKIPPED", "reason": "unsupported_browser_source"}
