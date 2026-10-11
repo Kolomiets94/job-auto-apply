@@ -238,7 +238,7 @@ def run():
         # QA applications are opt-in: prioritize the candidate's primary
         # Frontend / HTML-CSS roles instead of silently submitting QA.
         # QA vacancies remain visible in reports for later review.
-        if not freelance and _role_category(lead) == "qa":
+        if not freelance and _role_category(lead) == "qa" and os.getenv("AUTO_APPLY_QA", "0").strip().lower() not in ("1", "true", "yes"):
             results.append({
                 "title": lead.get("title"),
                 "source": lead.get("source"),
