@@ -1,6 +1,7 @@
 """Unified one-pass job + freelance hunter worker."""
 
 import os
+import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from job_sources import JOB_COLLECTORS
 
@@ -328,13 +329,17 @@ def run():
                 **result,
             })
         except Exception as exc:
+            print(f"[dispatch-error] {lead.get('source')} {lead.get('url')}: {exc!r}", flush=True)
+            traceback.print_exc()
             set_state(lid, "FAILED")
             stats["failed"] += 1
             results.append({
                 "id": lid,
                 "title": lead.get("title"),
                 "status": "FAILED",
-                "reason": type(exc).__name__,
+                "source": lead.get("source"),
+                "url": lead.get("url"),
+                "reason": f"{type(exc).__name__}: {str(exc)[:120]}",
             })
 
     # Report actual submission capability separately from discovered listings.
