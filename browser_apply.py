@@ -442,11 +442,8 @@ def apply_remote_job(lead: Dict, proposal: str) -> Dict[str, str]:
                 from urllib.parse import urljoin, urlsplit
                 destination = urljoin(raw_url, href)
                 if urlsplit(destination).hostname not in ("remote-job.ru", "www.remote-job.ru"):
-                    return {
-                        "status": "NEEDS_CONFIRMATION",
-                        "reason": "external_application_form_not_supported",
-                        "apply_url": destination,
-                    }
+                    from external_form_apply import apply_external
+                    return apply_external({**lead, "apply_url": destination}, proposal)
 
             # Remote-job.ru hides its public form until the vacancy response
             # button is clicked. Never click the submit button at this stage.
