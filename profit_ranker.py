@@ -137,6 +137,15 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "excluded job title"}
     if any(x in title for x in ("офис", "onsite", "on-site", "on site", "гибрид", "hybrid")):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "onsite/hybrid job"}
+    # Keep mandatory unsupported frameworks excluded, while allowing optional mentions.
+    requirements = " ".join(str(lead.get(k) or "") for k in ("description", "requirements")).lower()
+    required_parts = re.split(r"[\n.!?;]", requirements)
+    optional_markers = ("optional", "nice to have", "nice-to-have", "not required", "необязател", "будет плюсом", "как плюс")
+    unsupported = ("vue", "angular", "full stack", "fullstack", "react native", "flutter")
+    if any(any(term in part for term in unsupported) and not any(marker in part for marker in optional_markers)
+           and any(marker in part for marker in ("required", "must have", "mandatory", "обязательно", "требуется"))
+           for part in required_parts):
+        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "mandatory unsupported stack"}
     # SQL is outside the confirmed stack. Clearly optional mentions are allowed.
     sql_parts = re.split(r"[\n.!?;]", text)
     optional_sql = ("optional", "nice to have", "nice-to-have", "not required",
