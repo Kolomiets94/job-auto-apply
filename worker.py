@@ -397,6 +397,21 @@ def run():
         except Exception as exc:
             freelance_review_delivery = {"status": "FAILED", "reason": type(exc).__name__}
 
+    # Alert about blocked applications with the direct destination URL.
+    blocked = [item for item in results if item.get("status") in ("NEEDS_HUMAN", "NEEDS_CONFIRMATION")]
+    if blocked:
+        lines = ["Требуется действие: отклики НЕ отправлены:"]
+        for item in blocked[:10]:
+            lines.append(
+                f"- {str(item.get('title') or 'Вакансия')[:90]} "
+                f"({item.get('reason') or 'требуется проверка'})\\n"
+                f"{item.get('apply_url') or item.get('url') or ''}"
+            )
+        try:
+            send_message("\\n".join(lines))
+        except Exception as exc:
+            print(f"[telegram] blocked notification: {type(exc).__name__}", flush=True)
+
     deliveries = deliver_notifications(notifications)
     stats["notifications"] = len(notifications)
     stats["notifications_sent"] = sum(
