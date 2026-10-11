@@ -404,11 +404,11 @@ def run():
         for item in blocked[:10]:
             lines.append(
                 f"- {str(item.get('title') or 'Вакансия')[:90]} "
-                f"({item.get('reason') or 'требуется проверка'})\\n"
+                f"({item.get('reason') or 'требуется проверка'})\n"
                 f"{item.get('apply_url') or item.get('url') or ''}"
             )
         try:
-            send_message("\\n".join(lines))
+            send_message("\n".join(lines))
         except Exception as exc:
             print(f"[telegram] blocked notification: {type(exc).__name__}", flush=True)
 
