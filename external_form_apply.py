@@ -13,7 +13,11 @@ from application_schedule import application_time_allowed
 def allowed_host(url):
     host = (urlsplit(url).hostname or "").lower()
     allowed = {h.strip().lower() for h in os.getenv("EXTERNAL_APPLY_HOSTS", "").split(",") if h.strip()}
-    return urlsplit(url).scheme == "https" and host in allowed
+    allowed.update({"jobs.lever.co", "boards.greenhouse.io", "job-boards.greenhouse.io",
+                    "apply.workable.com", "jobs.ashbyhq.com", "careers.smartrecruiters.com"})
+    parts = urlsplit(url)
+    return (parts.scheme == "https" and host in allowed and not parts.username
+            and not parts.password and parts.port in (None, 443))
 
 
 def apply_external(lead, proposal):
@@ -39,16 +43,47 @@ def apply_external(lead, proposal):
             if any(term in body for term in ("captcha", "turnstile", "verify you are human", "проверка безопасности")):
                 return {"status": "NEEDS_HUMAN", "reason": "external_security_challenge", "apply_url": url}
             forms = page.locator("form")
-            if forms.count() != 1:
-                return {"status": "NEEDS_CONFIRMATION", "reason": "external_form_ambiguous", "apply_url": url}
-            form = forms.first
-            if form.locator('input[type="file"], select, input[type="radio"], input[type="checkbox"]').count():
-                return {"status": "NEEDS_CONFIRMATION", "reason": "external_complex_form", "apply_url": url}
-            fields = form.locator('input:not([type="hidden"]):not([type="submit"]), textarea')
+            if forms.count() == 1:
+                form = forms.first
+            else:
+                candidates = [
+                    forms.nth(index) for index in range(forms.count())
+                    if forms.nth(index).locator('input[type="email"], input[name="email"]').count()
+                    and forms.nth(index).locator('textarea, input[type="file"]').count()
+                ]
+                if len(candidates) != 1:
+                    return {"status": "NEEDS_CONFIRMATION", "reason": "external_form_ambiguous", "apply_url": url}
+                form = candidates[0]
+            # Optional uploads and choices need not block a simple application.
+            for selector in ('select', 'input[type="radio"]', 'input[type="checkbox"]'):
+                controls = form.locator(selector)
+                for index in range(controls.count()):
+                    control = controls.nth(index)
+                    if control.is_visible() and (control.get_attribute("required") is not None or
+                                                 control.get_attribute("aria-required") == "true"):
+                        return {"status": "NEEDS_CONFIRMATION", "reason": "external_required_choice",
+                                "apply_url": url}
+            uploads = form.locator('input[type="file"]')
+            for index in range(uploads.count()):
+                upload = uploads.nth(index)
+                category = str(lead.get("category") or "frontend").upper()
+                resume_path = os.getenv(category + "_CV_FILE") or os.getenv("RESUME_FILE_FOR_UPLOAD", "")
+                if resume_path and os.path.isfile(resume_path):
+                    upload.set_input_files(resume_path)
+                elif upload.get_attribute("required") is not None:
+                    return {"status": "NEEDS_HUMAN", "reason": "external_resume_file_missing",
+                            "apply_url": url}
+            fields = form.locator('input:not([type="hidden"]):not([type="submit"]):not([type="file"]):not([type="checkbox"]):not([type="radio"]), textarea')
             values = {"name": name, "fullname": name, "full_name": name,
                       "email": email, "phone": phone, "telephone": phone,
                       "message": proposal, "cover_letter": proposal, "coverletter": proposal,
-                      "letter": proposal}
+                      "letter": proposal, "coverlettertext": proposal,
+                      "github": "https://github.com/Kolomiets94",
+                      "github_url": "https://github.com/Kolomiets94",
+                      "portfolio": "https://github.com/Kolomiets94",
+                      "portfolio_url": "https://github.com/Kolomiets94",
+                      "location": "Yekaterinburg, Russia",
+                      "current_location": "Yekaterinburg, Russia"}
             filled = set()
             for i in range(fields.count()):
                 field = fields.nth(i)
@@ -60,10 +95,13 @@ def apply_external(lead, proposal):
                     key = "email"
                 elif kind == "tel":
                     key = "phone"
-                if key not in values or kind not in ("text", "email", "tel"):
+                required = field.get_attribute("required") is not None or field.get_attribute("aria-required") == "true"
+                if not required and (key not in values or kind not in ("text", "email", "tel", "url")):
+                    continue
+                if key not in values or kind not in ("text", "email", "tel", "url"):
                     return {"status": "NEEDS_CONFIRMATION", "reason": "external_unknown_field", "apply_url": url}
                 field.fill(values[key])
-                filled.add("letter" if key in ("message", "cover_letter", "coverletter", "letter") else
+                filled.add("letter" if key in ("message", "cover_letter", "coverletter", "coverlettertext", "letter") else
                            "name" if key in ("name", "fullname", "full_name") else key)
             if not {"name", "email", "letter"}.issubset(filled):
                 return {"status": "NEEDS_CONFIRMATION", "reason": "external_required_fields_missing", "apply_url": url}
@@ -72,15 +110,17 @@ def apply_external(lead, proposal):
                 return {"status": "NEEDS_CONFIRMATION", "reason": "external_submit_ambiguous", "apply_url": url}
             if not application_time_allowed():
                 return {"status": "SKIPPED", "reason": "outside_application_hours"}
+            success_phrases = ("thank you for applying", "application submitted", "application received",
+                               "отклик успешно отправлен", "спасибо за отклик")
+            before_submit = (page.locator("body").inner_text(timeout=5000) or "").lower()
             submit.first.click(timeout=10000)
             page.wait_for_timeout(1500)
             body = (page.locator("body").inner_text(timeout=5000) or "").lower()
-            if any(term in body for term in ("thank you for applying", "application submitted",
-                                            "application received", "отклик успешно отправлен",
-                                            "спасибо за отклик")):
+            if any(term in body and term not in before_submit for term in success_phrases):
                 return {"status": "SUBMITTED", "reason": "external_form_confirmed"}
             return {"status": "NEEDS_CONFIRMATION", "reason": "external_submission_unconfirmed", "apply_url": url}
         except PlaywrightTimeoutError:
             return {"status": "FAILED", "reason": "external_browser_timeout", "apply_url": url}
         finally:
             browser.close()
+

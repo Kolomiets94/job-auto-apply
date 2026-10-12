@@ -12,7 +12,7 @@ from job_matcher import JobMatcher
 from profit_ranker import rank_leads, FREELANCE_SOURCES, ROLE_PRIORITY, _role_category
 from proposal_writer import make_proposal
 from application_dispatcher import dispatch
-from queue_store import enqueue, set_state, submitted_today, was_submitted
+from queue_store import enqueue, set_state, submitted_today, was_submitted, queued_leads
 from notification_rules import format_notification, should_notify
 from telegram_notifier import send_message, send_notification
 
@@ -188,7 +188,20 @@ def run():
     except Exception as exc:
         started = {"status": "FAILED", "reason": type(exc).__name__}
     print(f"[telegram] start notification: {started}", flush=True)
-    leads = apply_resume_matching(collect_all())
+    fresh = collect_all()
+    # Persist discovery before filtering, so previously found leads can benefit
+    # from later description/link adapters instead of disappearing next hour.
+    for lead in fresh:
+        enqueue(lead)
+    merged = {_lead_key(lead): lead for lead in queued_leads(limit=1000)}
+    merged.update({_lead_key(lead): lead for lead in fresh})
+    from lead_enrichment import enrich_lead
+    candidates = list(merged.values())
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        enriched = list(pool.map(enrich_lead, candidates))
+    for lead in enriched:
+        enqueue(lead)
+    leads = apply_resume_matching([lead for lead in enriched if not lead.get("unavailable")])
     ranked = prioritize_actionable_leads(rank_leads(leads))
     # Diagnose why collected Junior Frontend/layout leads never reach dispatch.
     from collections import Counter
@@ -236,6 +249,10 @@ def run():
         "collection_errors": list(COLLECTION_ERRORS),
         "resume_configured": bool(load_resume_text()),
         "found": len(leads),
+        "fresh_found": len(fresh),
+        "backlog_rechecked": len(candidates),
+        "descriptions_enriched": sum(bool(lead.get("enriched")) for lead in enriched),
+        "unavailable_skipped": sum(bool(lead.get("unavailable")) for lead in enriched),
         "ranked": len(ranked),
         "submitted": 0,
         "jobs_submitted": 0,
@@ -454,6 +471,9 @@ def run():
         f"Run: {os.getenv('GITHUB_SERVER_URL', 'https://github.com')}/{os.getenv('GITHUB_REPOSITORY', 'unknown')}/actions/runs/{os.getenv('GITHUB_RUN_ID', 'unknown')}\n"
         f"Workflow: {os.getenv('GITHUB_WORKFLOW', 'unknown')} | Ref: {os.getenv('GITHUB_REF_NAME', 'unknown')} | SHA: {os.getenv('GITHUB_SHA', 'unknown')[:12]}\n"
         f"Found: {stats['found']}\n"
+        f"Fresh found: {stats['fresh_found']}\n"
+        f"Fresh + saved leads checked: {stats['backlog_rechecked']}\n"
+        f"Full descriptions read: {stats['descriptions_enriched']}\n"
         f"Frontend found: {stats['frontend_found']}\n"
         f"Layout found: {stats['layout_found']}\n"
         f"QA found: {stats['qa_found']}\n"
@@ -513,3 +533,4 @@ def run():
 if __name__ == "__main__":
     import json
     print(json.dumps(run(), ensure_ascii=False, indent=2))
+

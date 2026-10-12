@@ -54,7 +54,34 @@ def enqueue(lead):
             "FOUND", int(lead.get("profit_score", 0)),
             json.dumps(lead, ensure_ascii=False), now,
         ))
+    # Refresh metadata without reopening a delivered application or changing its
+    # submission timestamp (daily counts depend on that timestamp).
+    with _db() as c:
+        c.execute("""UPDATE leads SET url=?,source=?,title=?,score=?,payload=?
+                     WHERE id=? AND state NOT IN ('SUBMITTED','REPLIED','WON')""", (
+            lead.get("url"), lead.get("source"), lead.get("title"),
+            int(lead.get("profit_score", 0)), json.dumps(lead, ensure_ascii=False), lid,
+        ))
     return lid
+
+
+def queued_leads(limit=1000):
+    """Recover previously discovered, undelivered leads for matching again."""
+    with _db() as c:
+        rows = c.execute(
+            """SELECT payload FROM leads
+               WHERE state NOT IN ('SUBMITTED','REPLIED','WON')
+               ORDER BY updated_at DESC LIMIT ?""", (limit,)
+        ).fetchall()
+    leads = []
+    for (payload,) in rows:
+        try:
+            lead = json.loads(payload)
+        except (ValueError, TypeError):
+            continue
+        if isinstance(lead, dict) and lead.get("url"):
+            leads.append(lead)
+    return leads
 
 
 def set_state(lid, state):
@@ -122,3 +149,4 @@ def list_queue(limit=100):
             (limit,),
         ).fetchall()
     return [dict(x) for x in rows]
+
