@@ -89,7 +89,7 @@ def _explicit_salary_rejected(lead: Dict[str, Any]) -> bool:
         amount = max(vals) if vals else None
         if amount is None:
             return False
-        if currency in ("RUR", "RUB") or source in RUSSIA_SOURCES:
+        if currency in ("RUR", "RUB"):
             return amount < 60000
         if currency in ("USD", "$"):
             # RemoteOK-style annual salaries are converted to a monthly comparison.
@@ -97,7 +97,7 @@ def _explicit_salary_rejected(lead: Dict[str, Any]) -> bool:
             monthly = amount / 12.0 if period in ("year", "yearly", "annual", "annually") else amount
             if not period and source == "remoteok" and amount > 12000:
                 monthly = amount / 12.0
-            return monthly < 2000
+            return monthly < 1000
     return False
 
 
@@ -158,6 +158,9 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     if any(re.search(r"\b(?:sql|mysql|postgresql)\b", part) and
            not any(marker in part for marker in optional_sql) for part in sql_parts):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "SQL outside confirmed stack"}
+    if source_is_job := str(lead.get("source") or "").lower() not in FREELANCE_SOURCES:
+        if re.search(r"\b(?:intern|internship|trainee)\b|стаж[её]р|стажиров|практикант", title):
+            return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "internship excluded"}
     if _explicit_salary_rejected(lead):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "salary below configured floor"}
     if _location_rejected(lead, text):
