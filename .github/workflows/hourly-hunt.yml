@@ -2,7 +2,7 @@ name: Hourly Job Hunter
 
 on:
   schedule:
-    - cron: "0 * * * *" # Every hour, 24 hours a day, including weekends
+    - cron: "17 * * * *" # Every hour at minute 17 UTC; avoids GitHub Actions top-of-hour congestion
   workflow_dispatch:
 
 concurrency:
