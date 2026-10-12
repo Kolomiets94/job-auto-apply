@@ -606,7 +606,7 @@ def run():
         f"Mode: {'DRAFT — no applications sent' if dry_run else 'LIVE'}\n"
         f"Drafts prepared: {stats['drafted']}\n"
         f"Daily total cap: {_limit_label(total_daily_limit)} | Hourly total cap: {_limit_label(total_hourly_limit)}\n"
-        f"Submitted by role (React/frontend, layout, QA): {stats['submitted_by_role']['frontend']}, {stats['submitted_by_role']['layout']}, {stats['submitted_by_role']['qa']}\n"
+        f"Submitted by role (React/frontend, layout, QA): {stats['submitted_by_role']['frontend']}, {stats['submitted_by_role']['layout']}, {stats['submitted_by_role']['qa']}\n"        "Refusals/invitations by role: not synchronized with HH or email (unknown)\n"
         f"Jobs submitted this run: {stats['jobs_submitted']}/{_limit_label(stats['hourly_job_limit'])}\n"
         f"Freelance submitted this run: {stats['freelance_submitted']}/{_limit_label(stats['hourly_freelance_limit'])}\n"
         f"Submitted this run total: {stats['submitted']}\n"
