@@ -1,5 +1,7 @@
 """Freelancehunt API adapter. Token stays in environment, never in git."""
 import os, requests
+import math
+import re
 from application_schedule import application_time_allowed
 
 BASE="https://api.freelancehunt.com/v2"
@@ -40,13 +42,13 @@ def add_bid(lead, proposal, days=None):
         return {"status": "SKIPPED", "reason": "paid_bid"}
     budget = lead.get("budget") or {}
     amount, currency = budget.get("amount"), budget.get("currency")
-    # Only compare currencies for which the user supplied a minimum; never guess FX.
-    floors = {"RUB": 2000, "USD": 50}
-    if currency not in floors or not isinstance(amount, (int, float)):
-        return {"status": "NEEDS_CONFIRMATION", "reason": "bid_budget_requires_review",
-                "detail": (f"budget_amount={amount!r}; budget_currency={currency!r}")[:180]}
-    if amount < floors[currency]:
-        return {"status": "SKIPPED", "reason": "freelance_budget_below_floor"}
+    # No minimum budget; the API still requires a concrete positive quote.
+    valid_amount = (isinstance(amount, (int, float)) and not isinstance(amount, bool)
+                    and math.isfinite(amount) and amount > 0)
+    valid_currency = isinstance(currency, str) and bool(re.fullmatch(r"[A-Z]{3}", currency))
+    if not valid_amount or not valid_currency:
+        return {"status": "NEEDS_CONFIRMATION", "reason": "bid_price_missing_or_invalid",
+                "detail": (f"quote_amount={amount!r}; quote_currency={currency!r}")[:180]}
     title = str(lead.get("title") or "").lower()
     if days is None:
         if any(x in title for x in ("исправ", "правк", "fix", "bug")):

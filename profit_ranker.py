@@ -74,6 +74,8 @@ def _money(lead: Dict[str, Any]) -> float:
 
 
 def _explicit_salary_rejected(lead: Dict[str, Any]) -> bool:
+    if str(lead.get("source") or "").lower() in FREELANCE_SOURCES:
+        return False
     salary = lead.get("salary")
     if not salary:
         return False
@@ -190,7 +192,8 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     matched = [k for k in SKILLS if k in text]
     fit = sum(SKILLS[k] for k in matched) / max(sum(SKILLS.values()), 1)
     budget = _money(lead)
-    budget_score = min(budget / 30000.0, 1.0) if budget else .25
+    budget_score = (.25 if source in FREELANCE_SOURCES else
+                    min(budget / 30000.0, 1.0) if budget else .25)
     quick = .15 if any(x in text for x in ("лендинг", "landing", "верст", "fix", "bug", "правк")) else 0
     competition = lead.get("proposals")
     comp_score = .15 if isinstance(competition, int) and competition < 10 else 0
