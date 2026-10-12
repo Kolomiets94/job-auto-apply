@@ -30,6 +30,33 @@ def collect_freelancehunt():
           "can_api_bid":True})
     return out
 
+def estimate_quote(lead):
+    """Estimate only narrowly scoped jobs, with a user-configured hourly rate.
+
+    A missing budget is not evidence of a client's willingness to pay.
+    """
+    try:
+        rate = float(os.getenv("FREELANCE_QUOTE_HOURLY_RATE", "0"))
+    except ValueError:
+        return None
+    currency = os.getenv("FREELANCE_QUOTE_CURRENCY", "UAH").strip().upper()
+    if not math.isfinite(rate) or rate <= 0 or not re.fullmatch(r"[A-Z]{3}", currency):
+        return None
+    title = str(lead.get("title") or "").lower()
+    description = re.sub(r"<[^>]+>", " ", str(lead.get("description") or "")).lower()
+    if not description.strip() or len(description.strip()) < 40:
+        return None
+    if any(term in title for term in ("нескольк", "декільк", "several", "multiple", "комплекс", "full website")):
+        return None
+    if any(term in title for term in ("исправ", "правк", "fix", "bug")):
+        hours, days = 4, 2
+    elif any(term in title for term in ("лендинг", "landing", "верст", "вёрст", "верстк")):
+        hours, days = 16, 4
+    else:
+        return None
+    return {"amount": round(rate * hours, 2), "currency": currency, "days": days}
+
+
 def add_bid(lead, proposal, days=None):
     if os.getenv("AUTO_FREELANCE_APPLY", "0") != "1":
         return {"status": "SHORTLISTED", "reason": "freelance_apply_disabled"}
@@ -47,11 +74,17 @@ def add_bid(lead, proposal, days=None):
                     and math.isfinite(amount) and amount > 0)
     valid_currency = isinstance(currency, str) and bool(re.fullmatch(r"[A-Z]{3}", currency))
     if not valid_amount or not valid_currency:
-        # An unpriced project needs a deliberate quote; never fabricate a bid.
-        return {"status": "NEEDS_CONFIRMATION", "reason": "bid_price_missing_or_invalid",
-                "detail": (f"quote_amount={amount!r}; quote_currency={currency!r}")[:180],
-                "apply_url": lead.get("url"),
-                "next_action": "Review scope and choose a positive amount and currency before bidding"}
+        estimate = estimate_quote(lead)
+        if estimate and os.getenv("AUTO_FREELANCE_ESTIMATED_BIDS") == "1":
+            amount, currency = estimate["amount"], estimate["currency"]
+            if days is None:
+                days = estimate["days"]
+        else:
+            return {"status": "NEEDS_CONFIRMATION", "reason": "bid_price_missing_or_invalid",
+                    "detail": (f"quote_amount={amount!r}; quote_currency={currency!r}")[:180],
+                    "suggested_quote": estimate,
+                    "apply_url": lead.get("url"),
+                    "next_action": "Configure hourly rate and explicitly enable estimated bids, or review scope manually"}
     title = str(lead.get("title") or "").lower()
     if days is None:
         if any(x in title for x in ("исправ", "правк", "fix", "bug")):
