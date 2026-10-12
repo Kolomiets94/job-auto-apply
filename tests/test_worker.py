@@ -140,3 +140,58 @@ def test_two_challenges_pause_browser_but_allow_email(monkeypatch):
     assert report["stats"]["paused_browser_hosts"] == ["remote-job.ru"]
     assert report["stats"]["email_submitted_after_browser_pause"] == 1
     assert report["stats"]["paid_placements_ranked"] == 0
+
+
+def test_draft_run_prepares_letter_without_dispatch_or_state_change(monkeypatch):
+    lead = {"source": "hh", "category": "frontend", "title": "Junior React Developer",
+            "url": "https://hh.ru/vacancy/1234", "description": "React"}
+    monkeypatch.setenv("DRY_RUN", "1")
+    monkeypatch.setattr(worker, "JOB_COLLECTORS", ())
+    monkeypatch.setattr("lead_enrichment.enrich_lead", lambda item: item)
+    with patch.object(worker, "collect_all", return_value=[lead]), \
+         patch.object(worker, "queued_leads", return_value=[]), \
+         patch.object(worker, "enqueue", return_value="1234"), \
+         patch.object(worker, "rank_leads", return_value=[lead]), \
+         patch.object(worker, "apply_resume_matching", side_effect=lambda items: items), \
+         patch.object(worker, "was_submitted", return_value=False), \
+         patch.object(worker, "submitted_today", return_value=0), \
+         patch.object(worker, "set_state") as set_state, \
+         patch.object(worker, "dispatch") as dispatch, \
+         patch.object(worker, "send_message", return_value={"status": "SENT"}):
+        report = worker.run()
+    assert report["stats"]["submitted"] == 0
+    assert report["stats"]["drafted"] == 1
+    assert report["results"][0]["status"] == "DRAFT"
+    assert "https://github.com/Kolomiets94/" in report["results"][0]["proposal"]
+    dispatch.assert_not_called()
+    set_state.assert_not_called()
+
+
+def test_total_hourly_cap_counts_across_job_and_freelance(monkeypatch):
+    leads = [
+        {"source": "jobicy", "category": "frontend", "title": "Junior React",
+         "url": "https://example.com/job", "apply_email": "jobs@example.com"},
+        {"source": "freelancehunt", "category": "freelance", "title": "React landing",
+         "url": "https://example.com/project", "can_api_bid": True},
+    ]
+    monkeypatch.delenv("DRY_RUN", raising=False)
+    monkeypatch.setenv("HOURLY_TOTAL_LIMIT", "1")
+    monkeypatch.setenv("FREELANCEHUNT_TOKEN", "test")
+    monkeypatch.setenv("AUTO_FREELANCE_APPLY", "1")
+    monkeypatch.setattr(worker, "JOB_COLLECTORS", ())
+    monkeypatch.setattr("lead_enrichment.enrich_lead", lambda item: item)
+    with patch.object(worker, "collect_all", return_value=leads), \
+         patch.object(worker, "queued_leads", return_value=[]), \
+         patch.object(worker, "enqueue", side_effect=lambda item: item["url"]), \
+         patch.object(worker, "rank_leads", return_value=leads), \
+         patch.object(worker, "apply_resume_matching", side_effect=lambda items: items), \
+         patch.object(worker, "was_submitted", return_value=False), \
+         patch.object(worker, "submitted_today", return_value=0), \
+         patch.object(worker, "set_state"), \
+         patch.object(worker, "dispatch", return_value={"status": "SUBMITTED", "reason": "email_sent"}) as dispatch, \
+         patch.object(worker, "send_message", return_value={"status": "SENT"}):
+        report = worker.run()
+    assert dispatch.call_count == 1
+    assert report["stats"]["submitted"] == 1
+    assert report["stats"]["submitted_by_role"]["frontend"] == 1
+    assert report["results"][1]["reason"] == "hourly_total_limit"
