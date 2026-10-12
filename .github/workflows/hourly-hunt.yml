@@ -12,7 +12,7 @@ concurrency:
 jobs:
   hunt:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     env:
       RESUME_TEXT: ${{ secrets.RESUME_TEXT }}
       SUPERJOB_API_KEY: ${{ secrets.SUPERJOB_API_KEY }}
@@ -37,10 +37,14 @@ jobs:
       REMOTE_JOB_EMAIL: ${{ secrets.REMOTE_JOB_EMAIL || secrets.SMTP_USER }}
       REMOTE_JOB_PHONE: ${{ secrets.REMOTE_JOB_PHONE }}
       HH_STORAGE_STATE_JSON: ${{ secrets.HH_STORAGE_STATE_JSON }}
-      DAILY_JOB_LIMIT: "0"
-      DAILY_FREELANCE_LIMIT: "0"
-      HOURLY_JOB_LIMIT: "0"
-      HOURLY_FREELANCE_LIMIT: "0"
+      # First diagnostic run: prepare application drafts without submitting.
+      DRY_RUN: "1"
+      DAILY_TOTAL_LIMIT: "5"
+      HOURLY_TOTAL_LIMIT: "2"
+      DAILY_JOB_LIMIT: "5"
+      DAILY_FREELANCE_LIMIT: "5"
+      HOURLY_JOB_LIMIT: "2"
+      HOURLY_FREELANCE_LIMIT: "2"
       HUNTER_DB: hunter.db
       PYTHONPATH: .
     steps:
