@@ -12,7 +12,7 @@ concurrency:
 jobs:
   hunt:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       RESUME_TEXT: ${{ secrets.RESUME_TEXT }}
       SUPERJOB_API_KEY: ${{ secrets.SUPERJOB_API_KEY }}

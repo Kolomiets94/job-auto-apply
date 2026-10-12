@@ -3,13 +3,17 @@
 This reader never sends candidate data or submits a form.
 """
 import re
+import time
 from html.parser import HTMLParser
 from urllib.parse import urlsplit
 from urllib.request import Request, build_opener, HTTPRedirectHandler
 from urllib.error import HTTPError, URLError
 
-# Avoid hammering an aggregator after it explicitly rate-limits this run.
+# Space requests out and stop after a bounded 429 retry sequence.
 _GORODRABOT_RATE_LIMITED = False
+_LAST_REQUEST_AT = None
+_RETRY_DELAYS = (60, 120, 240)
+_MIN_INTERVAL_SECONDS = 5
 
 
 def is_gorodrabot_advert(url):
@@ -74,7 +78,7 @@ def direct_hh_origin(lead):
         value = lead.get(key)
         if not isinstance(value, str):
             continue
-        for match in re.finditer(r"https://(?:[a-z0-9-]+\\.)?hh\\.ru/vacancy/(\\d+)(?!\\d)", value, re.I):
+        for match in re.finditer(r"https://(?:[a-z0-9-]+\.)?hh\.ru/vacancy/(\d+)(?!\d)", value, re.I):
             ids.add(match.group(1))
     return "https://hh.ru/vacancy/" + next(iter(ids)) if len(ids) == 1 else None
 
@@ -91,29 +95,48 @@ def apply_origin(lead, proposal, hh_apply):
     return {**hh_apply(original_lead, proposal), 'origin_url': origin}
 
 
+def _paced_open(request):
+    """At most one origin request every five seconds in this worker."""
+    global _LAST_REQUEST_AT
+    now = time.monotonic()
+    if _LAST_REQUEST_AT is not None:
+        remaining = _MIN_INTERVAL_SECONDS - (now - _LAST_REQUEST_AT)
+        if remaining > 0:
+            time.sleep(remaining)
+    _LAST_REQUEST_AT = time.monotonic()
+    try:
+        return build_opener(_NoRedirect).open(request, timeout=20)
+    except HTTPError as exc:
+        return exc
+
+
 def resolve_gorodrabot(url):
     global _GORODRABOT_RATE_LIMITED
     if not is_gorodrabot_advert(url):
         return {'status': 'SKIPPED', 'reason': 'unsupported_aggregator_url'}
     if _GORODRABOT_RATE_LIMITED:
-        return {'status': 'NEEDS_CONFIRMATION', 'reason': 'aggregator_rate_limited', 'detail': 'HTTP 429 earlier in this run'}
+        return {'status': 'NEEDS_CONFIRMATION', 'reason': 'aggregator_rate_limited',
+                'detail': 'HTTP 429 after bounded retries earlier in this run'}
     request = Request(url, headers={'User-Agent': 'Mozilla/5.0', 'Accept': 'text/html'})
-    try:
-        response = build_opener(_NoRedirect).open(request, timeout=20)
-    except HTTPError as exc:
-        response = exc
-    except (URLError, TimeoutError, OSError):
-        return {'status': 'NEEDS_CONFIRMATION', 'reason': 'aggregator_network_error'}
-    with response:
-        if response.status == 429:
-            _GORODRABOT_RATE_LIMITED = True
-            return {'status': 'NEEDS_CONFIRMATION', 'reason': 'aggregator_rate_limited', 'detail': 'HTTP 429'}
-        data = response.read(2 * 1024 * 1024 + 1)
-        if len(data) > 2 * 1024 * 1024:
-            return {'status': 'NEEDS_CONFIRMATION', 'reason': 'aggregator_page_too_large'}
-        encoding = response.headers.get_content_charset() or 'utf-8'
+    for attempt in range(len(_RETRY_DELAYS) + 1):
         try:
-            html = data.decode(encoding, errors='replace')
-        except LookupError:
-            html = data.decode('utf-8', errors='replace')
-        return parse_origin(html, response.status)
+            response = _paced_open(request)
+        except (URLError, TimeoutError, OSError):
+            return {'status': 'NEEDS_CONFIRMATION', 'reason': 'aggregator_network_error'}
+        with response:
+            if response.status == 429:
+                if attempt < len(_RETRY_DELAYS):
+                    time.sleep(_RETRY_DELAYS[attempt])
+                    continue
+                _GORODRABOT_RATE_LIMITED = True
+                return {'status': 'NEEDS_CONFIRMATION', 'reason': 'aggregator_rate_limited',
+                        'detail': 'HTTP 429 after 4 spaced attempts'}
+            data = response.read(2 * 1024 * 1024 + 1)
+            if len(data) > 2 * 1024 * 1024:
+                return {'status': 'NEEDS_CONFIRMATION', 'reason': 'aggregator_page_too_large'}
+            encoding = response.headers.get_content_charset() or 'utf-8'
+            try:
+                html = data.decode(encoding, errors='replace')
+            except LookupError:
+                html = data.decode('utf-8', errors='replace')
+            return parse_origin(html, response.status)

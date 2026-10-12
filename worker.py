@@ -32,6 +32,7 @@ def load_resume_text():
 
 
 COLLECTION_ERRORS = []
+COLLECTION_RAW_COUNT = 0
 
 
 def _lead_key(lead):
@@ -56,7 +57,9 @@ def record_collection_error(source, exc):
 
 
 def collect_all():
+    global COLLECTION_RAW_COUNT
     COLLECTION_ERRORS.clear()
+    COLLECTION_RAW_COUNT = 0
     leads = []
     for tag, query in QUERIES:
         try:
@@ -90,6 +93,7 @@ def collect_all():
             except Exception as exc:
                 record_collection_error(source, exc)
 
+    COLLECTION_RAW_COUNT = len(leads)
     seen = set()
     unique = []
     for lead in leads:
@@ -182,7 +186,15 @@ def _limit_label(value):
     return str(value) if value is not None else "без лимита"
 
 
+def _uses_browser(lead):
+    if lead.get('apply_email') or str(lead.get('apply_url') or '').startswith('mailto:'):
+        return False
+    return str(lead.get('source') or '').lower() in ('hh', 'remote_job_ru') or str(lead.get('apply_url') or '').startswith('https://')
+
+
 def run():
+    global COLLECTION_RAW_COUNT
+    COLLECTION_RAW_COUNT = 0
     try:
         started = send_message("Job Auto Apply: поиск вакансий и заказов запущен.")
     except Exception as exc:
@@ -249,6 +261,9 @@ def run():
         "collection_errors": list(COLLECTION_ERRORS),
         "resume_configured": bool(load_resume_text()),
         "found": len(leads),
+        "raw_found": COLLECTION_RAW_COUNT or len(fresh),
+        "fresh_unique": len(fresh),
+        "unique_checked": len(candidates),
         "fresh_found": len(fresh),
         "backlog_rechecked": len(candidates),
         "descriptions_enriched": sum(bool(lead.get("enriched")) for lead in enriched),
@@ -265,9 +280,13 @@ def run():
         "duplicate_skipped": 0,
         "daily_limit_skipped": 0,
         "hourly_limit_skipped": 0,
+        "browser_challenge_paused": 0,
     }
     results = []
     notifications = []
+    consecutive_browser_challenges = 0
+    challenge_reasons = {'remote_job_turnstile_required', 'security_challenge',
+                         'aggregator_security_challenge'}
 
     for lead in ranked:
         freelance = is_freelance(lead)
@@ -321,6 +340,16 @@ def run():
             })
             continue
 
+        if consecutive_browser_challenges >= 2 and _uses_browser(lead):
+            stats["browser_challenge_paused"] += 1
+            stats["skipped"] += 1
+            results.append({
+                "id": lid, "title": lead.get("title"),
+                "source": lead.get("source"), "url": lead.get("url"),
+                "status": "SKIPPED", "reason": "browser_challenge_pause",
+            })
+            continue
+
         if should_notify(lead):
             notifications.append({
                 "title": lead.get("title"),
@@ -335,6 +364,11 @@ def run():
             proposal = make_proposal(lead)
             result = dispatch(lead, proposal)
             state = result["status"]
+            if _uses_browser(lead):
+                consecutive_browser_challenges = (
+                    consecutive_browser_challenges + 1
+                    if result.get("reason") in challenge_reasons else 0
+                )
             set_state(lid, state)
 
             if state == "SUBMITTED":
@@ -415,7 +449,18 @@ def run():
             freelance_review_delivery = {"status": "FAILED", "reason": type(exc).__name__}
 
     # Alert about blocked applications with the direct destination URL.
-    blocked = [item for item in results if item.get("status") in ("NEEDS_HUMAN", "NEEDS_CONFIRMATION")]
+    budget_review = [item for item in results if item.get("reason") == "bid_price_missing_or_invalid"]
+    if budget_review:
+        lines = ["Уточнить бюджет: ставки НЕ отправлены:"]
+        for item in budget_review:
+            lines.append(f"- {str(item.get('title') or 'Проект')[:90]}\n{item.get('url') or ''}")
+        try:
+            send_message("\n".join(lines))
+        except Exception as exc:
+            print(f"[telegram] budget review notification: {type(exc).__name__}", flush=True)
+
+    blocked = [item for item in results if item.get("status") in ("NEEDS_HUMAN", "NEEDS_CONFIRMATION")
+               and item.get("reason") != "bid_price_missing_or_invalid"]
     if blocked:
         lines = ["Требуется действие: отклики НЕ отправлены:", "При Turnstile открой ссылку, пройди проверку и отправь отклик на сайте. При HTTP 429 не обновляй страницу многократно: сайт ограничивает запросы."]
         for item in blocked[:10]:
@@ -430,6 +475,12 @@ def run():
             print(f"[telegram] blocked notification: {type(exc).__name__}", flush=True)
 
     deliveries = deliver_notifications(notifications)
+    stats["captcha_count"] = sum(item.get("reason") in challenge_reasons for item in results)
+    stats["rate_limited_count"] = sum(item.get("reason") == "aggregator_rate_limited" for item in results)
+    stats["missing_bid_price_count"] = len(budget_review)
+    stats["duplicates_skipped"] = stats["duplicate_skipped"] + sum(
+        item.get("reason") == "already_applied_on_hh" for item in results
+    )
     stats["notifications"] = len(notifications)
     stats["notifications_sent"] = sum(
         1 for item in deliveries if item.get("status") == "SENT"
@@ -471,6 +522,10 @@ def run():
         f"Run: {os.getenv('GITHUB_SERVER_URL', 'https://github.com')}/{os.getenv('GITHUB_REPOSITORY', 'unknown')}/actions/runs/{os.getenv('GITHUB_RUN_ID', 'unknown')}\n"
         f"Workflow: {os.getenv('GITHUB_WORKFLOW', 'unknown')} | Ref: {os.getenv('GITHUB_REF_NAME', 'unknown')} | SHA: {os.getenv('GITHUB_SHA', 'unknown')[:12]}\n"
         f"Found: {stats['found']}\n"
+        f"Raw discovered: {stats['raw_found']}\n"
+        f"Fresh unique: {stats['fresh_unique']}\n"
+        f"Unique checked: {stats['unique_checked']}\n"
+        f"After filters: {stats['ranked']}\n"
         f"Fresh found: {stats['fresh_found']}\n"
         f"Fresh + saved leads checked: {stats['backlog_rechecked']}\n"
         f"Full descriptions read: {stats['descriptions_enriched']}\n"
@@ -495,6 +550,11 @@ def run():
         f"Needs human: {stats['needs_human']}\n"
         f"Shortlisted (not sent): {stats['shortlisted']}\n"
         f"Needs confirmation: {stats['needs_confirmation']}\n"
+        f"Captcha blockers: {stats['captcha_count']}\n"
+        f"Rate-limited leads (429): {stats['rate_limited_count']}\n"
+        f"Duplicates skipped: {stats['duplicates_skipped']}\n"
+        f"No bid price: {stats['missing_bid_price_count']}\n"
+        f"Browser paused after two challenges: {stats['browser_challenge_paused']}\n"
         f"Telegram vacancy alerts sent: {stats['notifications_sent']}\n"
         f"Jobs submitted today: {stats['jobs_submitted_today']}/{_limit_label(stats['daily_job_limit'])}\n"
         f"Freelance submitted today: {stats['freelance_submitted_today']}/{_limit_label(stats['daily_freelance_limit'])}\n\n"

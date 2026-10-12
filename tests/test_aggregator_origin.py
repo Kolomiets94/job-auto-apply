@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch
-from aggregator_origin import parse_origin, is_gorodrabot_advert, resolve_gorodrabot, apply_origin
+import aggregator_origin
+from aggregator_origin import parse_origin, is_gorodrabot_advert, resolve_gorodrabot, apply_origin, direct_hh_origin
 
 
 class OriginTests(unittest.TestCase):
@@ -41,6 +42,45 @@ class OriginTests(unittest.TestCase):
     def test_rejects_untrusted_links(self):
         html = '<a href="https://hh.ru.evil.test/vacancy/123">A</a><a href="https://user@hh.ru/vacancy/123">B</a>'
         self.assertEqual(parse_origin(html)['reason'], 'aggregator_origin_not_found')
+
+    def test_explicit_hh_origin_needs_unique_vacancy_id(self):
+        self.assertEqual(direct_hh_origin({'description': 'https://hh.ru/vacancy/123?from=remote'}),
+                         'https://hh.ru/vacancy/123')
+        self.assertIsNone(direct_hh_origin({'description': 'https://hh.ru/vacancy/123 https://hh.ru/vacancy/124'}))
+
+    def test_rate_limit_retries_with_bound_and_stops_other_adverts(self):
+        from unittest.mock import Mock
+        response = Mock()
+        response.status = 429
+        response.__enter__ = Mock(return_value=response)
+        response.__exit__ = Mock(return_value=None)
+        with patch.object(aggregator_origin, '_GORODRABOT_RATE_LIMITED', False), \
+             patch.object(aggregator_origin, '_paced_open', return_value=response) as open_request, \
+             patch('aggregator_origin.time.sleep') as sleep:
+            result = resolve_gorodrabot('https://gorodrabot.ru/advert/123/job')
+            again = resolve_gorodrabot('https://gorodrabot.ru/advert/124/job')
+        self.assertEqual(result['reason'], 'aggregator_rate_limited')
+        self.assertEqual(again['reason'], 'aggregator_rate_limited')
+        self.assertEqual(open_request.call_count, 4)
+        self.assertEqual([x.args[0] for x in sleep.call_args_list], [60, 120, 240])
+
+    def test_second_origin_request_waits_for_five_second_spacing(self):
+        from unittest.mock import Mock
+        reply = Mock(status=200)
+        reply.read.return_value = b'<a href="https://hh.ru/vacancy/123">Apply</a>'
+        reply.headers.get_content_charset.return_value = 'utf-8'
+        reply.__enter__ = Mock(return_value=reply)
+        reply.__exit__ = Mock(return_value=None)
+        opener = Mock()
+        opener.open.return_value = reply
+        with patch.object(aggregator_origin, '_GORODRABOT_RATE_LIMITED', False), \
+             patch.object(aggregator_origin, '_LAST_REQUEST_AT', None), \
+             patch('aggregator_origin.build_opener', return_value=opener), \
+             patch('aggregator_origin.time.monotonic', side_effect=[0, 0, 1, 5]) as monotonic, \
+             patch('aggregator_origin.time.sleep') as sleep:
+            self.assertIn('origin_url', resolve_gorodrabot('https://gorodrabot.ru/advert/123/job'))
+            self.assertIn('origin_url', resolve_gorodrabot('https://gorodrabot.ru/advert/124/job'))
+        sleep.assert_called_once_with(4)
 
     def test_invalid_origin_is_never_requested(self):
         with patch('aggregator_origin.build_opener') as opener:

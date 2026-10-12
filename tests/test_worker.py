@@ -98,3 +98,38 @@ def test_role_priority_is_preserved_over_channel_priority():
         "Junior React Developer", "Junior Frontend Developer",
         "Junior HTML CSS верстальщик", "Junior QA Engineer",
     ]
+
+
+def test_two_challenges_pause_browser_but_allow_email(monkeypatch):
+    leads = [
+        {"source": "remote_job_ru", "category": "frontend", "title": f"Junior React {i}",
+         "url": f"https://remote-job.ru/vacancy/show/{i}/react"} for i in (1, 2, 3)
+    ]
+    leads.append({"source": "jobicy", "category": "frontend", "title": "Junior React email",
+                  "url": "https://jobicy.com/jobs/4", "apply_email": "jobs@example.com"})
+    monkeypatch.setattr(worker, "JOB_COLLECTORS", ())
+    monkeypatch.setattr("lead_enrichment.enrich_lead", lambda lead: lead)
+    with patch.object(worker, "collect_all", return_value=leads), \
+         patch.object(worker, "queued_leads", return_value=[]), \
+         patch.object(worker, "enqueue", side_effect=lambda lead: lead["url"]), \
+         patch.object(worker, "rank_leads", return_value=leads), \
+         patch.object(worker, "apply_resume_matching", side_effect=lambda items: items), \
+         patch.object(worker, "was_submitted", return_value=False), \
+         patch.object(worker, "submitted_today", return_value=0), \
+         patch.object(worker, "set_state"), \
+         patch.object(worker, "send_message", return_value={"status": "SENT"}), \
+         patch.object(worker, "should_notify", return_value=False), \
+         patch.object(worker, "dispatch", side_effect=[
+             {"status": "NEEDS_HUMAN", "reason": "remote_job_turnstile_required"},
+             {"status": "NEEDS_HUMAN", "reason": "remote_job_turnstile_required"},
+             {"status": "SUBMITTED", "reason": "email_sent"},
+         ]) as dispatch:
+        report = worker.run()
+    assert dispatch.call_count == 3
+    assert [item["reason"] for item in report["results"]] == [
+        "remote_job_turnstile_required", "remote_job_turnstile_required",
+        "browser_challenge_pause", "email_sent",
+    ]
+    assert report["stats"]["captcha_count"] == 2
+    assert report["stats"]["browser_challenge_paused"] == 1
+    assert report["stats"]["submitted"] == 1
