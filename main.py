@@ -8,10 +8,15 @@ QUERIES=[
     ("frontend","junior frontend"),
     ("frontend","junior React"),
     ("frontend","junior фронтенд"),
+    ("frontend","junior JavaScript"),
+    ("frontend","младший frontend"),
     ("layout","junior верстальщик"),
     ("layout","junior HTML CSS"),
+    ("layout","младший верстальщик"),
+    ("layout","junior HTML"),
     ("qa","junior QA tester"),
     ("qa","manual QA junior"),
+    ("qa","junior тестировщик"),
 ]
 EXCLUDE=("стажер","стажировка","internship","trainee","full stack","fullstack","full-stack","vue","angular","react native","react-native","flutter","middle","senior","lead","head of","manager","director")
 UA={"User-Agent":"JobFreelanceHunter/1.1"}
@@ -45,7 +50,12 @@ def salary_ok(v):
 
 def ok(v):
     text=((v.get("name") or "")+" "+" ".join(str(x or "") for x in (v.get("snippet") or {}).values())).lower()
-    if any(x in text for x in EXCLUDE): return False
+    title = (v.get("name") or "").lower()
+    level_terms = ("middle", "senior", "lead", "head of", "manager", "director")
+    # Team descriptions may mention senior colleagues or a team lead.
+    # The target vacancy's title determines its advertised seniority.
+    if any(x in title for x in level_terms): return False
+    if any(x in text for x in EXCLUDE if x not in level_terms): return False
     if not salary_ok(v): return False
     # The candidate also accepts hybrid and office roles; location is checked
     # against the vacancy before a human approves any draft.
