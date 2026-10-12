@@ -73,7 +73,7 @@ def test_full_jobs_bucket_does_not_block_freelance(monkeypatch):
     monkeypatch.setenv("SMTP_PASSWORD", "test")
     with patch.object(worker, "collect_all", return_value=[job, freelance]), \
          patch.object(worker, "rank_leads", return_value=[job, freelance]), \
-         patch.object(worker, "enqueue", side_effect=["job-1", "freelance-1"]), \
+         patch.object(worker, "enqueue", side_effect=lambda lead: "freelance-1" if lead["source"] == "habr_freelance" else "job-1"), \
          patch.object(worker, "was_submitted", return_value=False), \
          patch.object(worker, "submitted_today", side_effect=[10, 0]), \
          patch.object(worker, "set_state"), \
@@ -106,7 +106,7 @@ def test_zero_limits_do_not_cap_hourly_or_daily_submissions(monkeypatch):
     leads = [_lead(f"https://hh.ru/vacancy/{i}") for i in range(20, 25)]
     with patch.object(worker, "collect_all", return_value=leads), \
          patch.object(worker, "rank_leads", return_value=leads), \
-         patch.object(worker, "enqueue", side_effect=[f"job-{i}" for i in range(5)]), \
+         patch.object(worker, "enqueue", side_effect=lambda lead: "job-" + lead["url"].rsplit("/", 1)[-1]), \
          patch.object(worker, "was_submitted", return_value=False), \
          patch.object(worker, "submitted_today", side_effect=[20, 0]), \
          patch.object(worker, "set_state"), \
