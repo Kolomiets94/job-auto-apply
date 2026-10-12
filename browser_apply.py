@@ -275,6 +275,20 @@ def _verify_response_sent(page, vacancy_url):
     ))
 
 
+def _hh_live_filter(page, lead):
+    """Recheck live requirements and experience before opening an application."""
+    from profit_ranker import rank_lead
+    live_lead = {**lead, "source": "hh"}
+    for key, selector in (
+        ("experience", '[data-qa="vacancy-experience"]'),
+        ("description", '[data-qa="vacancy-description"]'),
+    ):
+        field = page.locator(selector).first
+        if _visible(field):
+            live_lead[key] = field.inner_text(timeout=5000)
+    return rank_lead(live_lead)
+
+
 def apply_hh(lead: Dict, proposal: str, storage_state=None) -> Dict[str, str]:
     raw_url = str(lead.get("url") or "")
     if not raw_url:
@@ -302,6 +316,11 @@ def apply_hh(lead: Dict, proposal: str, storage_state=None) -> Dict[str, str]:
 
             if _verify_response_sent(page, vacancy_url):
                 return {"status": "SKIPPED", "reason": "already_applied_on_hh"}
+
+            suitability = _hh_live_filter(page, lead)
+            if not suitability["eligible"]:
+                return {"status": "SKIPPED", "reason": "vacancy_outside_filters",
+                        "detail": suitability["rank_reason"]}
 
             respond = page.locator(
                 '[data-qa="vacancy-response-link-top"], [data-qa="vacancy-response-link-bottom"]'

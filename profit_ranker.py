@@ -174,7 +174,7 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
         one_year = bool(re.search(r"(?:от|from|at least)\s*1\s*(?:год|года|year)|\b1\s*\+?\s*(?:год|года|year)", experience))
         if not is_entry_level(title) and not one_year:
             return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "not Junior or explicitly from one year"}
-        if re.search(r"(?:от|from|at least)\s*[2-9]\s*(?:год|года|лет|year)", experience):
+        if re.search(r"(?:от|from|at least)\s*[2-9]\s*(?:год|года|лет|year)|\b[2-9]\s*(?:[–—-]\s*\d+\s*)?(?:год|года|лет|years?)", experience):
             return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "experience above one year"}
         if re.search(r"junior\s*\+|junior\s+plus|джун(?:иор)?\s*\+", title):
             return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "Junior+ excluded"}

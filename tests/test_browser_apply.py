@@ -118,3 +118,33 @@ def test_unreadable_choice_question_has_nonempty_diagnostic():
         ok, unanswered = browser_apply._answer_known_questions(page, "qa")
     assert not ok
     assert unanswered == ["choice_question_text_unavailable"]
+
+
+def test_hh_live_experience_overrides_search_card():
+    from unittest.mock import Mock, patch
+    page = Mock()
+    experience = Mock()
+    experience.inner_text.return_value = "3–6 лет"
+    description = Mock()
+    description.inner_text.return_value = "Manual QA Linux"
+    page.locator.side_effect = lambda selector: Mock(first=experience if selector == '[data-qa="vacancy-experience"]' else description)
+    with patch.object(browser_apply, "_visible", return_value=True):
+        result = browser_apply._hh_live_filter(page, {"source": "hh", "title": "Junior QA Engineer",
+                                                     "experience": "", "description": "QA"})
+    assert not result["eligible"]
+    assert result["rank_reason"] == "experience above one year"
+
+
+def test_hh_live_requirements_override_search_snippet():
+    from unittest.mock import Mock, patch
+    page = Mock()
+    experience = Mock()
+    experience.inner_text.return_value = "Нет опыта"
+    description = Mock()
+    description.inner_text.return_value = "Manual QA. SQL required."
+    page.locator.side_effect = lambda selector: Mock(first=experience if selector == '[data-qa="vacancy-experience"]' else description)
+    with patch.object(browser_apply, "_visible", return_value=True):
+        result = browser_apply._hh_live_filter(page, {"source": "hh", "title": "Junior QA Engineer",
+                                                     "description": "QA"})
+    assert not result["eligible"]
+    assert result["rank_reason"] == "SQL outside confirmed stack"

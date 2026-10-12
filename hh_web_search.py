@@ -62,8 +62,10 @@ def search_hh_web(category, query):
                 # Candidate accepts on-site/hybrid work in Moscow and St Petersburg.
                 if not card.get("remote") and card.get("location") not in ("Москва", "Санкт-Петербург"):
                     continue
+                experience = re.search(r"\b[1-9]\s*[–—-]\s*[1-9]\s*(?:лет|год[а]?)|(?:от|from)\s*\d+\s*(?:лет|год[а]?|years?)", card.get("description", ""), re.I)
                 results.append({
                     **card, "source": "hh", "category": category,
+                    "experience": experience.group(0) if experience else "",
                     "collection_method": "hh_web",
                 })
             return results

@@ -47,3 +47,12 @@ def test_junior_web_developer_in_moscow_is_frontend():
     assert result["eligible"]
     assert result["category"] == "frontend"
 
+
+
+def test_junior_title_does_not_override_experience_range():
+    base = {"source": "hh", "title": "Junior QA Engineer", "description": "Manual QA"}
+    for experience in ("3–6 лет", "3-6 лет", "2 года", "от 3 лет", "3 years"):
+        result = rank_lead({**base, "experience": experience})
+        assert not result["eligible"], experience
+        assert result["rank_reason"] == "experience above one year"
+    assert rank_lead({**base, "experience": "1–3 года"})["eligible"]
