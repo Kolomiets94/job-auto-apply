@@ -8,6 +8,9 @@ from urllib.parse import urlsplit
 from urllib.request import Request, build_opener, HTTPRedirectHandler
 from urllib.error import HTTPError, URLError
 
+# Avoid hammering an aggregator after it explicitly rate-limits this run.
+_GORODRABOT_RATE_LIMITED = False
+
 
 def is_gorodrabot_advert(url):
     try:
@@ -76,8 +79,11 @@ def apply_origin(lead, proposal, hh_apply):
 
 
 def resolve_gorodrabot(url):
+    global _GORODRABOT_RATE_LIMITED
     if not is_gorodrabot_advert(url):
         return {'status': 'SKIPPED', 'reason': 'unsupported_aggregator_url'}
+    if _GORODRABOT_RATE_LIMITED:
+        return {'status': 'NEEDS_CONFIRMATION', 'reason': 'aggregator_rate_limited', 'detail': 'HTTP 429 earlier in this run'}
     request = Request(url, headers={'User-Agent': 'Mozilla/5.0', 'Accept': 'text/html'})
     try:
         response = build_opener(_NoRedirect).open(request, timeout=20)
@@ -86,6 +92,9 @@ def resolve_gorodrabot(url):
     except (URLError, TimeoutError, OSError):
         return {'status': 'NEEDS_CONFIRMATION', 'reason': 'aggregator_network_error'}
     with response:
+        if response.status == 429:
+            _GORODRABOT_RATE_LIMITED = True
+            return {'status': 'NEEDS_CONFIRMATION', 'reason': 'aggregator_rate_limited', 'detail': 'HTTP 429'}
         data = response.read(2 * 1024 * 1024 + 1)
         if len(data) > 2 * 1024 * 1024:
             return {'status': 'NEEDS_CONFIRMATION', 'reason': 'aggregator_page_too_large'}
