@@ -21,11 +21,11 @@ def make_proposal(lead):
         name, url = PROJECTS["travel"]
         if english:
             return (f"Hello! I'm applying for {title}. "
-                    "I have manually tested my own React web applications, including form validation, navigation, and API error handling. "
+                    "I have manually tested my own React web applications, including form validation and navigation. "
                     f"One project is {name}: {url}. "
                     "I would be glad to discuss my testing approach and learn your QA process.")
         return (f"Здравствуйте! Откликаюсь на вакансию «{title}». "
-                "Проводил ручное тестирование собственных веб-приложений на React: проверял формы, навигацию и обработку ошибок API. "
+                "Проводил ручное тестирование собственных веб-приложений на React: проверял формы и навигацию. "
                 f"Пример проекта — {name}: {url}. "
                 "Готов рассказать о проверках и освоить процессы тестирования вашей команды.")
 
