@@ -187,7 +187,7 @@ def _known_question_answer(question, category):
 def _employer_question_text(field):
     """Read the surrounding question rather than just the input placeholder."""
     try:
-        for level in (2, 3, 4, 5):
+        for level in (1, 2, 3, 4, 5):
             parent = field.locator(f"xpath=ancestor::*[self::div or self::fieldset][{level}]")
             if not parent.count():
                 continue
@@ -225,12 +225,8 @@ def _answer_known_questions(page, category):
     for i in range(choice_controls.count()):
         control = choice_controls.nth(i)
         if _visible(control):
-            try:
-                container = control.locator("xpath=ancestor::*[self::div or self::fieldset][1]")
-                question = container.inner_text(timeout=1000) if container.count() else "choice_question"
-            except Exception:
-                question = "choice_question"
-            normalized = _norm(question)[:180]
+            question = _employer_question_text(control)
+            normalized = _norm(question)[:180] or "choice_question_text_unavailable"
             if normalized not in unanswered:
                 unanswered.append(normalized)
 

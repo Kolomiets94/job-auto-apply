@@ -89,3 +89,32 @@ def test_hh_gamedev_motivation_authorized_by_candidate():
     assert answer and "своих веб-приложений" in answer
     assert browser_apply._known_question_answer("Какой у вас коммерческий опыт в геймдеве?", "qa").startswith("Коммерческого опыта пока нет.")
     assert browser_apply._known_question_answer("Почему вы хотите работать в геймдеве?", "frontend") is None
+
+
+def test_choice_question_reads_outer_container_when_nearest_is_empty():
+    from unittest.mock import Mock
+    control = Mock()
+    empty = Mock()
+    empty.count.return_value = 1
+    empty.inner_text.return_value = ""
+    outer = Mock()
+    outer.count.return_value = 1
+    outer.inner_text.return_value = "Готовы ли вы работать с оборудованием в офисе?"
+    control.locator.side_effect = lambda selector: empty if selector.endswith("[1]") else outer
+    assert browser_apply._employer_question_text(control) == "готовы ли вы работать с оборудованием в офисе?"
+
+
+def test_unreadable_choice_question_has_nonempty_diagnostic():
+    from unittest.mock import Mock, patch
+    page = Mock()
+    fields = Mock()
+    fields.count.return_value = 0
+    choices = Mock()
+    choices.count.return_value = 1
+    page.locator.side_effect = [fields, choices]
+    with patch.object(browser_apply, "_visible", return_value=True), patch.object(
+        browser_apply, "_employer_question_text", return_value=""
+    ):
+        ok, unanswered = browser_apply._answer_known_questions(page, "qa")
+    assert not ok
+    assert unanswered == ["choice_question_text_unavailable"]
