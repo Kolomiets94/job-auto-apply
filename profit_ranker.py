@@ -170,11 +170,11 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
             return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "non-target job title"}
         if not any(x in title for x in TARGET_TITLE_TERMS) and not re.search(r"\bqa\b|\btester\b", title):
             return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "job title outside target roles"}
-        experience = str(lead.get("experience") or "").lower()
+        experience = re.sub(r"\s*([–—-])\s*", r"\1", str(lead.get("experience") or "").lower())
         one_year = bool(re.search(r"(?:от|from|at least)\s*1\s*(?:год|года|year)|\b1\s*\+?\s*(?:год|года|year)", experience))
         if not is_entry_level(title) and not one_year:
             return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "not Junior or explicitly from one year"}
-        if re.search(r"(?:от|from|at least)\s*[2-9]\s*(?:год|года|лет|year)|\b[2-9]\s*(?:[–—-]\s*\d+\s*)?(?:год|года|лет|years?)", experience):
+        if re.search(r"(?:от|from|at least)\s*[2-9]\s*(?:год|года|лет|year)|(?<![\d–—-])\b[2-9]\s*(?:[–—-]\s*\d+\s*)?(?:год|года|лет|years?)", experience):
             return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "experience above one year"}
         if re.search(r"junior\s*\+|junior\s+plus|джун(?:иор)?\s*\+", title):
             return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "Junior+ excluded"}
