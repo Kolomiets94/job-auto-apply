@@ -2,6 +2,7 @@ import re, json, hashlib, os
 from datetime import datetime, timezone
 import requests
 from freelance_sources import collect_freelance
+from entry_level import is_placement, placement_is_paid
 
 HH_API="https://api.hh.ru/vacancies"
 QUERIES=[
@@ -17,16 +18,28 @@ QUERIES=[
     ("qa","junior QA tester"),
     ("qa","manual QA junior"),
     ("qa","junior тестировщик"),
+    ("frontend","стажер frontend"),
+    ("frontend","frontend intern"),
+    ("frontend","практикант React"),
+    ("layout","стажер верстальщик"),
+    ("layout","HTML CSS intern"),
+    ("layout","практикант верстальщик"),
+    ("qa","стажер тестировщик"),
+    ("qa","QA intern"),
+    ("qa","практикант тестировщик"),
 ]
-EXCLUDE=("стажер","стажировка","internship","trainee","full stack","fullstack","full-stack","vue","angular","react native","react-native","flutter","middle","senior","lead","head of","manager","director")
+EXCLUDE=("full stack","fullstack","full-stack","vue","angular","react native","react-native","flutter","middle","senior","lead","head of","manager","director")
 UA={"User-Agent":"JobFreelanceHunter/1.1"}
 
 
 def salary_ok(v):
     """Keep hh.ru vacancies paying at least the configured RUB floor when salary is explicit.
 
-    Vacancies without salary remain eligible because many employers omit compensation.
+    Regular vacancies without salary remain eligible. Placements require confirmed
+    payment and may pay below the regular-job salary floor.
     """
+    if is_placement(v.get("name")):
+        return placement_is_paid({**v, "title": v.get("name"), "description": " ".join(str(x or "") for x in (v.get("snippet") or {}).values())})
     salary = v.get("salary")
     if not salary:
         return True
@@ -105,3 +118,4 @@ def collect():
 
 
 if __name__=="__main__":print(json.dumps(collect(),ensure_ascii=False,indent=2))
+

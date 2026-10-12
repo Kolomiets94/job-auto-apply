@@ -13,7 +13,7 @@ class JuniorDescriptionTests(unittest.TestCase):
             self.assertFalse(main.ok({'name': title}))
 
     def test_other_exclusions_remain(self):
-        for title in ('Junior Full-Stack Developer', 'Junior React Native Developer', 'Trainee React Developer'):
+        for title in ('Junior Full-Stack Developer', 'Junior React Native Developer'):
             self.assertFalse(main.ok({'name': title}))
 
     def test_salary_floor_remains(self):
@@ -22,3 +22,4 @@ class JuniorDescriptionTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+

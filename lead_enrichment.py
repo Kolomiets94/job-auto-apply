@@ -4,6 +4,7 @@ from html.parser import HTMLParser
 from urllib.parse import urlsplit, urljoin
 import requests
 from application_links import application_link
+from entry_level import is_entry_level
 
 SOURCE_HOSTS = {
     'jobicy': {'jobicy.com'}, 'remotive': {'remotive.com'},
@@ -35,8 +36,7 @@ class _Text(HTMLParser):
 def needs_enrichment(lead):
     source = str(lead.get('source') or '').lower()
     title = str(lead.get('title') or '')
-    junior = re.search(r'\bjunior\b|\bjr\b|джун|младш', title, re.I)
-    return (source in SOURCE_HOSTS and bool(junior) and
+    return (source in SOURCE_HOSTS and is_entry_level(title) and
             (len(str(lead.get('description') or '')) < 300 or
              not (lead.get('apply_url') or lead.get('apply_email'))))
 
@@ -83,3 +83,4 @@ def enrich_lead(lead):
         return {**lead, 'enrichment_error': 'too_many_source_redirects'}
     except (requests.RequestException, ValueError):
         return {**lead, 'enrichment_error': 'source_read_failed'}
+

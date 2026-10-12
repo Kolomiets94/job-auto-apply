@@ -3,13 +3,14 @@ import re
 from urllib.parse import urlencode
 from playwright.sync_api import sync_playwright
 from browser_apply import _storage_state, _looks_like_challenge
+from entry_level import is_entry_level
 
 JUNIOR = re.compile(r"(?<![a-z])(?:junior|джуниор|джун|младший|младшая)(?![a-zа-я])", re.I)
-EXCLUDED = re.compile(r"full[ -]?stack|фул[ -]?ст[еэ]к|middle|senior|lead|trainee|intern|стаж[её]р|стажиров|junior\s*\+|junior\s+plus", re.I)
+EXCLUDED = re.compile(r"full[ -]?stack|фул[ -]?ст[еэ]к|middle|senior|lead|junior\s*\+|junior\s+plus", re.I)
 
 
 def title_matches_category(title, category):
-    if not JUNIOR.search(title) or EXCLUDED.search(title):
+    if not is_entry_level(title) or EXCLUDED.search(title):
         return False
     if category != "qa" and re.search(r"\bqa\b|tester|тестиров|quality assurance|автотест", title, re.I):
         return False
@@ -68,3 +69,4 @@ def search_hh_web(category, query):
             return results
         finally:
             browser.close()
+

@@ -106,7 +106,8 @@ def weworkremotely():
 
 def trudvsem():
     out = []
-    for query in ('junior frontend', 'верстальщик', 'junior тестировщик'):
+    for query in ('junior frontend', 'верстальщик', 'junior тестировщик',
+                  'стажер frontend', 'практикант верстальщик', 'стажер тестировщик'):
         data = response('https://opendata.trudvsem.ru/api/v1/vacancies', text=query, limit=100, offset=0).json()
         for wrapper in (data.get('results') or {}).get('vacancies', []):
             v = wrapper.get('vacancy', wrapper)
@@ -195,7 +196,9 @@ def zarplata():
 def remote_job_ru():
     out = []
     seen = set()
-    for query in ('junior frontend', 'junior react', 'верстальщик html css', 'junior qa'):
+    for query in ('junior frontend', 'junior react', 'верстальщик html css', 'junior qa',
+                  'стажер frontend', 'frontend intern', 'стажер верстальщик',
+                  'практикант верстальщик', 'стажер тестировщик', 'QA intern'):
         url = 'https://remote-job.ru/search'
         page = response(url, **{'search[query]': query, 'search[searchType]': 'vacancy'}).text
         from html.parser import HTMLParser
@@ -282,3 +285,4 @@ JOB_COLLECTORS = (('habr_career', habr_career), ('trudvsem', trudvsem),
                   ('weworkremotely', weworkremotely), ('arbeitnow', arbeitnow),
                   ('geekjob', geekjob), ('getmatch', getmatch), ('zarplata', zarplata), ('remote_job_ru', remote_job_ru),
                   ('superjob', superjob), ('jooble', jooble))
+

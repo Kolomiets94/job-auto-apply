@@ -1,6 +1,7 @@
 """Rank leads by expected profitability and resume fit."""
 import re
 from typing import Any, Dict
+from entry_level import is_entry_level, is_placement, placement_is_paid
 
 SKILLS = {
     "react": 1.0, "typescript": 1.0, "javascript": .8, "js": .45, "html": .7,
@@ -14,7 +15,7 @@ SKILLS = {
 BLOCK = (
     "middle", "mid-level", "mid level", "senior", "lead ", "team lead", "tech lead", "head of", "manager", "director", "fullstack", "full stack", "full-stack",
     "react native", "flutter", "angular", "vue.js", "vuejs", "vue 3", "vue 2", "nuxt",
-    "node.js required", "internship", "trainee", "стажировка", "стажер", "стажёр",
+    "node.js required",
     "ai engineer", "ai agent engineer", "machine learning engineer", "ml engineer", "security engineer", "security analyst", "cybersecurity",
     "coreldraw", "полиграф", "типограф", "для печати", "визитк",
     "логотип", "illustrator", "интерьер", "3d-модел",
@@ -76,6 +77,8 @@ def _money(lead: Dict[str, Any]) -> float:
 def _explicit_salary_rejected(lead: Dict[str, Any]) -> bool:
     if str(lead.get("source") or "").lower() in FREELANCE_SOURCES:
         return False
+    if is_placement(lead.get("title")):
+        return not placement_is_paid(lead)
     salary = lead.get("salary")
     if not salary:
         return False
@@ -165,12 +168,11 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     if source not in FREELANCE_SOURCES:
         if any(x in title for x in NON_TARGET_TITLE_TERMS):
             return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "non-target job title"}
-        if not any(x in title for x in TARGET_TITLE_TERMS):
+        if not any(x in title for x in TARGET_TITLE_TERMS) and not re.search(r"\bqa\b|\btester\b", title):
             return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "job title outside target roles"}
-        junior_markers = ("junior", "jr.", "jr ", "джуниор", "джун", "младший", "младшая")
         experience = str(lead.get("experience") or "").lower()
         one_year = bool(re.search(r"(?:от|from|at least)\s*1\s*(?:год|года|year)|\b1\s*\+?\s*(?:год|года|year)", experience))
-        if not any(x in title for x in junior_markers) and not one_year:
+        if not is_entry_level(title) and not one_year:
             return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "not Junior or explicitly from one year"}
         if re.search(r"(?:от|from|at least)\s*[2-9]\s*(?:год|года|лет|year)", experience):
             return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "experience above one year"}
@@ -223,3 +225,4 @@ def rank_leads(leads):
         eligible,
         key=lambda x: (x.get("role_priority", 99), -x.get("profit_score", 0)),
     )
+
