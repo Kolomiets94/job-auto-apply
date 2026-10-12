@@ -56,3 +56,16 @@ def test_junior_title_does_not_override_experience_range():
         assert not result["eligible"], experience
         assert result["rank_reason"] == "experience above one year"
     assert rank_lead({**base, "experience": "1–3 года"})["eligible"]
+
+
+def test_freelance_shortlist_excludes_non_web_design_and_backend_delivery():
+    titles = (
+        "Верстка макетов книг по готовому шаблону. Фигма и гуглдок",
+        "Разработать дизайн лендинга на Tilda",
+        "Разработать лендинг с регистрацией и функцией сбора имя + мэйл и выдачи заданий на почту",
+    )
+    for title in titles:
+        assert not rank_lead({"source": "fl_ru", "title": title,
+                              "description": "React HTML CSS"})["eligible"], title
+    assert rank_lead({"source": "freelancehunt", "title": "Верстка лендинга по Figma",
+                      "description": "HTML CSS адаптивная верстка"})["eligible"]

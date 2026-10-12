@@ -45,6 +45,8 @@ FREELANCE_TITLE_EXCLUDE = (
     "c# developer", "c# engineer", "blazor", "asp.net",
     "mobile platform", "mobile app", "android", "ios app",
     "full-time", "full time", "webshop", "e-commerce platform",
+    "tilda", "тильда", "тильде", "макетов книг", "верстка книг", "вёрстка книг",
+    "выдачи заданий на почту",
 )
 
 FREELANCE_TOO_COMPLEX = (
