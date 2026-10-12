@@ -537,6 +537,10 @@ def apply_remote_job(lead: Dict, proposal: str) -> Dict[str, str]:
 
 
 def dispatch_browser(lead: Dict, proposal: str) -> Dict[str, str]:
+    from application_links import hh_vacancy_url
+    original_hh = hh_vacancy_url(lead.get("apply_url"))
+    if original_hh:
+        return apply_hh({**lead, "source": "hh", "url": original_hh}, proposal)
     source = str(lead.get("source") or lead.get("site") or "").lower()
     url = str(lead.get("url") or "").lower()
     if "hh" in source or "hh.ru" in url:

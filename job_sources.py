@@ -44,8 +44,13 @@ def explicit_application_email(description):
 
 
 def job(source, title, url, description='', **extra):
+    from application_links import application_link
     if 'apply_email' not in extra:
         extra['apply_email'] = explicit_application_email(description)
+    if not extra.get('apply_url'):
+        destination = application_link(description, url)
+        if destination:
+            extra['apply_url'] = destination
     return {'source': source, 'title': clean(title), 'url': url,
             'description': clean(description), 'remote': True, **extra}
 
