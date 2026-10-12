@@ -67,9 +67,22 @@ class _NoRedirect(HTTPRedirectHandler):
         return None
 
 
+def direct_hh_origin(lead):
+    """Use only an explicit, unambiguous HH vacancy URL already present in lead metadata."""
+    ids = set()
+    for key in ("origin_url", "original_url", "employer_url", "description", "apply_url"):
+        value = lead.get(key)
+        if not isinstance(value, str):
+            continue
+        for match in re.finditer(r"https://(?:[a-z0-9-]+\\.)?hh\\.ru/vacancy/(\\d+)(?!\\d)", value, re.I):
+            ids.add(match.group(1))
+    return "https://hh.ru/vacancy/" + next(iter(ids)) if len(ids) == 1 else None
+
+
 def apply_origin(lead, proposal, hh_apply):
     """Use the existing authenticated HH handler, including its duplicate check."""
-    result = resolve_gorodrabot(str(lead.get('apply_url') or ''))
+    origin = direct_hh_origin(lead)
+    result = {'origin_url': origin} if origin else resolve_gorodrabot(str(lead.get('apply_url') or ''))
     origin = result.get('origin_url')
     if not origin:
         return {**result, 'apply_url': lead.get('apply_url')}
