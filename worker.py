@@ -263,6 +263,9 @@ def run():
     daily_limit = (sum(daily_limits.values())
                    if all(v is not None for v in daily_limits.values()) else None)
     submitted_count = sum(daily_counts.values())
+    total_daily_limit = _application_limit("DAILY_TOTAL_LIMIT")
+    total_hourly_limit = _application_limit("HOURLY_TOTAL_LIMIT")
+    dry_run = os.getenv("DRY_RUN", "0").strip().lower() in ("1", "true", "yes")
     job_limit = _application_limit("HOURLY_JOB_LIMIT")
     freelance_limit = _application_limit("HOURLY_FREELANCE_LIMIT")
 
@@ -291,6 +294,8 @@ def run():
         "unavailable_skipped": sum(bool(lead.get("unavailable")) for lead in enriched),
         "ranked": len(ranked),
         "submitted": 0,
+        "drafted": 0,
+        "submitted_by_role": {"frontend": 0, "layout": 0, "qa": 0, "freelance": 0},
         "jobs_submitted": 0,
         "freelance_submitted": 0,
         "shortlisted": 0,
@@ -355,6 +360,16 @@ def run():
             })
             continue
 
+        if total_daily_limit is not None and submitted_count >= total_daily_limit:
+            stats["daily_limit_skipped"] += 1
+            results.append({"id": lid, "title": lead.get("title"), "source": lead.get("source"),
+                            "url": lead.get("url"), "status": "SKIPPED", "reason": "daily_total_limit"})
+            continue
+        if total_hourly_limit is not None and stats["submitted"] >= total_hourly_limit:
+            stats["hourly_limit_skipped"] += 1
+            results.append({"id": lid, "title": lead.get("title"), "source": lead.get("source"),
+                            "url": lead.get("url"), "status": "SKIPPED", "reason": "hourly_total_limit"})
+            continue
         if daily_limits[bucket] is not None and daily_counts[bucket] >= daily_limits[bucket]:
             stats["daily_limit_skipped"] += 1
             results.append({
@@ -374,6 +389,14 @@ def run():
                 "source": lead.get("source"), "url": lead.get("url"),
                 "status": "SKIPPED", "reason": "browser_challenge_pause",
             })
+            continue
+
+        if dry_run:
+            proposal = make_proposal(lead)
+            stats["drafted"] += 1
+            results.append({"id": lid, "title": lead.get("title"), "source": lead.get("source"),
+                            "url": lead.get("url"), "status": "DRAFT", "reason": "dry_run",
+                            "proposal": proposal})
             continue
 
         if should_notify(lead):
@@ -405,6 +428,9 @@ def run():
                 daily_counts[bucket] += 1
                 stats["submitted"] += 1
                 stats[bucket] += 1
+                role = "freelance" if freelance else _role_category(lead)
+                if role in stats["submitted_by_role"]:
+                    stats["submitted_by_role"][role] += 1
                 if browser_pause_active and (lead.get("apply_email") or str(lead.get("apply_url") or "").startswith("mailto:")):
                     stats["email_submitted_after_browser_pause"] += 1
             else:
@@ -517,6 +543,9 @@ def run():
     stats["notifications_sent"] = sum(
         1 for item in deliveries if item.get("status") == "SENT"
     )
+    stats["dry_run"] = dry_run
+    stats["daily_total_limit"] = total_daily_limit
+    stats["hourly_total_limit"] = total_hourly_limit
     stats["daily_application_limit"] = daily_limit
     stats["hourly_job_limit"] = job_limit
     stats["hourly_freelance_limit"] = freelance_limit
@@ -574,6 +603,10 @@ def run():
         f"Freelance configured limit: {_limit_label(freelance_limit)} (HOURLY_FREELANCE_LIMIT)\n"
         f"QA auto-apply: {os.getenv('AUTO_APPLY_QA', '0')}\n"
         f"Ranked: {stats['ranked']}\n"
+        f"Mode: {'DRAFT — no applications sent' if dry_run else 'LIVE'}\n"
+        f"Drafts prepared: {stats['drafted']}\n"
+        f"Daily total cap: {_limit_label(total_daily_limit)} | Hourly total cap: {_limit_label(total_hourly_limit)}\n"
+        f"Submitted by role (React/frontend, layout, QA): {stats['submitted_by_role']['frontend']}, {stats['submitted_by_role']['layout']}, {stats['submitted_by_role']['qa']}\n"
         f"Jobs submitted this run: {stats['jobs_submitted']}/{_limit_label(stats['hourly_job_limit'])}\n"
         f"Freelance submitted this run: {stats['freelance_submitted']}/{_limit_label(stats['hourly_freelance_limit'])}\n"
         f"Submitted this run total: {stats['submitted']}\n"
@@ -603,6 +636,11 @@ def run():
     reasons = Counter(str(item.get("reason") or item.get("status") or "unknown") for item in results if item.get("status") != "SUBMITTED")
     if reasons:
         summary_message += "\nReasons: " + "; ".join(f"{reason}: {count}" for reason, count in reasons.most_common(8))
+    if dry_run:
+        drafts = [item for item in results if item.get("status") == "DRAFT"]
+        summary_message += "\n\nDraft examples (NOT sent):" + ("".join(
+            f"\n- {item.get('title')} [{item.get('source')}]\n{item.get('url')}\n{item.get('proposal')}"
+            for item in drafts[:5]) if drafts else "\nNone")
     if budget_review:
         summary_message += "\nУточнить бюджет (ставки не отправлены):" + "".join(
             f"\n- {str(item.get('title') or 'Проект')[:80]}\n{item.get('url') or ''}" for item in budget_review[:5]
