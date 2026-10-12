@@ -43,7 +43,8 @@ def add_bid(lead, proposal, days=None):
     # Only compare currencies for which the user supplied a minimum; never guess FX.
     floors = {"RUB": 2000, "USD": 50}
     if currency not in floors or not isinstance(amount, (int, float)):
-        return {"status": "NEEDS_CONFIRMATION", "reason": "bid_budget_requires_review"}
+        return {"status": "NEEDS_CONFIRMATION", "reason": "bid_budget_requires_review",
+                "detail": (f"budget_amount={amount!r}; budget_currency={currency!r}")[:180]}
     if amount < floors[currency]:
         return {"status": "SKIPPED", "reason": "freelance_budget_below_floor"}
     title = str(lead.get("title") or "").lower()

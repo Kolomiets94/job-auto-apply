@@ -442,6 +442,9 @@ def apply_remote_job(lead: Dict, proposal: str) -> Dict[str, str]:
                 from urllib.parse import urljoin, urlsplit
                 destination = urljoin(raw_url, href)
                 if urlsplit(destination).hostname not in ("remote-job.ru", "www.remote-job.ru"):
+                    from aggregator_origin import is_gorodrabot_advert, apply_origin
+                    if is_gorodrabot_advert(destination):
+                        return apply_origin({**lead, "apply_url": destination}, proposal, apply_hh)
                     from external_form_apply import apply_external
                     return apply_external({**lead, "apply_url": destination}, proposal)
 
