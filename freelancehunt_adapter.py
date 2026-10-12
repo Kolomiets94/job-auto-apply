@@ -47,8 +47,11 @@ def add_bid(lead, proposal, days=None):
                     and math.isfinite(amount) and amount > 0)
     valid_currency = isinstance(currency, str) and bool(re.fullmatch(r"[A-Z]{3}", currency))
     if not valid_amount or not valid_currency:
+        # An unpriced project needs a deliberate quote; never fabricate a bid.
         return {"status": "NEEDS_CONFIRMATION", "reason": "bid_price_missing_or_invalid",
-                "detail": (f"quote_amount={amount!r}; quote_currency={currency!r}")[:180]}
+                "detail": (f"quote_amount={amount!r}; quote_currency={currency!r}")[:180],
+                "apply_url": lead.get("url"),
+                "next_action": "Review scope and choose a positive amount and currency before bidding"}
     title = str(lead.get("title") or "").lower()
     if days is None:
         if any(x in title for x in ("исправ", "правк", "fix", "bug")):
