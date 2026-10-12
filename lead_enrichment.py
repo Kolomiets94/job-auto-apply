@@ -11,6 +11,7 @@ SOURCE_HOSTS = {
     'weworkremotely': {'weworkremotely.com'}, 'arbeitnow': {'arbeitnow.com', 'www.arbeitnow.com'},
     'geekjob': {'geekjob.ru'}, 'getmatch': {'getmatch.ru'},
     'zarplata': {'zarplata.ru'}, 'remoteok': {'remoteok.com'},
+    'remote_job_ru': {'remote-job.ru', 'www.remote-job.ru'},
 }
 
 
@@ -37,7 +38,7 @@ def needs_enrichment(lead):
     source = str(lead.get('source') or '').lower()
     title = str(lead.get('title') or '')
     return (source in SOURCE_HOSTS and is_entry_level(title) and
-            (len(str(lead.get('description') or '')) < 300 or
+            (source == 'remote_job_ru' or len(str(lead.get('description') or '')) < 300 or
              not (lead.get('apply_url') or lead.get('apply_email'))))
 
 
@@ -65,18 +66,30 @@ def enrich_lead(lead):
             if len(html) > 2 * 1024 * 1024:
                 return {**lead, 'enrichment_error': 'source_page_too_large'}
             parser = _Text()
-            parser.feed(html)
+            # Remote-job's vacancy block starts at its H1 and ends before
+            # the panel footer; unrelated recommendations must not become requirements.
+            vacancy_html = html
+            if source == 'remote_job_ru':
+                start = re.search(r'<h1\b', html, re.I)
+                if not start:
+                    return {**lead, 'enrichment_error': 'vacancy_content_not_found'}
+                vacancy_html = html[start.start():]
+                end = re.search(r'<div\b[^>]*class=[\"\'][^\"\']*\bpanel-footer\b', vacancy_html, re.I)
+                if not end:
+                    return {**lead, 'enrichment_error': 'vacancy_content_not_found'}
+                vacancy_html = vacancy_html[:end.start()]
+            parser.feed(vacancy_html)
             text = re.sub(r'\s+', ' ', ' '.join(parser.parts)).strip()
-            if re.search(r'vacancy (?:is )?(?:closed|archived)|job (?:has )?expired|вакансия в архиве|вакансия закрыта', text, re.I):
+            if re.search(r'vacancy (?:is )?(?:closed|archived)|job (?:has )?expired|вакансия в архиве|вакансия закрыта|вакансия не опубликована', text, re.I):
                 return {**lead, 'unavailable': True, 'enrichment_error': 'vacancy_unavailable'}
             from job_sources import explicit_application_email
             result = {**lead, 'description': text[:20000], 'enriched': True}
             if not lead.get('apply_email'):
-                email = explicit_application_email(html)
+                email = explicit_application_email(vacancy_html)
                 if email:
                     result['apply_email'] = email
             if not lead.get('apply_url'):
-                destination = application_link(html, url)
+                destination = application_link(vacancy_html, url)
                 if destination:
                     result['apply_url'] = destination
             return result

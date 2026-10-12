@@ -434,6 +434,10 @@ def apply_remote_job(lead: Dict, proposal: str) -> Dict[str, str]:
             if _looks_like_challenge(page):
                 return {"status": "NEEDS_HUMAN", "reason": "security_challenge"}
 
+            heading = _norm(page.locator("h1").inner_text(timeout=5000))
+            if "вакансия не опубликована" in heading:
+                return {"status": "SKIPPED", "reason": "vacancy_unavailable"}
+
             # Some Remote-job.ru entries are aggregator links to other sites,
             # not public forms. Do not treat clicking those links as an application.
             external_link = page.get_by_role("link", name="Откликнуться на вакансию", exact=True).first

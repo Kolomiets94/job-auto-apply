@@ -20,6 +20,24 @@ class EnrichmentTests(unittest.TestCase):
         with patch('lead_enrichment.requests.get', return_value=Mock(status_code=200, text='Вакансия в архиве')):
             self.assertTrue(enrich_lead(self.lead())['unavailable'])
 
+    def test_remote_job_unpublished_is_unavailable(self):
+        page = '<h1>Junior QA (вакансия не опубликована)</h1><div class="panel-body">SQL required</div><div class="panel-footer"></div>'
+        lead = {**self.lead(), 'source': 'remote_job_ru', 'title': 'Junior QA',
+                'url': 'https://remote-job.ru/vacancy/show/123/qa'}
+        with patch('lead_enrichment.requests.get', return_value=Mock(status_code=200, text=page)):
+            result = enrich_lead(lead)
+        self.assertTrue(result['unavailable'])
+
+    def test_remote_job_description_excludes_recommendations(self):
+        from profit_ranker import rank_lead
+        page = '<h1>Junior React Developer</h1><div class="panel-body">React HTML CSS</div><div class="panel-footer"></div><aside>SQL required</aside>'
+        lead = {**self.lead(), 'source': 'remote_job_ru',
+                'url': 'https://remote-job.ru/vacancy/show/123/react'}
+        with patch('lead_enrichment.requests.get', return_value=Mock(status_code=200, text=page)):
+            result = enrich_lead(lead)
+        self.assertNotIn('SQL', result['description'])
+        self.assertTrue(rank_lead(result)['eligible'])
+
     def test_read_failure_is_not_submission(self):
         with patch('lead_enrichment.requests.get', return_value=Mock(status_code=429)):
             lead = enrich_lead(self.lead())
