@@ -18,15 +18,6 @@ QUERIES=[
     ("qa","junior QA tester"),
     ("qa","manual QA junior"),
     ("qa","junior тестировщик"),
-    ("frontend","стажер frontend"),
-    ("frontend","frontend intern"),
-    ("frontend","практикант React"),
-    ("layout","стажер верстальщик"),
-    ("layout","HTML CSS intern"),
-    ("layout","практикант верстальщик"),
-    ("qa","стажер тестировщик"),
-    ("qa","QA intern"),
-    ("qa","практикант тестировщик"),
 ]
 EXCLUDE=("full stack","fullstack","full-stack","vue","angular","react native","react-native","flutter","middle","senior","lead","head of","manager","director")
 UA={"User-Agent":"JobFreelanceHunter/1.1"}
@@ -70,15 +61,16 @@ def ok(v):
     if any(x in title for x in level_terms): return False
     if any(x in text for x in EXCLUDE if x not in level_terms): return False
     if not salary_ok(v): return False
-    # The candidate also accepts hybrid and office roles; location is checked
-    # against the vacancy before a human approves any draft.
+    if re.search(r"junior\s*\+|джуниор\s*\+|джун\s*\+", title): return False
+    if re.search(r"\b(?:intern|internship|trainee)\b|стаж[её]р|стажиров|практикант", title): return False
+    if any(x in title for x in ("офис", "гибрид", "hybrid", "onsite", "on-site")): return False
     return True
 
 
 def hh_search(tag,q):
     items=[]
     for page in range(6):
-        r=requests.get(HH_API,params={"text":q,"per_page":50,"page":page,"order_by":"publication_time"},headers=UA,timeout=20)
+        r=requests.get(HH_API,params={"text":q,"per_page":50,"page":page,"order_by":"publication_time","schedule":"remote"},headers=UA,timeout=20)
         if r.status_code == 403:
             from hh_web_search import search_hh_web
             return search_hh_web(tag, q)
