@@ -186,10 +186,28 @@ def _limit_label(value):
     return str(value) if value is not None else "без лимита"
 
 
-def _uses_browser(lead):
+def _browser_scope(lead):
+    """Pause challenges per destination, keeping other application sites usable."""
+    from urllib.parse import urlsplit
     if lead.get('apply_email') or str(lead.get('apply_url') or '').startswith('mailto:'):
-        return False
-    return str(lead.get('source') or '').lower() in ('hh', 'remote_job_ru') or str(lead.get('apply_url') or '').startswith('https://')
+        return None
+    source = str(lead.get('source') or '').lower()
+    apply_url = str(lead.get('apply_url') or '')
+    try:
+        host = urlsplit(apply_url).hostname
+    except ValueError:
+        host = None
+    if source == 'hh' or host == 'hh.ru' or (host or '').endswith('.hh.ru'):
+        return 'hh.ru'
+    if source == 'remote_job_ru':
+        return 'remote-job.ru'
+    if host and apply_url.startswith('https://'):
+        return host.lower()
+    return None
+
+
+def _uses_browser(lead):
+    return _browser_scope(lead) is not None
 
 
 def run():
@@ -284,12 +302,13 @@ def run():
         "daily_limit_skipped": 0,
         "hourly_limit_skipped": 0,
         "browser_challenge_paused": 0,
+        "paused_browser_hosts": [],
         "email_submitted_after_browser_pause": 0,
         "paid_placements_ranked": sum(is_placement(lead.get("title")) and not is_freelance(lead) for lead in ranked),
     }
     results = []
     notifications = []
-    consecutive_browser_challenges = 0
+    browser_challenge_streak = {}
     browser_pause_active = False
     challenge_reasons = {'remote_job_turnstile_required', 'security_challenge',
                          'aggregator_security_challenge'}
@@ -346,7 +365,8 @@ def run():
             })
             continue
 
-        if consecutive_browser_challenges >= 2 and _uses_browser(lead):
+        browser_scope = _browser_scope(lead)
+        if browser_scope and browser_challenge_streak.get(browser_scope, 0) >= 2:
             stats["browser_challenge_paused"] += 1
             stats["skipped"] += 1
             results.append({
@@ -370,12 +390,14 @@ def run():
             proposal = make_proposal(lead)
             result = dispatch(lead, proposal)
             state = result["status"]
-            if _uses_browser(lead):
-                consecutive_browser_challenges = (
-                    consecutive_browser_challenges + 1
-                    if result.get("reason") in challenge_reasons else 0
-                )
-                browser_pause_active |= consecutive_browser_challenges >= 2
+            if browser_scope:
+                streak = (browser_challenge_streak.get(browser_scope, 0) + 1
+                          if result.get("reason") in challenge_reasons else 0)
+                browser_challenge_streak[browser_scope] = streak
+                if streak >= 2:
+                    browser_pause_active = True
+                    if browser_scope not in stats["paused_browser_hosts"]:
+                        stats["paused_browser_hosts"].append(browser_scope)
             set_state(lid, state)
 
             if state == "SUBMITTED":
@@ -565,6 +587,7 @@ def run():
         f"Duplicates skipped: {stats['duplicates_skipped']}\n"
         f"No bid price: {stats['missing_bid_price_count']}\n"
         f"Browser paused after two challenges: {stats['browser_challenge_paused']}\n"
+        f"Paused browser hosts: {', '.join(stats['paused_browser_hosts']) or 'none'}\n"
         f"Email submitted after browser pause: {stats['email_submitted_after_browser_pause']}\n"
         f"Paid placements ranked: {stats['paid_placements_ranked']}\n"
         f"Aggregator origin requests: {stats['origin_diagnostics']['origin_requests']}\n"

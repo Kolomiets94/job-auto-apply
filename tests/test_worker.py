@@ -105,9 +105,12 @@ def test_two_challenges_pause_browser_but_allow_email(monkeypatch):
         {"source": "remote_job_ru", "category": "frontend", "title": f"Junior React {i}",
          "url": f"https://remote-job.ru/vacancy/show/{i}/react"} for i in (1, 2, 3)
     ]
+    leads.append({"source": "hh", "category": "qa", "title": "Junior Manual QA",
+                  "url": "https://hh.ru/vacancy/123"})
     leads.append({"source": "jobicy", "category": "frontend", "title": "Junior React email",
                   "url": "https://jobicy.com/jobs/4", "apply_email": "jobs@example.com"})
     monkeypatch.setattr(worker, "JOB_COLLECTORS", ())
+    monkeypatch.setenv("AUTO_APPLY_QA", "1")
     monkeypatch.setattr("lead_enrichment.enrich_lead", lambda lead: lead)
     with patch.object(worker, "collect_all", return_value=leads), \
          patch.object(worker, "queued_leads", return_value=[]), \
@@ -122,16 +125,18 @@ def test_two_challenges_pause_browser_but_allow_email(monkeypatch):
          patch.object(worker, "dispatch", side_effect=[
              {"status": "NEEDS_HUMAN", "reason": "remote_job_turnstile_required"},
              {"status": "NEEDS_HUMAN", "reason": "remote_job_turnstile_required"},
+             {"status": "SUBMITTED", "reason": "browser_hh_sent"},
              {"status": "SUBMITTED", "reason": "email_sent"},
          ]) as dispatch:
         report = worker.run()
-    assert dispatch.call_count == 3
+    assert dispatch.call_count == 4
     assert [item["reason"] for item in report["results"]] == [
         "remote_job_turnstile_required", "remote_job_turnstile_required",
-        "browser_challenge_pause", "email_sent",
+        "browser_challenge_pause", "browser_hh_sent", "email_sent",
     ]
     assert report["stats"]["captcha_count"] == 2
     assert report["stats"]["browser_challenge_paused"] == 1
-    assert report["stats"]["submitted"] == 1
+    assert report["stats"]["submitted"] == 2
+    assert report["stats"]["paused_browser_hosts"] == ["remote-job.ru"]
     assert report["stats"]["email_submitted_after_browser_pause"] == 1
     assert report["stats"]["paid_placements_ranked"] == 0

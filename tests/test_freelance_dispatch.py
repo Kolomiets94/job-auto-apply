@@ -61,3 +61,12 @@ def test_dispatch_submits_without_telegram_interaction(monkeypatch):
         result = dispatch({"source": "hh", "title": "Junior React"}, "Draft")
     assert result["status"] == "SUBMITTED"
     send.assert_called_once()
+
+
+@pytest.mark.parametrize("code", [404, 410])
+def test_closed_freelancehunt_project_is_not_reported_as_failed(code, monkeypatch):
+    monkeypatch.setenv("AUTO_FREELANCE_APPLY", "1")
+    monkeypatch.setenv("FREELANCEHUNT_TOKEN", "test-token")
+    with patch.object(fh.requests, "post", return_value=Mock(status_code=code)):
+        result = dispatch(lead(), "Hello")
+    assert result == {"status": "SKIPPED", "reason": "project_unavailable"}

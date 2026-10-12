@@ -104,6 +104,8 @@ def add_bid(lead, proposal, days=None):
         return {"status": "SKIPPED", "reason": "outside_application_hours"}
     r = requests.post(f"{BASE}/projects/{project_id}/bids",
                       headers={**h, "Content-Type": "application/json"}, json=body, timeout=20)
+    if r.status_code in (404, 410):
+        return {"status": "SKIPPED", "reason": "project_unavailable"}
     if r.status_code not in (200, 201):
         return {"status": "FAILED", "reason": f"freelancehunt_http_{r.status_code}"}
     try:
