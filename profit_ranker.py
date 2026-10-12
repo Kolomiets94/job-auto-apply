@@ -158,9 +158,6 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     if any(re.search(r"\b(?:sql|mysql|postgresql)\b", part) and
            not any(marker in part for marker in optional_sql) for part in sql_parts):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "SQL outside confirmed stack"}
-    if source_is_job := str(lead.get("source") or "").lower() not in FREELANCE_SOURCES:
-        if re.search(r"\b(?:intern|internship|trainee)\b|стаж[её]р|стажиров|практикант", title):
-            return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "internship excluded"}
     if _explicit_salary_rejected(lead):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "salary below configured floor"}
     if _location_rejected(lead, text):
