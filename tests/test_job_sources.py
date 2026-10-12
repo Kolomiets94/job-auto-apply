@@ -12,9 +12,13 @@ def test_trudvsem_preserves_vacancy_contact_and_remote_requirement():
               'contact_list': [{'contact_type': 'Эл. почта', 'contact_value': 'jobs@example.com'}]}
     onsite = {**remote, 'duty': 'работа в офисе'}
     payload = {'results': {'vacancies': [{'vacancy': remote}, {'vacancy': onsite}]}}
-    with patch.object(job_sources, 'response', return_value=Mock(json=lambda: payload)):
+    with patch.object(job_sources, 'response', return_value=Mock(json=lambda: payload)) as fetch:
         leads = job_sources.trudvsem()
-    assert len(leads) == 3
+    assert leads
+    queries = {call.kwargs['text'] for call in fetch.call_args_list}
+    assert 'стажер frontend' in queries
+    assert 'стажер тестировщик' in queries
+    assert all('удалённая работа' in lead['description'] for lead in leads)
     assert all(l['apply_email'] == 'jobs@example.com' for l in leads)
     assert 'React TypeScript' in leads[0]['description']
 
