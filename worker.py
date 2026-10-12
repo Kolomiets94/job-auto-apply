@@ -631,6 +631,11 @@ def run():
         f"Freelance submitted today: {stats['freelance_submitted_today']}/{_limit_label(stats['daily_freelance_limit'])}\n\n"
         "Results:\n" + ("\n".join(detail_lines) if detail_lines else "No ranked results")
     )
+    summary_message += "\n\nFilters by role:" + "".join(
+        f"\n- {role}: found {data['found']}, eligible {data['eligible']}; rejected: " +
+        (", ".join(f"{reason}={count}" for reason, count in data["rejected_reasons"].items()) or "none")
+        for role, data in eligibility.items()
+    )
     summary_message += "\n\nSources: " + ", ".join(f"{name}: {count}" for name, count in source_counts.items())
     from collections import Counter
     reasons = Counter(str(item.get("reason") or item.get("status") or "unknown") for item in results if item.get("status") != "SUBMITTED")
