@@ -36,7 +36,7 @@ def estimate_quote(lead):
     A missing budget is not evidence of a client's willingness to pay.
     """
     try:
-        rate = float(os.getenv("FREELANCE_QUOTE_HOURLY_RATE", "0"))
+        rate = float(os.getenv("FREELANCE_QUOTE_HOURLY_RATE", "750"))
     except ValueError:
         return None
     currency = os.getenv("FREELANCE_QUOTE_CURRENCY", "UAH").strip().upper()
