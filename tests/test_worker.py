@@ -133,3 +133,5 @@ def test_two_challenges_pause_browser_but_allow_email(monkeypatch):
     assert report["stats"]["captcha_count"] == 2
     assert report["stats"]["browser_challenge_paused"] == 1
     assert report["stats"]["submitted"] == 1
+    assert report["stats"]["email_submitted_after_browser_pause"] == 1
+    assert report["stats"]["paid_placements_ranked"] == 0

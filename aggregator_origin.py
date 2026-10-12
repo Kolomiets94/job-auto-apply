@@ -14,6 +14,27 @@ _GORODRABOT_RATE_LIMITED = False
 _LAST_REQUEST_AT = None
 _RETRY_DELAYS = (60, 120, 240)
 _MIN_INTERVAL_SECONDS = 5
+_AGGREGATOR_REQUESTS = 0
+_FIRST_429 = None
+_DEFERRED_ADVERTS = 0
+
+
+def reset_origin_diagnostics():
+    global _GORODRABOT_RATE_LIMITED, _LAST_REQUEST_AT
+    global _AGGREGATOR_REQUESTS, _FIRST_429, _DEFERRED_ADVERTS
+    _GORODRABOT_RATE_LIMITED = False
+    _LAST_REQUEST_AT = None
+    _AGGREGATOR_REQUESTS = 0
+    _FIRST_429 = None
+    _DEFERRED_ADVERTS = 0
+
+
+def origin_diagnostics():
+    return {
+        'origin_requests': _AGGREGATOR_REQUESTS,
+        'first_429': dict(_FIRST_429) if _FIRST_429 else None,
+        'deferred_adverts': _DEFERRED_ADVERTS,
+    }
 
 
 def is_gorodrabot_advert(url):
@@ -97,13 +118,14 @@ def apply_origin(lead, proposal, hh_apply):
 
 def _paced_open(request):
     """At most one origin request every five seconds in this worker."""
-    global _LAST_REQUEST_AT
+    global _LAST_REQUEST_AT, _AGGREGATOR_REQUESTS
     now = time.monotonic()
     if _LAST_REQUEST_AT is not None:
         remaining = _MIN_INTERVAL_SECONDS - (now - _LAST_REQUEST_AT)
         if remaining > 0:
             time.sleep(remaining)
     _LAST_REQUEST_AT = time.monotonic()
+    _AGGREGATOR_REQUESTS += 1
     try:
         return build_opener(_NoRedirect).open(request, timeout=20)
     except HTTPError as exc:
@@ -111,10 +133,11 @@ def _paced_open(request):
 
 
 def resolve_gorodrabot(url):
-    global _GORODRABOT_RATE_LIMITED
+    global _GORODRABOT_RATE_LIMITED, _FIRST_429, _DEFERRED_ADVERTS
     if not is_gorodrabot_advert(url):
         return {'status': 'SKIPPED', 'reason': 'unsupported_aggregator_url'}
     if _GORODRABOT_RATE_LIMITED:
+        _DEFERRED_ADVERTS += 1
         return {'status': 'NEEDS_CONFIRMATION', 'reason': 'aggregator_rate_limited',
                 'detail': 'HTTP 429 after bounded retries earlier in this run'}
     request = Request(url, headers={'User-Agent': 'Mozilla/5.0', 'Accept': 'text/html'})
@@ -125,6 +148,9 @@ def resolve_gorodrabot(url):
             return {'status': 'NEEDS_CONFIRMATION', 'reason': 'aggregator_network_error'}
         with response:
             if response.status == 429:
+                if _FIRST_429 is None:
+                    _FIRST_429 = {'advert_path': urlsplit(url).path,
+                                  'request_index': _AGGREGATOR_REQUESTS}
                 if attempt < len(_RETRY_DELAYS):
                     time.sleep(_RETRY_DELAYS[attempt])
                     continue

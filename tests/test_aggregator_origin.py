@@ -55,13 +55,20 @@ class OriginTests(unittest.TestCase):
         response.__enter__ = Mock(return_value=response)
         response.__exit__ = Mock(return_value=None)
         with patch.object(aggregator_origin, '_GORODRABOT_RATE_LIMITED', False), \
+             patch.object(aggregator_origin, '_FIRST_429', None), \
+             patch.object(aggregator_origin, '_DEFERRED_ADVERTS', 0), \
+             patch.object(aggregator_origin, '_AGGREGATOR_REQUESTS', 8), \
              patch.object(aggregator_origin, '_paced_open', return_value=response) as open_request, \
              patch('aggregator_origin.time.sleep') as sleep:
             result = resolve_gorodrabot('https://gorodrabot.ru/advert/123/job')
             again = resolve_gorodrabot('https://gorodrabot.ru/advert/124/job')
+            diagnostics = aggregator_origin.origin_diagnostics()
         self.assertEqual(result['reason'], 'aggregator_rate_limited')
         self.assertEqual(again['reason'], 'aggregator_rate_limited')
         self.assertEqual(open_request.call_count, 4)
+        self.assertEqual(diagnostics['first_429'], {
+            'advert_path': '/advert/123/job', 'request_index': 8})
+        self.assertEqual(diagnostics['deferred_adverts'], 1)
         self.assertEqual([x.args[0] for x in sleep.call_args_list], [60, 120, 240])
 
     def test_second_origin_request_waits_for_five_second_spacing(self):

@@ -193,8 +193,11 @@ def _uses_browser(lead):
 
 
 def run():
+    from aggregator_origin import reset_origin_diagnostics, origin_diagnostics
+    from entry_level import is_placement
     global COLLECTION_RAW_COUNT
     COLLECTION_RAW_COUNT = 0
+    reset_origin_diagnostics()
     try:
         started = send_message("Job Auto Apply: поиск вакансий и заказов запущен.")
     except Exception as exc:
@@ -281,10 +284,13 @@ def run():
         "daily_limit_skipped": 0,
         "hourly_limit_skipped": 0,
         "browser_challenge_paused": 0,
+        "email_submitted_after_browser_pause": 0,
+        "paid_placements_ranked": sum(is_placement(lead.get("title")) and not is_freelance(lead) for lead in ranked),
     }
     results = []
     notifications = []
     consecutive_browser_challenges = 0
+    browser_pause_active = False
     challenge_reasons = {'remote_job_turnstile_required', 'security_challenge',
                          'aggregator_security_challenge'}
 
@@ -369,6 +375,7 @@ def run():
                     consecutive_browser_challenges + 1
                     if result.get("reason") in challenge_reasons else 0
                 )
+                browser_pause_active |= consecutive_browser_challenges >= 2
             set_state(lid, state)
 
             if state == "SUBMITTED":
@@ -376,6 +383,8 @@ def run():
                 daily_counts[bucket] += 1
                 stats["submitted"] += 1
                 stats[bucket] += 1
+                if browser_pause_active and (lead.get("apply_email") or str(lead.get("apply_url") or "").startswith("mailto:")):
+                    stats["email_submitted_after_browser_pause"] += 1
             else:
                 key = state.lower()
                 if key in stats:
@@ -475,6 +484,7 @@ def run():
             print(f"[telegram] blocked notification: {type(exc).__name__}", flush=True)
 
     deliveries = deliver_notifications(notifications)
+    stats["origin_diagnostics"] = origin_diagnostics()
     stats["captcha_count"] = sum(item.get("reason") in challenge_reasons for item in results)
     stats["rate_limited_count"] = sum(item.get("reason") == "aggregator_rate_limited" for item in results)
     stats["missing_bid_price_count"] = len(budget_review)
@@ -555,6 +565,11 @@ def run():
         f"Duplicates skipped: {stats['duplicates_skipped']}\n"
         f"No bid price: {stats['missing_bid_price_count']}\n"
         f"Browser paused after two challenges: {stats['browser_challenge_paused']}\n"
+        f"Email submitted after browser pause: {stats['email_submitted_after_browser_pause']}\n"
+        f"Paid placements ranked: {stats['paid_placements_ranked']}\n"
+        f"Aggregator origin requests: {stats['origin_diagnostics']['origin_requests']}\n"
+        f"Aggregator adverts deferred after 429: {stats['origin_diagnostics']['deferred_adverts']}\n"
+        f"First aggregator 429: {stats['origin_diagnostics']['first_429'] or 'none'}\n"
         f"Telegram vacancy alerts sent: {stats['notifications_sent']}\n"
         f"Jobs submitted today: {stats['jobs_submitted_today']}/{_limit_label(stats['daily_job_limit'])}\n"
         f"Freelance submitted today: {stats['freelance_submitted_today']}/{_limit_label(stats['daily_freelance_limit'])}\n\n"
@@ -565,6 +580,10 @@ def run():
     reasons = Counter(str(item.get("reason") or item.get("status") or "unknown") for item in results if item.get("status") != "SUBMITTED")
     if reasons:
         summary_message += "\nReasons: " + "; ".join(f"{reason}: {count}" for reason, count in reasons.most_common(8))
+    if budget_review:
+        summary_message += "\nУточнить бюджет (ставки не отправлены):" + "".join(
+            f"\n- {str(item.get('title') or 'Проект')[:80]}\n{item.get('url') or ''}" for item in budget_review[:5]
+        )
     if freelance_review:
         summary_message += "\nFreelance shortlist: five links sent separately (not applications)."
     if COLLECTION_ERRORS:
