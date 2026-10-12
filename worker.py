@@ -417,7 +417,7 @@ def run():
     # Alert about blocked applications with the direct destination URL.
     blocked = [item for item in results if item.get("status") in ("NEEDS_HUMAN", "NEEDS_CONFIRMATION")]
     if blocked:
-        lines = ["Требуется действие: отклики НЕ отправлены:"]
+        lines = ["Требуется действие: отклики НЕ отправлены:", "При Turnstile открой ссылку, пройди проверку и отправь отклик на сайте. При HTTP 429 не обновляй страницу многократно: сайт ограничивает запросы."]
         for item in blocked[:10]:
             lines.append(
                 f"- {str(item.get('title') or 'Вакансия')[:90]} "
