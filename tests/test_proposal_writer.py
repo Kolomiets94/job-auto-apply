@@ -22,3 +22,12 @@ def test_unsupported_vacancy_skill_not_added_to_letter():
     text = make_proposal({"title": "Junior Frontend", "description": "Требуется SQL"})
     assert "SQL" not in text
     assert "https://github.com/Kolomiets94/travel-blog" in text
+
+
+def test_qa_letter_describes_only_manual_testing_of_own_apps():
+    for language in ("ru", "en"):
+        text = make_proposal({"title": "Junior QA", "language": language})
+        assert "API error handling" not in text
+        assert "обработку ошибок API" not in text
+        assert "commercial" not in text.lower()
+        assert "команде работал" not in text.lower()
