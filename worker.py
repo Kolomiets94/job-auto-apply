@@ -651,6 +651,21 @@ def run():
         f"Freelance submitted today: {stats['freelance_submitted_today']}/{_limit_label(stats['daily_freelance_limit'])}\n\n"
         "Results:\n" + ("\n".join(detail_lines) if detail_lines else "No ranked results")
     )
+    # Funnel conversion uses confirmed submissions, never discovered links.
+    eligible_jobs = stats['job_ranked']
+    submitted_jobs = stats['jobs_submitted']
+    job_conversion = 100.0 * submitted_jobs / eligible_jobs if eligible_jobs else 0.0
+    summary_message += (
+        '\n\nEmployment funnel (this run):'
+        f"\nDiscovered non-freelance: {sum(not is_freelance(lead) for lead in leads)}"
+        f"\nEligible non-freelance: {eligible_jobs}"
+        f"\nConfirmed applications: {submitted_jobs}"
+        f"\nEligible-to-submitted conversion: {job_conversion:.1f}%"
+        '\nEmployer replies / interviews / offers: not synchronized (unknown)'
+    )
+    if eligible_jobs and not submitted_jobs:
+        summary_message += '\nPriority: fix application channels before expanding discovery.'
+
     summary_message += "\n\nFilters by role:" + "".join(
         f"\n- {role}: found {data['found']}, eligible {data['eligible']}; rejected: " +
         (", ".join(f"{reason}={count}" for reason, count in data["rejected_reasons"].items()) or "none")
