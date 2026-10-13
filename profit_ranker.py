@@ -198,7 +198,7 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
         # evidence in the description/requirements, never a missing grade alone.
         layout_title = any(term in title for term in ("верстальщик", "верстка", "вёрстка", "html/css", "html-верст"))
         entry_evidence = bool(re.search(
-            r"(?<![a-zа-я])(?:junior|джуниор|джун|младший|начинающ|без опыта|no experience|entry.level)(?![a-zа-я])",
+            r"(?<![a-zа-я])(?:junior|джуниор|джун|младший|начинающ[а-я]*|без опыта|no experience|entry.level)(?![a-zа-я])",
             details
         ))
         senior_evidence = bool(re.search(
