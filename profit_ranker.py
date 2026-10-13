@@ -144,8 +144,14 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     # Exclude non-Junior roles by title, not incidental descriptions.
     if any(x in title for x in BLOCK) or re.search(r"(?<![a-z])vue(?![a-z])", title):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "excluded job title"}
-    if any(x in title for x in ("офис", "onsite", "on-site", "on site", "гибрид", "hybrid")):
-        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "onsite/hybrid job"}
+    # Local office/hybrid roles are acceptable in Yekaterinburg only.
+    place = " ".join(str(lead.get(k) or "") for k in ("location", "region", "city")).lower()
+    details = " ".join(str(lead.get(k) or "") for k in ("description", "requirements")).lower()
+    local = any(x in place for x in ("екатеринбург", "yekaterinburg", "ekaterinburg"))
+    office = any(x in title for x in ("офис", "onsite", "on-site", "on site", "гибрид", "hybrid"))
+    office = office or any(x in details for x in ("только в офисе", "строго в офисе", "office only", "on-site only", "onsite only"))
+    if office and not local:
+        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "nonlocal office/hybrid job"}
     # Keep mandatory unsupported frameworks excluded, while allowing optional mentions.
     requirements = " ".join(str(lead.get(k) or "") for k in ("description", "requirements")).lower()
     required_parts = re.split(r"[\n.!?;]", requirements)
