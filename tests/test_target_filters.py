@@ -18,7 +18,7 @@ def test_accepts_explicit_one_year_frontend_and_rejects_higher_experience():
 def test_internship_requires_confirmed_payment():
     lead = {"source": "hh", "title": "Junior React internship", "description": "React"}
     assert not rank_lead(lead)["eligible"]
-    assert rank_lead({**lead, "description": "Paid internship. React"})["eligible"]
+    assert not rank_lead({**lead, "description": "Paid internship. React"})["eligible"]
 
 
 def test_required_sql_rejected_and_explicit_optional_sql_allowed():
@@ -69,3 +69,20 @@ def test_freelance_shortlist_excludes_non_web_design_and_backend_delivery():
                               "description": "React HTML CSS"})["eligible"], title
     assert rank_lead({"source": "freelancehunt", "title": "Верстка лендинга по Figma",
                       "description": "HTML CSS адаптивная верстка"})["eligible"]
+
+
+def test_entry_level_layout_without_junior_title():
+    base = {"source": "hh", "title": "Верстальщик HTML CSS", "description": "Начинающий специалист, HTML CSS SCSS"}
+    assert rank_lead(base)["eligible"]
+    assert rank_lead(base)["category"] == "layout"
+    assert not rank_lead({**base, "description": "HTML CSS SCSS"})["eligible"]
+    assert not rank_lead({**base, "title": "Senior верстальщик HTML CSS"})["eligible"]
+    assert not rank_lead({**base, "experience": "от 3 лет"})["eligible"]
+    assert not rank_lead({**base, "requirements": "SQL required"})["eligible"]
+
+
+def test_office_location_policy():
+    base = {"source": "hh", "title": "Junior React Developer офис", "description": "React TypeScript"}
+    assert rank_lead({**base, "location": "Екатеринбург"})["eligible"]
+    assert not rank_lead({**base, "location": "Санкт-Петербург"})["eligible"]
+    assert not rank_lead({"source": "hh", "title": "Junior QA Engineer", "location": "Санкт-Петербург", "description": "Работа только в офисе. Manual QA"})["eligible"]
