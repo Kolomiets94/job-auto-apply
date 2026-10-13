@@ -5,3 +5,5 @@ aiohttp==3.13.2
 python-dotenv==1.1.1
 pytest==8.4.2
 playwright==1.55.0
+
+psycopg[binary]==3.2.10
