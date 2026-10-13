@@ -593,6 +593,10 @@ def run():
         detail = str(item.get("detail") or "")
         if detail and reason == "remote_job_form_validation_error":
             detail_lines.append("  Form error: " + detail[:240])
+        if reason == "unknown_employer_question":
+            questions = item.get("unanswered_questions") or ([detail] if detail else [])
+            for question in questions[:10]:
+                detail_lines.append("  HH employer question (answer required): " + str(question).replace("\\n", " ")[:300])
         if url:
             detail_lines.append(url)
 
