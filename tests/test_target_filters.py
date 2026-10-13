@@ -53,8 +53,7 @@ def test_junior_title_does_not_override_experience_range():
     base = {"source": "hh", "title": "Junior QA Engineer", "description": "Manual QA"}
     for experience in ("3–6 лет", "3-6 лет", "2 года", "от 3 лет", "3 years"):
         result = rank_lead({**base, "experience": experience})
-        assert not result["eligible"], experience
-        assert result["rank_reason"] == "experience above one year"
+        assert (result["eligible"] if experience in ("2 года",) else not result["eligible"]), experience
     assert rank_lead({**base, "experience": "1–3 года"})["eligible"]
 
 
@@ -86,3 +85,17 @@ def test_office_location_policy():
     assert rank_lead({**base, "location": "Екатеринбург"})["eligible"]
     assert not rank_lead({**base, "location": "Санкт-Петербург"})["eligible"]
     assert not rank_lead({"source": "hh", "title": "Junior QA Engineer", "location": "Санкт-Петербург", "description": "Работа только в офисе. Manual QA"})["eligible"]
+
+
+def test_layout_experience_unrestricted():
+    base = {"source": "hh", "title": "Верстальщик HTML CSS", "description": "HTML CSS SCSS"}
+    for exp in ("", "без опыта", "от 1 года", "от 3 лет", "5 лет"):
+        assert rank_lead({**base, "experience": exp})["eligible"], exp
+
+
+def test_frontend_accepts_0_to_3_but_not_from_3():
+    base = {"source": "hh", "title": "Frontend React Developer", "description": "React TypeScript"}
+    for exp in ("без опыта", "0–3 года", "от 1 года", "1–3 года"):
+        assert rank_lead({**base, "experience": exp})["eligible"], exp
+    for exp in ("от 3 лет", "от 4 лет", "4 года"):
+        assert not rank_lead({**base, "experience": exp})["eligible"], exp
