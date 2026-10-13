@@ -28,7 +28,26 @@ def send_message(text: str, timeout: int = 10) -> Dict[str, str]:
     if not token or not chat_id:
         return {"status": "DISABLED", "reason": "telegram_not_configured"}
 
-    # Telegram sendMessage has a 4096-character limit. Split on line boundaries.\n    chunks = []\n    remaining = str(text)\n    while remaining:\n        if len(remaining) <= 3900:\n            chunks.append(remaining)\n            break\n        boundary = remaining.rfind("\\n", 0, 3900)\n        if boundary < 1000:\n            boundary = 3900\n        chunks.append(remaining[:boundary])\n        remaining = remaining[boundary:].lstrip("\\n")\n    for index, chunk in enumerate(chunks):\n        response = requests.post(\n            f"https://api.telegram.org/bot{token}/sendMessage",\n            json={"chat_id": chat_id, "text": chunk, "disable_web_page_preview": True},\n            timeout=timeout,\n        )\n        response.raise_for_status()\n    return {"status": "SENT", "parts": len(chunks)}
+    # Keep every message below Telegram's 4096-character limit.
+    chunks = []
+    remaining = str(text)
+    while remaining:
+        if len(remaining) <= 3900:
+            chunks.append(remaining)
+            break
+        boundary = remaining.rfind("\n", 0, 3900)
+        if boundary < 1000:
+            boundary = 3900
+        chunks.append(remaining[:boundary])
+        remaining = remaining[boundary:].lstrip("\n")
+    for chunk in chunks:
+        response = requests.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={"chat_id": chat_id, "text": chunk, "disable_web_page_preview": True},
+            timeout=timeout,
+        )
+        response.raise_for_status()
+    return {"status": "SENT", "parts": len(chunks)}
 
 
 def send_notification(notification: Dict, timeout: int = 10) -> Dict[str, str]:
