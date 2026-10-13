@@ -139,6 +139,8 @@ ROLE_PRIORITY = {"frontend": 0, "layout": 1, "qa": 2}
 def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     text = _text(lead)
     title = str(lead.get("title") or "").lower()
+    if is_placement(title):
+        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "internship/trainee excluded"}
     # Exclude non-Junior roles by title, not incidental descriptions.
     if any(x in title for x in BLOCK) or re.search(r"(?<![a-z])vue(?![a-z])", title):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "excluded job title"}
