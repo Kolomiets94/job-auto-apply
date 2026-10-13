@@ -12,8 +12,8 @@ class PaidPlacementTests(unittest.TestCase):
             with self.subTest(title=title):
                 lead = rank_lead({"source": "hh", "title": title,
                                   "salary": {"from": 15000, "currency": "RUB"}})
-                self.assertTrue(lead["eligible"])
-                self.assertEqual(lead["category"], category)
+                self.assertFalse(lead["eligible"])
+                self.assertEqual(lead["rank_reason"], "internship/trainee excluded")
 
     def test_unknown_unpaid_and_zero_compensation_are_rejected(self):
         for description, salary in (("React", None), ("Unpaid React internship", {"from": 15000}),
@@ -24,7 +24,7 @@ class PaidPlacementTests(unittest.TestCase):
                                            "description": description, "salary": salary})["eligible"])
 
     def test_paid_worldwide_and_salary_rules_for_regular_jobs(self):
-        self.assertTrue(rank_lead({"source": "remotive", "title": "Paid Frontend Internship",
+        self.assertFalse(rank_lead({"source": "remotive", "title": "Paid Frontend Internship",
                                    "location": "Worldwide", "description": "React"})["eligible"])
         self.assertFalse(rank_lead({"source": "hh", "title": "Junior React",
                                     "salary": {"from": 15000, "currency": "RUB"}})["eligible"])
