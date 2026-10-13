@@ -350,6 +350,9 @@ def apply_hh(lead: Dict, proposal: str, storage_state=None) -> Dict[str, str]:
                     "status": "NEEDS_CONFIRMATION",
                     "reason": "unknown_employer_question",
                     "detail": unanswered[0] if unanswered else "unknown_question",
+                    "unanswered_questions": unanswered,
+                    "apply_url": lead.get("url"),
+                    "next_action": "Review employer questions and answer manually on HH",
                 }
 
             textarea = _find_letter_area(page)
