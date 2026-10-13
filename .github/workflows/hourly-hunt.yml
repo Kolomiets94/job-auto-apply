@@ -32,7 +32,7 @@ jobs:
       SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
       AUTO_BROWSER_APPLY: "1"
       EXTERNAL_APPLY_HOSTS: ${{ vars.EXTERNAL_APPLY_HOSTS }}
-      AUTO_APPLY_QA: "0"
+      AUTO_APPLY_QA: "1"
       REMOTE_JOB_NAME: ${{ secrets.REMOTE_JOB_NAME }}
       REMOTE_JOB_EMAIL: ${{ secrets.REMOTE_JOB_EMAIL || secrets.SMTP_USER }}
       REMOTE_JOB_PHONE: ${{ secrets.REMOTE_JOB_PHONE }}
