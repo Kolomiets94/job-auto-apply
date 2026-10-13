@@ -152,6 +152,14 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     office = office or any(x in details for x in ("только в офисе", "строго в офисе", "office only", "on-site only", "onsite only"))
     if office and not local:
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "nonlocal office/hybrid job"}
+    # Exclude explicit mandatory relocation to another city even if office is not in title.
+    relocation = any(x in details for x in (
+        "обязателен переезд", "переезд обязателен", "необходим переезд",
+        "готовность к переезду обязательна", "relocation required",
+        "must relocate", "required to relocate"
+    ))
+    if relocation and not local:
+        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "mandatory nonlocal relocation"}
     # Keep mandatory unsupported frameworks excluded, while allowing optional mentions.
     requirements = " ".join(str(lead.get(k) or "") for k in ("description", "requirements")).lower()
     required_parts = re.split(r"[\n.!?;]", requirements)
@@ -168,7 +176,11 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     if any(re.search(r"\b(?:sql|mysql|postgresql)\b", part) and
            not any(marker in part for marker in optional_sql) for part in sql_parts):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "SQL outside confirmed stack"}
-    # Known stale listing: Thimble.cz remote-job vacancy from September 2023.\n    # Do not send a real application to this archived-era posting.\n    if "remote-job.ru/vacancy/show/729285/" in str(lead.get("url") or ""):\n        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "known stale vacancy (2023)"}\n    if _explicit_salary_rejected(lead):
+    # Known stale listing: Thimble.cz remote-job vacancy from September 2023.
+    # Do not send a real application to this archived-era posting.
+    if "remote-job.ru/vacancy/show/729285/" in str(lead.get("url") or ""):
+        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "known stale vacancy (2023)"}
+    if _explicit_salary_rejected(lead):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "salary below configured floor"}
     if _location_rejected(lead, text):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "explicit location/work-authorization restriction"}
