@@ -37,8 +37,8 @@ jobs:
       REMOTE_JOB_EMAIL: ${{ secrets.REMOTE_JOB_EMAIL || secrets.SMTP_USER }}
       REMOTE_JOB_PHONE: ${{ secrets.REMOTE_JOB_PHONE }}
       HH_STORAGE_STATE_JSON: ${{ secrets.HH_STORAGE_STATE_JSON }}
-      # First diagnostic run: prepare application drafts without submitting.
-      DRY_RUN: "1"
+      # Live mode: submit eligible applications, respecting rate and daily limits.
+      DRY_RUN: "0"
       DAILY_TOTAL_LIMIT: "5"
       HOURLY_TOTAL_LIMIT: "2"
       DAILY_JOB_LIMIT: "5"
