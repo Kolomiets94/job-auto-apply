@@ -194,7 +194,18 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
             return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "job title outside target roles"}
         experience = re.sub(r"\s*([–—-])\s*", r"\1", str(lead.get("experience") or "").lower())
         one_year = bool(re.search(r"(?:от|from|at least)\s*1\s*(?:год|года|year)|\b1\s*\+?\s*(?:год|года|year)", experience))
-        if not is_entry_level(title) and not one_year:
+        # Layout titles often omit the grade. Accept only explicit entry-level
+        # evidence in the description/requirements, never a missing grade alone.
+        layout_title = any(term in title for term in ("верстальщик", "верстка", "вёрстка", "html/css", "html-верст"))
+        entry_evidence = bool(re.search(
+            r"(?<![a-zа-я])(?:junior|джуниор|джун|младший|начинающ|без опыта|no experience|entry.level)(?![a-zа-я])",
+            details
+        ))
+        senior_evidence = bool(re.search(
+            r"(?<![a-zа-я])(?:middle|mid.level|senior|lead|ведущий|старший|опытный)(?![a-zа-я])",
+            title
+        ))
+        if not is_entry_level(title) and not one_year and not (layout_title and entry_evidence and not senior_evidence):
             return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "not Junior or explicitly from one year"}
         if re.search(r"(?:от|from|at least)\s*[2-9]\s*(?:год|года|лет|year)|(?<![\d–—-])\b[2-9]\s*(?:[–—-]\s*\d+\s*)?(?:год|года|лет|years?)", experience):
             return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "experience above one year"}
