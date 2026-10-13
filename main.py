@@ -8,6 +8,11 @@ HH_API="https://api.hh.ru/vacancies"
 QUERIES=[
     ("frontend","junior frontend"),
     ("frontend","junior React"),
+    ("frontend","React разработчик"),
+    ("frontend","React TypeScript"),
+    ("frontend","младший React разработчик"),
+    ("frontend","frontend React"),
+    ("frontend","React frontend developer"),
     ("frontend","junior фронтенд"),
     ("frontend","junior JavaScript"),
     ("frontend","младший frontend"),
