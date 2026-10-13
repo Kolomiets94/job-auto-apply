@@ -1,4 +1,6 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
+import hmac
+import os
 from main import collect
 from profit_ranker import rank_leads
 from queue_store import enqueue, list_queue
@@ -31,4 +33,9 @@ def queue():
 
 @app.post("/run")
 def run_hunter():
+    # Never allow anonymous internet requests to submit real job applications.
+    expected = os.getenv("HUNTER_RUN_TOKEN", "").strip()
+    provided = request.headers.get("Authorization", "")
+    if not expected or not hmac.compare_digest(provided, "Bearer " + expected):
+        return jsonify({"error": "unauthorized"}), 401
     return jsonify(run_worker())
