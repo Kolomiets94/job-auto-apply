@@ -149,7 +149,7 @@ def prioritize_actionable_leads(ranked):
         react_first = 0 if role == "frontend" and "react" in title else 1
         channel = _application_priority(lead)
         return (
-            1 if is_freelance(lead) and channel != 0 else 0,
+            1 if is_freelance(lead) else 0,
             ROLE_PRIORITY.get(role, 99),
             react_first,
             channel,
@@ -482,6 +482,24 @@ def run():
         and bool(os.getenv("REMOTE_JOB_EMAIL") or os.getenv("SMTP_USER"))
     )
 
+    # Show matching employment vacancies independently of freelance projects.
+    job_review = sorted(
+        (lead for lead in ranked if not is_freelance(lead) and lead.get('url')),
+        key=lambda lead: (ROLE_PRIORITY.get(_role_category(lead), 99),
+                          _application_priority(lead), -lead.get('profit_score', 0)),
+    )[:10]
+    stats['job_ranked'] = sum(not is_freelance(lead) for lead in ranked)
+    stats['job_actionable'] = sum(not is_freelance(lead) and _application_priority(lead) == 0 for lead in ranked)
+    if job_review:
+        lines = ['Вакансии Junior Frontend / вёрстка / QA — Россия и мир:',
+                 'Ссылки на вакансии; отправка откликов здесь не подтверждается.']
+        for lead in job_review:
+            lines.append(f"- {str(lead.get('title') or 'Вакансия')[:85]} [{lead.get('source') or '?'}]\n{lead['url']}")
+        try:
+            send_message('\n'.join(lines))
+        except Exception as exc:
+            print(f'[telegram] job shortlist: {type(exc).__name__}', flush=True)
+
     # Report promising freelance projects even when bidding is not supported.
     # Prefer marketplaces where a direct application path may exist, rather
     # than filling the whole shortlist with ProLinker discovery-only cards.
@@ -593,6 +611,8 @@ def run():
         f"Frontend found: {stats['frontend_found']}\n"
         f"Layout found: {stats['layout_found']}\n"
         f"QA found: {stats['qa_found']}\n"
+        f"Job vacancies ranked: {stats['job_ranked']}\n"
+        f"Job actionable channels: {stats['job_actionable']}\n"
         f"Freelance found: {stats['freelance_found']}\n"
         f"Freelance ranked: {stats['freelance_ranked']}\n"
         f"Freelance actionable channels: {stats['freelance_actionable']}\n"
