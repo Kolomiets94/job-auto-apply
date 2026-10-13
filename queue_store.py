@@ -1,4 +1,4 @@
-"""Persistent lead queue using SQLite."""
+"""Persistent lead queue using SQLite locally or Neon PostgreSQL in production."""
 
 import hashlib
 import json
@@ -6,6 +6,7 @@ import os
 import re
 from urllib.parse import urlsplit
 import sqlite3
+from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 
@@ -16,7 +17,45 @@ STATES = (
 )
 
 
+class _PgConnection:
+    def __init__(self, conn):
+        self.conn = conn
+        self.row_factory = None
+
+    def execute(self, sql, params=()):
+        from psycopg.rows import dict_row
+        sql = sql.replace("INSERT OR IGNORE INTO leads", "INSERT INTO leads")
+        if sql.lstrip().startswith("INSERT INTO leads"):
+            sql += " ON CONFLICT (id) DO NOTHING"
+        sql = sql.replace("?", "%s")
+        cur = self.conn.cursor(row_factory=dict_row if self.row_factory else None)
+        cur.execute(sql, params)
+        if self.row_factory:
+            class _Result:
+                def __init__(self, cursor): self.cursor = cursor
+                def fetchall(self): return list(self.cursor.fetchall())
+                def fetchone(self): return self.cursor.fetchone()
+            return _Result(cur)
+        return cur
+
+    def __enter__(self):
+        self.conn.__enter__()
+        return self
+
+    def __exit__(self, *args):
+        return self.conn.__exit__(*args)
+
+
 def _db():
+    url = os.getenv("DATABASE_URL", "").strip()
+    if url:
+        import psycopg
+        conn = psycopg.connect(url, connect_timeout=10)
+        conn.execute("""CREATE TABLE IF NOT EXISTS leads(
+          id TEXT PRIMARY KEY, url TEXT, source TEXT, title TEXT, state TEXT,
+          score INTEGER DEFAULT 0, payload TEXT, updated_at TEXT)""")
+        conn.commit()
+        return _PgConnection(conn)
     c = sqlite3.connect(DB_PATH)
     c.execute("""CREATE TABLE IF NOT EXISTS leads(
       id TEXT PRIMARY KEY, url TEXT, source TEXT, title TEXT, state TEXT,
