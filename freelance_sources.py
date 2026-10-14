@@ -4,6 +4,7 @@ Uses public feeds/listings only: no login, CAPTCHA handling, or private endpoint
 Failures are isolated so one source never stops the hunter.
 """
 import html, re
+from datetime import datetime, timezone
 from urllib.parse import urljoin
 from xml.etree import ElementTree as ET
 import requests
@@ -19,6 +20,14 @@ PPH_URLS=(
     "https://www.peopleperhour.com/freelance-react-js-jobs?sort=latest",
     "https://www.peopleperhour.com/freelance-front-end-developer-jobs?sort=latest",
 )
+WEBLANCER_CATEGORIES=(
+    "https://www.weblancer.net/freelance/dorabotka-saitov/",
+    "https://www.weblancer.net/freelance/sozdanie-saitov/",
+    "https://www.weblancer.net/freelance/html/",
+    "https://www.weblancer.net/freelance/css/",
+    "https://www.weblancer.net/freelance/javascript/",
+)
+FREELANCER_API="https://www.freelancer.com/api/projects/0.1/projects/active/"
 
 def _clean(s):
     return re.sub(r"\s+"," ",html.unescape(re.sub(r"<[^>]+>"," ",s or ""))).strip()
@@ -162,4 +171,95 @@ def collect_peopleperhour():
         except Exception as exc:
             print(f"[peopleperhour] failed: {type(exc).__name__}: {exc}",flush=True)
     print(f"[peopleperhour] {len(out)} leads",flush=True)
+    return out
+
+
+def _parse_weblancer_cards(page):
+    """Use the dated public project cards; an undated card cannot pass today's filter."""
+    out = []
+    for match in re.finditer(r"<article\b[^>]*>(.*?)</article>", page, re.I | re.S):
+        card = match.group(1)
+        heading = re.search(r"<h2\b[^>]*>\s*<a\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>(.*?)</a>", card, re.I | re.S)
+        date_match = re.search(r"\b(\d{2}\.\d{2}\.\d{4})\b", _clean(card))
+        if not heading or not date_match:
+            continue
+        url = urljoin("https://www.weblancer.net", html.unescape(heading.group(1)))
+        if not url.startswith("https://www.weblancer.net/freelance/"):
+            continue
+        try:
+            published = datetime.strptime(date_match.group(1), "%d.%m.%Y").date().isoformat()
+        except ValueError:
+            continue
+        description = re.search(r"<p\b[^>]*>(.*?)</p>", card, re.I | re.S)
+        out.append({
+            "source": "weblancer", "category": "freelance",
+            "title": _clean(heading.group(2)),
+            "description": _clean(description.group(1))[:5000] if description else "",
+            "url": url, "published": published,
+        })
+    return out
+
+
+def collect_weblancer():
+    """Public Weblancer category listings; discovery only, with verified card dates."""
+    out, seen = [], set()
+    for url in WEBLANCER_CATEGORIES:
+        try:
+            response = requests.get(url, headers=UA, timeout=20)
+            response.raise_for_status()
+            for lead in _parse_weblancer_cards(response.text):
+                if lead["url"] not in seen:
+                    seen.add(lead["url"])
+                    out.append(lead)
+        except (requests.RequestException, ValueError) as exc:
+            print(f"[weblancer] {url}: {type(exc).__name__}", flush=True)
+    print(f"[weblancer] {len(out)} dated leads", flush=True)
+    return out
+
+
+def _parse_freelancer_projects(payload):
+    """Parse public active projects without inventing a bid channel or publication date."""
+    if payload.get("status") != "success":
+        return []
+    out = []
+    for item in (payload.get("result") or {}).get("projects") or []:
+        slug = str(item.get("seo_url") or "")
+        timestamp = item.get("submitdate")
+        if (item.get("status") != "active" or not slug or
+                not re.fullmatch(r"[a-zA-Z0-9/_-]+", slug) or
+                not isinstance(timestamp, (int, float))):
+            continue
+        try:
+            published = datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
+        except (OSError, OverflowError, ValueError):
+            continue
+        out.append({
+            "source": "freelancer_com", "category": "freelance",
+            "title": str(item.get("title") or "").strip(),
+            "description": str(item.get("description") or item.get("preview_description") or "")[:5000],
+            "url": "https://www.freelancer.com/projects/" + slug,
+            "published": published, "language": item.get("language"),
+            "budget": item.get("budget"),
+        })
+    return [lead for lead in out if lead["title"]]
+
+
+def collect_freelancer_com():
+    """Official public active-project endpoint; discovery only, no automatic bids."""
+    out, seen = [], set()
+    for query in ("React", "TypeScript", "HTML CSS"):
+        try:
+            response = requests.get(
+                FREELANCER_API, headers=UA,
+                params={"query": query, "limit": 50, "full_description": "true"},
+                timeout=20,
+            )
+            response.raise_for_status()
+            for lead in _parse_freelancer_projects(response.json()):
+                if lead["url"] not in seen:
+                    seen.add(lead["url"])
+                    out.append(lead)
+        except (requests.RequestException, ValueError) as exc:
+            print(f"[freelancer.com] {query}: {type(exc).__name__}", flush=True)
+    print(f"[freelancer.com] {len(out)} dated leads", flush=True)
     return out

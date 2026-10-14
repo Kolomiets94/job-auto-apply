@@ -2,16 +2,22 @@
 import os
 from datetime import datetime, date, timezone
 from email.utils import parsedate_to_datetime
+from zoneinfo import ZoneInfo
+
+LOCAL_TZ = ZoneInfo("Asia/Yekaterinburg")
 
 
 def is_new_publication(lead):
     cutoff = os.getenv("MIN_PUBLICATION_DATE", "").strip()
     if not cutoff:
         return True
-    try:
-        threshold = date.fromisoformat(cutoff)
-    except ValueError:
-        raise ValueError("MIN_PUBLICATION_DATE must be YYYY-MM-DD")
+    if cutoff.lower() == "today":
+        threshold = datetime.now(LOCAL_TZ).date()
+    else:
+        try:
+            threshold = date.fromisoformat(cutoff)
+        except ValueError:
+            raise ValueError("MIN_PUBLICATION_DATE must be YYYY-MM-DD or today")
     raw = lead.get("published") or lead.get("published_at") or lead.get("publication_date")
     if raw is None or str(raw).strip() == "":
         return False
@@ -20,7 +26,7 @@ def is_new_publication(lead):
             number = float(raw)
             if number > 1e11:
                 number /= 1000
-            return datetime.fromtimestamp(number, tz=timezone.utc).date() >= threshold
+            return datetime.fromtimestamp(number, tz=timezone.utc).astimezone(LOCAL_TZ).date() >= threshold
         except (ValueError, OverflowError, OSError):
             return False
     try:
@@ -31,6 +37,5 @@ def is_new_publication(lead):
         except (ValueError, TypeError, IndexError):
             return False
     if parsed.tzinfo is not None:
-        from zoneinfo import ZoneInfo
-        parsed = parsed.astimezone(ZoneInfo("Asia/Yekaterinburg"))
+        parsed = parsed.astimezone(LOCAL_TZ)
     return parsed.date() >= threshold

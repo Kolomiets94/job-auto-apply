@@ -21,8 +21,8 @@ BLOCK = (
     "логотип", "illustrator", "интерьер", "3d-модел",
 )
 RUSSIA_SOURCES = {"hh", "habr_career", "trudvsem", "geekjob", "getmatch", "zarplata", "remote_job_ru", "superjob", "fl_ru", "habr_freelance", "freelancehunt"}
-INTERNATIONAL_SOURCES = {"remoteok", "jobicy", "remotive", "weworkremotely", "arbeitnow", "jooble", "peopleperhour", "prolinker", "prolinker_firecrawl", "upwork_frontend"}
-FREELANCE_SOURCES = {"fl_ru", "habr_freelance", "freelancehunt", "peopleperhour", "prolinker", "prolinker_firecrawl", "upwork_frontend"}
+INTERNATIONAL_SOURCES = {"remoteok", "jobicy", "remotive", "weworkremotely", "arbeitnow", "jooble", "peopleperhour", "prolinker", "prolinker_firecrawl", "upwork_frontend", "freelancer_com"}
+FREELANCE_SOURCES = {"fl_ru", "habr_freelance", "freelancehunt", "peopleperhour", "prolinker", "prolinker_firecrawl", "upwork_frontend", "weblancer", "freelancer_com"}
 TARGET_TITLE_TERMS = (
     "frontend", "front-end", "front end", "фронтенд", "фронтэнд", "фронт-енд", "react", "typescript", "javascript",
     "верстальщик", "верстка", "вёрстка", "html", "css", "веб-разработчик",
@@ -194,7 +194,22 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
             return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "job title outside target roles"}
         experience = re.sub(r"\s*([–—-])\s*", r"\1", str(lead.get("experience") or "").lower())
         category_for_experience = _role_category(lead)
-        # Layout: no experience restriction; keep separate title/stack/placement checks.
+        if re.search(r"(?:от|from|at least|minimum|min\.?|не менее)\s*[3-9]\s*(?:год|года|лет|years?)", experience):
+            return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "experience from 3 years"}
+        if re.search(r"\b\d+[-–—][4-9]\d*\s*(?:год|года|лет|years?)", experience):
+            return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "experience range above 3 years"}
+        if re.search(r"(?<![\d–—-])\b3\s*(?:год|года|лет|years?)", experience):
+            return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "three years required"}
+        if re.search(r"(?<![\d–—-])\b[4-9]\s*(?:год|года|лет|years?)", experience):
+            return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "experience above 3 years"}
+        # Generic layout titles must still show an entry-level signal.
+        if category_for_experience == "layout" and not is_entry_level(title):
+            entry_signal = any(term in (experience + " " + details) for term in (
+                "начинающ", "без опыта", "не требуется опыт", "no experience",
+                "entry level", "entry-level",
+            ))
+            if not entry_signal:
+                return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "layout entry level not confirmed"}
         if category_for_experience != "layout":
             one_year = bool(re.search(r"(?:от|from|at least)\s*1\s*(?:год|года|year)|\b1\s*\+?\s*(?:год|года|year)", experience))
             zero_to_three = bool(re.search(r"\b[01]\s*[-–—]\s*3\s*(?:год|года|лет|years?)", experience))
@@ -202,8 +217,6 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
             if not is_entry_level(title) and not (one_year or zero_to_three or no_experience):
                 return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "not Junior or 0-3 years"}
             # A range ending at 3 years is acceptable; "from 3 years" is not.
-            if re.search(r"(?:от|from|at least|minimum|min\.?|не менее)\s*[3-9]\s*(?:год|года|лет|years?)", experience):
-                return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "experience from 3 years"}
             if re.search(r"(?<![\d–—-])\b[4-9]\s*(?:[-–—]\s*\d+\s*)?(?:год|года|лет|years?)", experience):
                 return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "experience above 3 years"}
         if re.search(r"junior\s*\+|junior\s+plus|джун(?:иор)?\s*\+", title):

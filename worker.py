@@ -6,7 +6,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from job_sources import JOB_COLLECTORS
 
 from main import QUERIES, hh_search, remoteok
-from freelance_sources import collect_freelance, collect_peopleperhour, collect_prolinker
+from freelance_sources import (
+    collect_freelance, collect_peopleperhour, collect_prolinker,
+    collect_weblancer, collect_freelancer_com,
+)
 from freelancehunt_adapter import collect_freelancehunt
 from job_matcher import JobMatcher
 from profit_ranker import rank_leads, FREELANCE_SOURCES, ROLE_PRIORITY, _role_category
@@ -76,6 +79,8 @@ def collect_all():
         ("peopleperhour", collect_peopleperhour),
         ("prolinker", collect_prolinker),
         ("freelancehunt", collect_freelancehunt),
+        ("weblancer", collect_weblancer),
+        ("freelancer_com", collect_freelancer_com),
     ):
         try:
             leads += collector()

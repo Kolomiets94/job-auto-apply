@@ -87,10 +87,13 @@ def test_office_location_policy():
     assert not rank_lead({"source": "hh", "title": "Junior QA Engineer", "location": "Санкт-Петербург", "description": "Работа только в офисе. Manual QA"})["eligible"]
 
 
-def test_layout_experience_unrestricted():
-    base = {"source": "hh", "title": "Верстальщик HTML CSS", "description": "HTML CSS SCSS"}
-    for exp in ("", "без опыта", "от 1 года", "от 3 лет", "5 лет"):
+def test_layout_requires_entry_level_signal_and_rejects_senior_experience():
+    base = {"source": "hh", "title": "Верстальщик HTML CSS",
+            "description": "Начинающий специалист, HTML CSS SCSS"}
+    for exp in ("", "без опыта", "от 1 года"):
         assert rank_lead({**base, "experience": exp})["eligible"], exp
+    for exp in ("от 3 лет", "5 лет"):
+        assert not rank_lead({**base, "experience": exp})["eligible"], exp
 
 
 def test_frontend_accepts_0_to_3_but_not_from_3():
