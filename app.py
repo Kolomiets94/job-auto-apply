@@ -63,3 +63,54 @@ def database_health():
     except Exception:
         app.logger.exception("Database health check failed")
         return jsonify({"database": "unavailable"}), 503
+
+
+def _start_one_shot_from_deploy():
+    """Run a requested diagnostic pass once per ID, even across worker restarts."""
+    marker = os.getenv("HUNTER_ONE_SHOT_ID", "").strip()
+    if not marker:
+        return
+    import threading
+    from datetime import datetime, timezone
+    try:
+        from queue_store import _db
+        with _db() as connection:
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS hunter_one_shot_runs "
+                "(id TEXT PRIMARY KEY, started_at TEXT NOT NULL)"
+            )
+            claim = connection.execute(
+                "INSERT INTO hunter_one_shot_runs (id, started_at) "
+                "VALUES (?, ?) ON CONFLICT (id) DO NOTHING",
+                (marker, datetime.now(timezone.utc).isoformat()),
+            )
+            claimed = claim.rowcount == 1
+    except Exception:
+        app.logger.exception("Could not claim one-shot hunter run")
+        return
+    if not claimed:
+        return
+
+    def run_in_background():
+        try:
+            report = run_worker()
+            stats = report.get("stats", {})
+            fields = ("found", "fresh_unique", "unique_checked", "ranked",
+                      "job_ranked", "job_actionable", "drafted", "submitted",
+                      "smtp_configured", "freelancehunt_token_configured",
+                      "remote_job_identity_configured", "collection_errors")
+            print("[one-shot] complete", {key: stats.get(key) for key in fields}, flush=True)
+            drafts = [item for item in report.get("results", [])
+                      if item.get("status") == "DRAFT"]
+            for item in drafts[:5]:
+                print("[one-shot] draft", repr({
+                    key: item.get(key) for key in ("title", "source", "url", "proposal")
+                }), flush=True)
+        except Exception:
+            app.logger.exception("One-shot hunter run failed")
+
+    print("[one-shot] claimed", marker, flush=True)
+    threading.Thread(target=run_in_background, name="hunter-one-shot", daemon=True).start()
+
+
+_start_one_shot_from_deploy()
