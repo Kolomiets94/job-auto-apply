@@ -83,25 +83,31 @@ def lead_id(lead):
 
 
 def enqueue(lead):
-    lid = lead_id(lead)
-    now = datetime.now(timezone.utc).isoformat()
+    return enqueue_many([lead])[0]
+
+
+def enqueue_many(leads):
+    """Refresh a discovery batch in one transaction/connection."""
+    ids = []
     with _db() as c:
-        c.execute("""INSERT OR IGNORE INTO leads
-        (id,url,source,title,state,score,payload,updated_at)
-        VALUES(?,?,?,?,?,?,?,?)""", (
-            lid, lead.get("url"), lead.get("source"), lead.get("title"),
-            "FOUND", int(lead.get("profit_score", 0)),
-            json.dumps(lead, ensure_ascii=False), now,
-        ))
-    # Refresh metadata without reopening a delivered application or changing its
-    # submission timestamp (daily counts depend on that timestamp).
-    with _db() as c:
-        c.execute("""UPDATE leads SET url=?,source=?,title=?,score=?,payload=?
-                     WHERE id=? AND state NOT IN ('SUBMITTED','REPLIED','WON')""", (
-            lead.get("url"), lead.get("source"), lead.get("title"),
-            int(lead.get("profit_score", 0)), json.dumps(lead, ensure_ascii=False), lid,
-        ))
-    return lid
+        for lead in leads:
+            lid = lead_id(lead)
+            ids.append(lid)
+            payload = json.dumps(lead, ensure_ascii=False)
+            c.execute("""INSERT OR IGNORE INTO leads
+            (id,url,source,title,state,score,payload,updated_at)
+            VALUES(?,?,?,?,?,?,?,?)""", (
+                lid, lead.get("url"), lead.get("source"), lead.get("title"),
+                "FOUND", int(lead.get("profit_score", 0)), payload,
+                datetime.now(timezone.utc).isoformat(),
+            ))
+            # Preserve delivered states and their submission timestamps.
+            c.execute("""UPDATE leads SET url=?,source=?,title=?,score=?,payload=?
+                         WHERE id=? AND state NOT IN ('SUBMITTED','REPLIED','WON')""", (
+                lead.get("url"), lead.get("source"), lead.get("title"),
+                int(lead.get("profit_score", 0)), payload, lid,
+            ))
+    return ids
 
 
 def queued_leads(limit=1000):

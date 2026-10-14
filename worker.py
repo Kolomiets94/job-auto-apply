@@ -15,7 +15,7 @@ from job_matcher import JobMatcher
 from profit_ranker import rank_leads, FREELANCE_SOURCES, ROLE_PRIORITY, _role_category
 from proposal_writer import make_proposal
 from application_dispatcher import dispatch
-from queue_store import enqueue, set_state, submitted_today, was_submitted, queued_leads
+from queue_store import enqueue, enqueue_many, set_state, submitted_today, was_submitted, queued_leads
 from notification_rules import format_notification, should_notify
 from telegram_notifier import send_message, send_notification
 from publication_filter import is_new_publication
@@ -230,16 +230,14 @@ def run():
     fresh = [lead for lead in collect_all() if is_new_publication(lead)]
     # Persist discovery before filtering, so previously found leads can benefit
     # from later description/link adapters instead of disappearing next hour.
-    for lead in fresh:
-        enqueue(lead)
+    enqueue_many(fresh)
     merged = {_lead_key(lead): lead for lead in queued_leads(limit=1000)}
     merged.update({_lead_key(lead): lead for lead in fresh})
     from lead_enrichment import enrich_lead
     candidates = [lead for lead in merged.values() if is_new_publication(lead)]
     with ThreadPoolExecutor(max_workers=3) as pool:
         enriched = list(pool.map(enrich_lead, candidates))
-    for lead in enriched:
-        enqueue(lead)
+    enqueue_many(enriched)
     leads = apply_resume_matching([lead for lead in enriched if not lead.get("unavailable") and is_new_publication(lead)])
     ranked = prioritize_actionable_leads(rank_leads(leads))
     # Diagnose why collected Junior Frontend/layout leads never reach dispatch.

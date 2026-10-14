@@ -13,6 +13,8 @@ def test_collect_all_deduplicates_urls(monkeypatch):
          patch.object(worker, "collect_freelance", return_value=[]), \
          patch.object(worker, "collect_peopleperhour", return_value=[]), \
          patch.object(worker, "collect_prolinker", return_value=[]), \
+             patch.object(worker, "collect_weblancer", return_value=[]), \
+             patch.object(worker, "collect_freelancer_com", return_value=[]), \
          patch.object(worker, "collect_freelancehunt", return_value=[]):
         leads = worker.collect_all()
 
@@ -30,6 +32,8 @@ def test_collect_all_isolates_source_failures(monkeypatch):
          patch.object(worker, "collect_freelance", side_effect=RuntimeError("boom")), \
          patch.object(worker, "collect_peopleperhour", return_value=[]), \
          patch.object(worker, "collect_prolinker", return_value=[]), \
+         patch.object(worker, "collect_weblancer", return_value=[]), \
+         patch.object(worker, "collect_freelancer_com", return_value=[]), \
          patch.object(worker, "collect_freelancehunt", return_value=[]):
         leads = worker.collect_all()
 
