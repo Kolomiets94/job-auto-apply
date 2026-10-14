@@ -76,8 +76,8 @@ def collect_all():
     for source, collector in (
         ("remoteok", remoteok),
         ("freelance", collect_freelance),
-        ("peopleperhour", collect_peopleperhour),
-        ("prolinker", collect_prolinker),
+        # PeoplePerHour and ProLinker do not expose a reliable publication
+        # timestamp, so today's fail-closed filter would discard every card.
         ("freelancehunt", collect_freelancehunt),
         ("weblancer", collect_weblancer),
         ("freelancer_com", collect_freelancer_com),

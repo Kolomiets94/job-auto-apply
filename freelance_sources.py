@@ -11,11 +11,8 @@ import requests
 
 UA={"User-Agent":"Mozilla/5.0 (compatible; JobFreelanceHunter/2.2; +https://github.com/Kolomiets94/-JobAutoApply)"}
 FEEDS=(
-    ("habr_freelance","https://freelance.habr.com/rss/tasks"),
     ("fl_ru","https://www.fl.ru/rss/all.xml"),
-    ("upwork_frontend","https://www.upwork.com/ab/feed/jobs/rss?q=React%20OR%20TypeScript%20OR%20HTML%20OR%20CSS&sort=recency"),
 )
-FIRECRAWL_SCRAPE="https://api.firecrawl.dev/v2/scrape"
 PPH_URLS=(
     "https://www.peopleperhour.com/freelance-react-js-jobs?sort=latest",
     "https://www.peopleperhour.com/freelance-front-end-developer-jobs?sort=latest",
@@ -63,23 +60,6 @@ def collect_freelance():
     print(f"[freelance-feed] total: {len(leads)} leads", flush=True)
     return leads
 
-def _firecrawl_markdown(url):
-    """Firecrawl Keyless scrape: no account/API key required for the free allowance."""
-    r=requests.post(
-        FIRECRAWL_SCRAPE,
-        headers={"Content-Type":"application/json","User-Agent":UA["User-Agent"]},
-        json={"url":url,"formats":["markdown"],"onlyMainContent":True},
-        timeout=45,
-    )
-    if not r.ok:
-        print(f"[firecrawl] HTTP {r.status_code}: {r.text[:500]}", flush=True)
-        r.raise_for_status()
-    data=r.json()
-    if not data.get("success"):
-        print(f"[firecrawl] unsuccessful: {str(data)[:500]}", flush=True)
-        return ""
-    return (data.get("data") or {}).get("markdown","") or data.get("markdown","") or ""
-
 def _parse_prolinker_markdown(md):
     out=[]
     seen=set()
@@ -107,20 +87,15 @@ def _parse_prolinker_markdown(md):
         })
     return out
 
-def collect_prolinker(max_pages=10):
-    """Collect ProLinker via Firecrawl Keyless, with direct HTML as fallback."""
+def collect_prolinker(max_pages=3):
+    """Collect direct public pages only. Undated leads cannot enter today's run."""
     base="https://prolinker.com"
     out=[]
     seen=set()
     for page in range(1,max_pages+1):
         url=f"{base}/projects/s/frontend?skills=Frontend&page={page}"
         page_leads=[]
-        try:
-            page_leads=_parse_prolinker_markdown(_firecrawl_markdown(url))
-        except Exception as exc:
-            print(f"[prolinker] Firecrawl page {page} failed: {type(exc).__name__}: {exc}", flush=True)
-
-        # Cheap fallback if ProLinker happens to allow direct server access.
+        # Direct page only: no Firecrawl traffic.
         if not page_leads:
             try:
                 r=requests.get(url,headers=UA,timeout=25)
@@ -212,7 +187,10 @@ def collect_weblancer():
                     seen.add(lead["url"])
                     out.append(lead)
         except (requests.RequestException, ValueError) as exc:
-            print(f"[weblancer] {url}: {type(exc).__name__}", flush=True)
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            print(f"[weblancer] {url}: HTTP {status or type(exc).__name__}", flush=True)
+            if status in (403, 429):
+                break
     print(f"[weblancer] {len(out)} dated leads", flush=True)
     return out
 
