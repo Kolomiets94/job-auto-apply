@@ -5,7 +5,7 @@ import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from job_sources import JOB_COLLECTORS
 
-from main import QUERIES, hh_search, remoteok
+from main import QUERIES, HHAccessUnavailable, hh_search, remoteok
 from freelance_sources import (
     collect_freelance, collect_peopleperhour, collect_prolinker,
     collect_weblancer, collect_freelancer_com,
@@ -72,6 +72,10 @@ def collect_all():
             leads += matches
         except Exception as exc:
             record_collection_error(f"hh:{tag}:{query}", exc)
+            if isinstance(exc, HHAccessUnavailable):
+                # Every remaining query uses the same unavailable channel.
+                # Avoid repeating a blocked API request for each search term.
+                break
 
     for source, collector in (
         ("remoteok", remoteok),

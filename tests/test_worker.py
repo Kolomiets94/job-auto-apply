@@ -40,6 +40,20 @@ def test_collect_all_isolates_source_failures(monkeypatch):
     assert leads == [lead]
 
 
+def test_hh_block_without_session_stops_repeated_queries_but_other_sources_continue(monkeypatch):
+    monkeypatch.setattr(worker, "JOB_COLLECTORS", ())
+    lead = {"source": "remoteok", "title": "Junior React", "url": "https://example.com/job"}
+    with patch.object(worker, "hh_search", side_effect=worker.HHAccessUnavailable("HH API HTTP 403; browser session missing")) as hh, \
+         patch.object(worker, "remoteok", return_value=[lead]), \
+         patch.object(worker, "collect_freelance", return_value=[]), \
+         patch.object(worker, "collect_freelancehunt", return_value=[]), \
+         patch.object(worker, "collect_weblancer", return_value=[]), \
+         patch.object(worker, "collect_freelancer_com", return_value=[]):
+        assert worker.collect_all() == [lead]
+    assert hh.call_count == 1
+    assert len(worker.COLLECTION_ERRORS) == 1
+
+
 def test_run_keeps_no_email_lead_for_confirmation():
     lead = {
         "source": "test",

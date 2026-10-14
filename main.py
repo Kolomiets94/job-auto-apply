@@ -28,6 +28,10 @@ EXCLUDE=("full stack","fullstack","full-stack","vue","angular","react native","r
 UA={"User-Agent":"JobFreelanceHunter/1.1"}
 
 
+class HHAccessUnavailable(RuntimeError):
+    """Public API is blocked and there is no usable browser search session."""
+
+
 def salary_ok(v):
     """Keep hh.ru vacancies paying at least the configured RUB floor when salary is explicit.
 
@@ -78,7 +82,12 @@ def hh_search(tag,q):
         r=requests.get(HH_API,params={"text":q,"per_page":50,"page":page,"order_by":"publication_time","schedule":"remote"},headers=UA,timeout=20)
         if r.status_code == 403:
             from hh_web_search import search_hh_web
-            return search_hh_web(tag, q)
+            try:
+                return search_hh_web(tag, q)
+            except RuntimeError as exc:
+                if "needs a saved session" in str(exc):
+                    raise HHAccessUnavailable("HH API HTTP 403; browser session missing") from exc
+                raise
         r.raise_for_status()
         payload=r.json()
         items.extend(payload.get("items",[]))
