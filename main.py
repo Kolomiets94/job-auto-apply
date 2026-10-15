@@ -76,24 +76,60 @@ def ok(v):
     return True
 
 
-def hh_search(tag,q):
-    items=[]
+def hh_search(tag, q):
+    """Search official HH public vacancies API, with bounded retry and safe fallback.
+
+    Never treat a blocked API request as proof that no vacancies exist.
+    """
+    import time
+    items = []
     for page in range(6):
-        r=requests.get(HH_API,params={"text":q,"per_page":50,"page":page,"order_by":"publication_time","schedule":"remote"},headers=UA,timeout=20)
-        if r.status_code == 403:
+        params = {"text": q, "per_page": 50, "page": page,
+                  "order_by": "publication_time", "schedule": "remote"}
+        response = None
+        for attempt in range(3):
+            try:
+                response = requests.get(HH_API, params=params, headers=UA, timeout=20)
+            except (requests.Timeout, requests.ConnectionError) as exc:
+                if attempt == 2:
+                    raise HHAccessUnavailable("HH API network unavailable") from exc
+                time.sleep(2 ** attempt)
+                continue
+            if response.status_code in (429, 500, 502, 503, 504):
+                if attempt == 2:
+                    raise HHAccessUnavailable(
+                        f"HH API temporarily unavailable: HTTP {response.status_code}"
+                    )
+                retry_after = response.headers.get("Retry-After", "")
+                delay = min(int(retry_after), 10) if retry_after.isdigit() else 2 ** attempt
+                time.sleep(delay)
+                continue
+            break
+        if response.status_code == 403:
+            # A web-browser fallback requires a real, authorized HH session.
+            # Do not use it without a configured session or bypass challenges.
+            if not os.getenv("HH_STORAGE_STATE_JSON"):
+                raise HHAccessUnavailable("HH API HTTP 403; authenticated browser session unavailable")
             from hh_web_search import search_hh_web
             try:
                 return search_hh_web(tag, q)
-            except RuntimeError as exc:
-                if "needs a saved session" in str(exc):
-                    raise HHAccessUnavailable("HH API HTTP 403; browser session missing") from exc
-                raise
-        r.raise_for_status()
-        payload=r.json()
-        items.extend(payload.get("items",[]))
-        if page >= int(payload.get("pages",1))-1:
+            except Exception as exc:
+                raise HHAccessUnavailable("HH API HTTP 403; browser fallback unavailable") from exc
+        if response.status_code in (401, 407):
+            raise HHAccessUnavailable(f"HH API access denied: HTTP {response.status_code}")
+        response.raise_for_status()
+        payload = response.json()
+        items.extend(payload.get("items", []))
+        if page >= int(payload.get("pages", 1)) - 1:
             break
-    return [{"source":"hh","category":tag,"title":v["name"],"company":(v.get("employer") or {}).get("name"),"url":v.get("alternate_url"),"published":v.get("published_at"),"salary":v.get("salary"),"description":" ".join(str(x or "") for x in (v.get("snippet") or {}).values()),"experience":(v.get("experience") or {}).get("name"),"location":(v.get("area") or {}).get("name")} for v in items if ok(v)]
+    return [{"source": "hh", "category": tag, "title": v["name"],
+             "company": (v.get("employer") or {}).get("name"),
+             "url": v.get("alternate_url"), "published": v.get("published_at"),
+             "salary": v.get("salary"),
+             "description": " ".join(str(x or "") for x in (v.get("snippet") or {}).values()),
+             "experience": (v.get("experience") or {}).get("name"),
+             "location": (v.get("area") or {}).get("name")}
+            for v in items if ok(v)]
 
 
 def remoteok():
