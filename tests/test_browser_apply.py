@@ -132,7 +132,7 @@ def test_hh_live_experience_overrides_search_card():
         result = browser_apply._hh_live_filter(page, {"source": "hh", "title": "Junior QA Engineer",
                                                      "experience": "", "description": "QA"})
     assert not result["eligible"]
-    assert result["rank_reason"] == "experience above one year"
+    assert result["rank_reason"] == "experience range above 3 years"
 
 
 def test_hh_live_requirements_override_search_snippet():
