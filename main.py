@@ -76,24 +76,50 @@ def ok(v):
     return True
 
 
-def hh_search(tag,q):
-    items=[]
+def hh_search(tag, q):
+    """Fetch public HH vacancies with bounded retries and no browser fallback."""
+    import time
+
+    items = []
     for page in range(6):
-        r=requests.get(HH_API,params={"text":q,"per_page":50,"page":page,"order_by":"publication_time","schedule":"remote"},headers=UA,timeout=20)
-        if r.status_code == 403:
-            from hh_web_search import search_hh_web
+        params = {
+            "text": q, "per_page": 50, "page": page,
+            "order_by": "publication_time", "schedule": "remote",
+        }
+        for attempt in range(3):
             try:
-                return search_hh_web(tag, q)
-            except RuntimeError as exc:
-                if "needs a saved session" in str(exc):
-                    raise HHAccessUnavailable("HH API HTTP 403; browser session missing") from exc
-                raise
-        r.raise_for_status()
-        payload=r.json()
-        items.extend(payload.get("items",[]))
-        if page >= int(payload.get("pages",1))-1:
+                r = requests.get(HH_API, params=params, headers=UA, timeout=20)
+            except (requests.Timeout, requests.ConnectionError) as exc:
+                if attempt == 2:
+                    raise HHAccessUnavailable("HH API network unavailable") from exc
+                time.sleep(2 ** attempt)
+                continue
+            if r.status_code in (401, 403):
+                raise HHAccessUnavailable(f"HH API HTTP {r.status_code}; stop queries")
+            if r.status_code == 429 or 500 <= r.status_code < 600:
+                if attempt == 2:
+                    raise HHAccessUnavailable(f"HH API HTTP {r.status_code} after retries")
+                retry_after = r.headers.get("Retry-After", "")
+                try:
+                    delay = min(30, max(1, float(retry_after)))
+                except (TypeError, ValueError):
+                    delay = 2 ** attempt
+                time.sleep(delay)
+                continue
+            r.raise_for_status()
             break
-    return [{"source":"hh","category":tag,"title":v["name"],"company":(v.get("employer") or {}).get("name"),"url":v.get("alternate_url"),"published":v.get("published_at"),"salary":v.get("salary"),"description":" ".join(str(x or "") for x in (v.get("snippet") or {}).values()),"experience":(v.get("experience") or {}).get("name"),"location":(v.get("area") or {}).get("name")} for v in items if ok(v)]
+        payload = r.json()
+        items.extend(payload.get("items", []))
+        if page >= int(payload.get("pages", 1)) - 1:
+            break
+    return [{"source": "hh", "category": tag, "title": v["name"],
+             "company": (v.get("employer") or {}).get("name"),
+             "url": v.get("alternate_url"), "published": v.get("published_at"),
+             "salary": v.get("salary"),
+             "description": " ".join(str(x or "") for x in (v.get("snippet") or {}).values()),
+             "experience": (v.get("experience") or {}).get("name"),
+             "location": (v.get("area") or {}).get("name")}
+            for v in items if ok(v)]
 
 
 def remoteok():
