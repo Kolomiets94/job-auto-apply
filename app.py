@@ -65,6 +65,21 @@ def database_health():
         return jsonify({"database": "unavailable"}), 503
 
 
+@app.get("/health/db/status")
+def public_database_status():
+    """Read-only connectivity probe; never expose credentials or database details."""
+    if not os.getenv("DATABASE_URL", "").strip():
+        return jsonify({"database": "unavailable"}), 503
+    try:
+        from queue_store import _db
+        with _db() as connection:
+            connection.execute("SELECT 1").fetchone()
+        return jsonify({"database": "ok"})
+    except Exception:
+        app.logger.warning("Public database connectivity check failed")
+        return jsonify({"database": "unavailable"}), 503
+
+
 def _start_one_shot_from_deploy():
     """Run a requested diagnostic pass once per ID, even across worker restarts."""
     marker = os.getenv("HUNTER_ONE_SHOT_ID", "").strip()
