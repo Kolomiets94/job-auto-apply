@@ -162,7 +162,7 @@ def test_two_challenges_pause_browser_but_allow_email(monkeypatch):
 
 def test_draft_run_prepares_letter_without_dispatch_or_state_change(monkeypatch):
     lead = {"source": "hh", "category": "frontend", "title": "Junior React Developer",
-            "url": "https://hh.ru/vacancy/1234", "description": "React"}
+            "url": "https://hh.ru/vacancy/1234", "description": "React", "match_score": 90}
     monkeypatch.setenv("DRY_RUN", "1")
     monkeypatch.setattr(worker, "JOB_COLLECTORS", ())
     monkeypatch.setattr("lead_enrichment.enrich_lead", lambda item: item)
@@ -175,12 +175,15 @@ def test_draft_run_prepares_letter_without_dispatch_or_state_change(monkeypatch)
          patch.object(worker, "submitted_today", return_value=0), \
          patch.object(worker, "set_state") as set_state, \
          patch.object(worker, "dispatch") as dispatch, \
+         patch.object(worker, "send_notification", return_value={"status": "SENT"}) as alert, \
          patch.object(worker, "send_message", return_value={"status": "SENT"}):
         report = worker.run()
     assert report["stats"]["submitted"] == 0
     assert report["stats"]["drafted"] == 1
     assert report["results"][0]["status"] == "DRAFT"
     assert "https://github.com/Kolomiets94/" in report["results"][0]["proposal"]
+    assert report["stats"]["notifications_sent"] == 1
+    assert alert.call_args.args[0]["url"] == lead["url"]
     dispatch.assert_not_called()
     set_state.assert_not_called()
 

@@ -399,14 +399,8 @@ def run():
             })
             continue
 
-        if dry_run:
-            proposal = make_proposal(lead)
-            stats["drafted"] += 1
-            results.append({"id": lid, "title": lead.get("title"), "source": lead.get("source"),
-                            "url": lead.get("url"), "status": "DRAFT", "reason": "dry_run",
-                            "proposal": proposal})
-            continue
-
+        # Alerts describe matched vacancies, regardless of whether this run
+        # merely prepares a draft or sends an application.
         if should_notify(lead):
             notifications.append({
                 "title": lead.get("title"),
@@ -415,6 +409,14 @@ def run():
                 "match_score": lead.get("match_score"),
                 "message": format_notification(lead),
             })
+
+        if dry_run:
+            proposal = make_proposal(lead)
+            stats["drafted"] += 1
+            results.append({"id": lid, "title": lead.get("title"), "source": lead.get("source"),
+                            "url": lead.get("url"), "status": "DRAFT", "reason": "dry_run",
+                            "proposal": proposal})
+            continue
 
         try:
             set_state(lid, "SHORTLISTED")
