@@ -1,0 +1,5 @@
+hh_storage_state.json
+.env
+__pycache__/
+*.pyc
+hunter.db
