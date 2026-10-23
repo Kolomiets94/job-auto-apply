@@ -1,0 +1,4 @@
+hh-storage-state.json
+hunter.db
+__pycache__/
+.pytest_cache/
