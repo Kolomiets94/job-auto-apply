@@ -59,7 +59,7 @@ def inspect_public_page():
         data = request.get_json(silent=True) or {}
         target = _validate_public_url((data.get("url") or "").strip())
         response = requests.post(
-            "https://api.browserbase.com/v1/sessions",
+            "https://www.browserbase.com/v1/sessions",
             headers={"X-BB-API-Key": api_key, "Content-Type": "application/json"},
             json={"projectId": project_id, "browserSettings": {"viewport": {"width": 1280, "height": 800}}},
             timeout=20,
