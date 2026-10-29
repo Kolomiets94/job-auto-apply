@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: cloud-job-assistant
+    runtime: python
+    plan: free
+    buildCommand: pip install -r cloud-browser-agent/requirements.txt
+    startCommand: cd cloud-browser-agent && gunicorn app:app --bind 0.0.0.0:$PORT
+    healthCheckPath: /health
+    autoDeploy: true
