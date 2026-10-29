@@ -2,9 +2,11 @@ import os
 from flask import Flask, request, jsonify, render_template_string
 from urllib.parse import urlparse
 from browserbase_routes import browserbase_bp
+from assistant_routes import assistant_bp
 
 app = Flask(__name__)
 app.register_blueprint(browserbase_bp)
+app.register_blueprint(assistant_bp)
 PROFILE = {
     "name": os.getenv("CANDIDATE_NAME", "Alexander Kolomiets"),
     "email": os.getenv("CANDIDATE_EMAIL", "kolomiets94@yandex.ru"),
@@ -27,7 +29,7 @@ textarea{min-height:90px}button{background:#225de6;color:white;border:0;border-r
 .item{border-top:1px solid #e6eaf2;padding:12px 0;overflow-wrap:anywhere}.pill{font-size:12px;background:#e9efff;padding:4px 8px;border-radius:99px}
 @media(max-width:650px){.grid{grid-template-columns:1fr}.wrap{margin:10px;padding:10px}}
 </style><div class="wrap">
-<header><h1>Cloud Job Assistant</h1><p>Prepare and track job-application tasks. This first version validates target URLs and builds a tailored application brief. It does not submit applications or store passwords.</p><span class="pill">Prototype · free-tier friendly</span><p><a href="/browser">Open cloud browser test →</a></p></header>
+<header><h1>Cloud Job Assistant</h1><p>Prepare and track job-application tasks. This first version validates target URLs and builds a tailored application brief. It does not submit applications or store passwords.</p><span class="pill">Prototype · free-tier friendly</span><p><a href="/assistant">Универсальный помощник →</a> · <a href="/browser">Тест облачного браузера →</a></p></header>
 <div class="panel"><h2>New application task</h2><form id="task">
 <label>Job posting URL</label><input name="url" type="url" placeholder="https://company.com/careers/job" required>
 <div class="grid"><div><label>Role</label><input name="role" value="Junior Frontend Developer (React / TypeScript)"></div><div><label>Company</label><input name="company" placeholder="Company name"></div></div>
