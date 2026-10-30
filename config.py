@@ -20,12 +20,12 @@ os.makedirs(USER_DATA_FOLDER, exist_ok=True)
 
 # Default filters
 DEFAULT_FILTERS = {
-    'keywords': ['frontend', 'react', 'javascript', 'typescript', 'vue', 'angular'],
+    'keywords': ['frontend', 'react', 'javascript', 'typescript', 'html', 'css', 'scss'],
     'exclude_keywords': ['senior', 'lead', 'manager', 'director'],
-    'min_salary': 0,
+    'min_salary': 60000,
     'remote_only': True,
     'experience_level': 'junior',
-    'cities': ['Москва', 'Санкт-Петербург', 'Удаленная работа']
+    'cities': ['Екатеринбург', 'Удаленная работа по России']
 }
 
 # hh.ru API
