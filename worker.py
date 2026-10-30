@@ -20,7 +20,7 @@ from notification_rules import format_notification, should_notify
 from telegram_notifier import send_message, send_notification
 from publication_filter import is_new_publication
 
-DEFAULT_RESUME_TEXT = """Junior Frontend Developer. React, TypeScript, JavaScript ES6+, Redux Toolkit, React Router, REST API, HTML5, CSS3, SCSS, Git, Figma, Vite, Webpack, responsive and cross-browser layout. Projects include authentication, protected routes, CRUD, API integration, debounce search, validation and error handling. Manual testing of own web applications. English B1. Remote work."""
+DEFAULT_RESUME_TEXT = """Junior Frontend Developer. React, TypeScript, JavaScript ES6+, Redux Toolkit, React Router, REST API, HTML5, CSS3, SCSS, Git, Figma, Vite, Webpack, responsive and cross-browser layout. Projects include authentication, protected routes, CRUD, API integration, debounce search, validation and error handling. Manual testing of own web applications. English A2. Remote work."""
 
 
 def load_resume_text():
