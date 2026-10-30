@@ -11,9 +11,8 @@ def test_qa_automation_with_javascript_is_not_frontend():
         "category": "frontend",
     })
 
-    assert lead["eligible"]
-    assert lead["category"] == "qa"
-    assert lead["role_priority"] == 2
+    assert not lead["eligible"]
+    assert lead["rank_reason"] == "non-target QA role"
     assert not title_matches_category(title, "frontend")
     assert title_matches_category(title, "qa")
 
