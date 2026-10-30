@@ -186,6 +186,29 @@ def submitted_today(bucket=None):
                if ((str(source or "").lower() in FREELANCE_SOURCES) == (bucket == "freelance")))
 
 
+
+def submitted_this_week(bucket=None):
+    """Count confirmed submissions since Monday 00:00 in Yekaterinburg."""
+    from profit_ranker import FREELANCE_SOURCES
+    local = datetime.now(ZoneInfo("Asia/Yekaterinburg"))
+    monday = (local - timedelta(days=local.weekday())).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    start_utc = monday.astimezone(timezone.utc).isoformat()
+    with _db() as c:
+        rows = c.execute(
+            """SELECT source FROM leads
+               WHERE state IN ('SUBMITTED','REPLIED','WON') AND updated_at>=?""",
+            (start_utc,),
+        ).fetchall()
+    if bucket is None:
+        return len(rows)
+    if bucket not in ("jobs", "freelance"):
+        raise ValueError("invalid weekly limit bucket")
+    return sum(1 for (source,) in rows
+               if ((str(source or "").lower() in FREELANCE_SOURCES) == (bucket == "freelance")))
+
+
 def list_queue(limit=100):
     with _db() as c:
         c.row_factory = sqlite3.Row
