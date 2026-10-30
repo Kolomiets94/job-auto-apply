@@ -219,8 +219,6 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
             # A range ending at 3 years is acceptable; "from 3 years" is not.
             if re.search(r"(?<![\d–—-])\b[4-9]\s*(?:[-–—]\s*\d+\s*)?(?:год|года|лет|years?)", experience):
                 return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "experience above 3 years"}
-        if re.search(r"junior\s*\+|junior\s+plus|джун(?:иор)?\s*\+", title):
-            return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "Junior+ excluded"}
 
     if source in FREELANCE_SOURCES and not any(x in title for x in (
         "react", "typescript", "javascript", "frontend", "front-end", "front end",
