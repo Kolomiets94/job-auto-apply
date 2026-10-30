@@ -1,6 +1,8 @@
 name: Hourly Job Hunter
 
 on:
+  schedule:
+    - cron: '0 * * * *'
   workflow_dispatch:
 
 concurrency:
@@ -18,8 +20,8 @@ jobs:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       MATCH_NOTIFY_MIN_SCORE: "70"
-      AUTO_FREELANCE_APPLY: "1"
-      AUTO_FREELANCE_ESTIMATED_BIDS: "1"
+      AUTO_FREELANCE_APPLY: "0"
+      AUTO_FREELANCE_ESTIMATED_BIDS: "0"
       FREELANCE_QUOTE_HOURLY_RATE: "750"
       FREELANCE_QUOTE_CURRENCY: "UAH"
       FREELANCEHUNT_TOKEN: ${{ secrets.FREELANCEHUNT_TOKEN }}
@@ -30,7 +32,7 @@ jobs:
       SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
       AUTO_BROWSER_APPLY: "1"
       EXTERNAL_APPLY_HOSTS: ${{ vars.EXTERNAL_APPLY_HOSTS }}
-      AUTO_APPLY_QA: "1"
+      AUTO_APPLY_QA: "0"
       REMOTE_JOB_NAME: ${{ secrets.REMOTE_JOB_NAME }}
       REMOTE_JOB_EMAIL: ${{ secrets.REMOTE_JOB_EMAIL || secrets.SMTP_USER }}
       REMOTE_JOB_PHONE: ${{ secrets.REMOTE_JOB_PHONE }}
@@ -38,6 +40,7 @@ jobs:
       # Live mode: submit eligible applications, respecting rate and daily limits.
       DRY_RUN: "0"
       DAILY_TOTAL_LIMIT: "5"
+      WEEKLY_TOTAL_LIMIT: "20"
       HOURLY_TOTAL_LIMIT: "2"
       DAILY_JOB_LIMIT: "5"
       DAILY_FREELANCE_LIMIT: "5"
