@@ -10,7 +10,6 @@ SKILLS = {
     "frontend": .65, "front-end": .65, "верстка": .7, "вёрстка": .7,
     "верстка сайта": .85, "вёрстка сайта": .85, "верстальщик": .85,
     "лендинг": .55, "landing": .55, "адаптив": .5, "сайт": .25,
-    "qa": .55, "tester": .55, "тестировщик": .55, "manual qa": .65,
 }
 BLOCK = (
     "middle", "mid-level", "mid level", "senior", "lead ", "team lead", "tech lead", "head of", "manager", "director", "fullstack", "full stack", "full-stack",
@@ -26,8 +25,6 @@ FREELANCE_SOURCES = {"fl_ru", "habr_freelance", "freelancehunt", "peopleperhour"
 TARGET_TITLE_TERMS = (
     "frontend", "front-end", "front end", "фронтенд", "фронтэнд", "фронт-енд", "react", "typescript", "javascript",
     "верстальщик", "верстка", "вёрстка", "html", "css", "веб-разработчик",
-    "qa tester", "qa engineer", "manual qa", "manual tester",
-    "тестировщик", "quality assurance",
 )
 NON_TARGET_TITLE_TERMS = (
     "architect", "assessor", "annotator", "trainer", "evaluator",
@@ -122,9 +119,6 @@ def _location_rejected(lead: Dict[str, Any], text: str) -> bool:
 def _role_category(lead: Dict[str, Any]) -> str:
     """Route jobs to the user's preferred role/resume order."""
     title = str(lead.get("title") or "").lower()
-    # QA automation titles may mention JavaScript/TypeScript or React.
-    if re.search(r"\bqa\b|tester|тестировщик|тестирование|quality assurance|manual test|автотест", title):
-        return "qa"
     # Frontend wins when HTML/CSS also appears in the title.
     if any(x in title for x in ("frontend", "front-end", "front end", "фронтенд", "фронтэнд", "фронт-енд", "react", "typescript", "javascript", "веб-разработчик")):
         return "frontend"
@@ -133,7 +127,7 @@ def _role_category(lead: Dict[str, Any]) -> str:
     return str(lead.get("category") or "other").lower()
 
 
-ROLE_PRIORITY = {"frontend": 0, "layout": 1, "qa": 2}
+ROLE_PRIORITY = {"frontend": 0, "layout": 1}
 
 
 def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
@@ -260,7 +254,7 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
 def rank_leads(leads):
     ranked = [rank_lead(x) for x in leads]
     eligible = (x for x in ranked if x["eligible"])
-    # Primary order requested by the user: Frontend -> layout -> QA.
+    # Primary order requested by the user: Frontend -> layout.
     # Within the same role, keep the strongest fit/profit score first.
     return sorted(
         eligible,
