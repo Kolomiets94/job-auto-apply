@@ -129,8 +129,8 @@ def test_hh_live_experience_overrides_search_card():
     description.inner_text.return_value = "Manual QA Linux"
     page.locator.side_effect = lambda selector: Mock(first=experience if selector == '[data-qa="vacancy-experience"]' else description)
     with patch.object(browser_apply, "_visible", return_value=True):
-        result = browser_apply._hh_live_filter(page, {"source": "hh", "title": "Junior QA Engineer",
-                                                     "experience": "", "description": "QA"})
+        result = browser_apply._hh_live_filter(page, {"source": "hh", "title": "Junior React Developer",
+                                                     "experience": "", "description": "React TypeScript"})
     assert not result["eligible"]
     assert result["rank_reason"] == "experience range above 3 years"
 
