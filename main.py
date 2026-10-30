@@ -20,9 +20,6 @@ QUERIES=[
     ("layout","junior HTML CSS"),
     ("layout","младший верстальщик"),
     ("layout","junior HTML"),
-    ("qa","junior QA tester"),
-    ("qa","manual QA junior"),
-    ("qa","junior тестировщик"),
 ]
 EXCLUDE=("full stack","fullstack","full-stack","vue","angular","react native","react-native","flutter","middle","senior","lead","head of","manager","director")
 UA={"User-Agent":"JobFreelanceHunter/1.1"}
@@ -70,7 +67,6 @@ def ok(v):
     if any(x in title for x in level_terms): return False
     if any(x in text for x in EXCLUDE if x not in level_terms): return False
     if not salary_ok(v): return False
-    if re.search(r"junior\s*\+|джуниор\s*\+|джун\s*\+", title): return False
     if re.search(r"\b(?:intern|internship|trainee)\b|стаж[её]р|стажиров|практикант", title): return False
     if any(x in title for x in ("офис", "гибрид", "hybrid", "onsite", "on-site")): return False
     return True
