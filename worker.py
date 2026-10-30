@@ -15,7 +15,7 @@ from job_matcher import JobMatcher
 from profit_ranker import rank_leads, FREELANCE_SOURCES, ROLE_PRIORITY, _role_category
 from proposal_writer import make_proposal
 from application_dispatcher import dispatch
-from queue_store import enqueue, enqueue_many, set_state, submitted_today, was_submitted, queued_leads
+from queue_store import enqueue, enqueue_many, set_state, submitted_today, submitted_this_week, was_submitted, queued_leads
 from notification_rules import format_notification, should_notify
 from telegram_notifier import send_message, send_notification
 from publication_filter import is_new_publication
@@ -272,6 +272,8 @@ def run():
                    if all(v is not None for v in daily_limits.values()) else None)
     submitted_count = sum(daily_counts.values())
     total_daily_limit = _application_limit("DAILY_TOTAL_LIMIT")
+    weekly_total_limit = _application_limit("WEEKLY_TOTAL_LIMIT")
+    weekly_submitted_count = submitted_this_week()
     total_hourly_limit = _application_limit("HOURLY_TOTAL_LIMIT")
     dry_run = os.getenv("DRY_RUN", "0").strip().lower() in ("1", "true", "yes")
     job_limit = _application_limit("HOURLY_JOB_LIMIT")
@@ -368,6 +370,12 @@ def run():
             })
             continue
 
+        if weekly_total_limit is not None and weekly_submitted_count >= weekly_total_limit:
+            stats["weekly_limit_skipped"] = stats.get("weekly_limit_skipped", 0) + 1
+            results.append({"id": lid, "title": lead.get("title"), "source": lead.get("source"),
+                            "url": lead.get("url"), "status": "SKIPPED", "reason": "weekly_total_limit"})
+            continue
+
         if total_daily_limit is not None and submitted_count >= total_daily_limit:
             stats["daily_limit_skipped"] += 1
             results.append({"id": lid, "title": lead.get("title"), "source": lead.get("source"),
@@ -435,6 +443,7 @@ def run():
 
             if state == "SUBMITTED":
                 submitted_count += 1
+                weekly_submitted_count += 1
                 daily_counts[bucket] += 1
                 stats["submitted"] += 1
                 stats[bucket] += 1
