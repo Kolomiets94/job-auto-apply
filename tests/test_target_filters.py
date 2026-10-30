@@ -50,7 +50,7 @@ def test_junior_web_developer_in_moscow_is_frontend():
 
 
 def test_junior_title_does_not_override_experience_range():
-    base = {"source": "hh", "title": "Junior QA Engineer", "description": "Manual QA"}
+    base = {"source": "hh", "title": "Junior React Developer", "description": "React TypeScript"}
     for experience in ("3–6 лет", "3-6 лет", "2 года", "от 3 лет", "3 years"):
         result = rank_lead({**base, "experience": experience})
         assert (result["eligible"] if experience in ("2 года",) else not result["eligible"]), experience
