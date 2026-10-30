@@ -37,7 +37,7 @@ jobs:
       REMOTE_JOB_EMAIL: ${{ secrets.REMOTE_JOB_EMAIL || secrets.SMTP_USER }}
       REMOTE_JOB_PHONE: ${{ secrets.REMOTE_JOB_PHONE }}
       HH_STORAGE_STATE_JSON: ${{ secrets.HH_STORAGE_STATE_JSON }}
-      # Live mode: submit eligible applications, respecting rate and daily limits.
+      # Safe validation mode: collect vacancies and prepare drafts; do not send applications.
       DRY_RUN: "1"
       DAILY_TOTAL_LIMIT: "5"
       WEEKLY_TOTAL_LIMIT: "20"
