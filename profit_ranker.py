@@ -184,7 +184,7 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     if source not in FREELANCE_SOURCES:
         if any(x in title for x in NON_TARGET_TITLE_TERMS):
             return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "non-target job title"}
-        if not any(x in title for x in TARGET_TITLE_TERMS) and not re.search(r"\bqa\b|\btester\b", title):
+        if not any(x in title for x in TARGET_TITLE_TERMS):
             return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "job title outside target roles"}
         experience = re.sub(r"\s*([–—-])\s*", r"\1", str(lead.get("experience") or "").lower())
         category_for_experience = _role_category(lead)
