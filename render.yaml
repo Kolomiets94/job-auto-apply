@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: job-auto-apply
+    runtime: docker
+    plan: free
+    region: frankfurt
+    branch: render-playwright-migration
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: DRY_RUN
+        value: "1"
+      - key: AUTO_BROWSER_APPLY
+        value: "0"
+      - key: AUTO_SEND_EMAIL
+        value: "0"
+      - key: AUTO_FREELANCE_APPLY
+        value: "0"
+      - key: AUTO_APPLY_QA
+        value: "0"
+      - key: HUNTER_RUN_TOKEN
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
