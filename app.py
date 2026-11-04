@@ -52,6 +52,25 @@ def queue():
         return jsonify({"error": "unauthorized"}), 401
     return jsonify({"items":list_queue()})
 
+@app.post("/telegram/test")
+def telegram_test():
+    """Send one fixed Telegram connectivity test; protected by the hunter run token."""
+    if not _authorized():
+        return jsonify({"error": "unauthorized"}), 401
+
+    from telegram_notifier import is_configured, send_message
+
+    if not is_configured():
+        return jsonify({"error": "telegram_not_configured"}), 503
+
+    try:
+        result = send_message("JobAutoApplyAlerts: тестовое подключение Telegram успешно.")
+        return jsonify({"status": "sent", "parts": result.get("parts", 1)}), 200
+    except Exception:
+        app.logger.exception("Telegram connectivity test failed")
+        return jsonify({"error": "telegram_send_failed"}), 502
+
+
 @app.post("/run")
 def run_hunter():
     # Never allow anonymous internet requests to submit real job applications.
