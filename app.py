@@ -71,6 +71,33 @@ def telegram_test():
         return jsonify({"error": "telegram_send_failed"}), 502
 
 
+@app.route("/telegram/test-form", methods=["GET", "POST"])
+def telegram_test_form():
+    """Phone-friendly one-message test, protected by a separate Render secret."""
+    if request.method == "GET":
+        return """<!doctype html><html lang="ru"><meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>Telegram test</title><body style="font:16px sans-serif;max-width:34rem;margin:3rem auto;padding:0 1rem">
+        <h2>Тест Telegram</h2><p>Введи TELEGRAM_TEST_TOKEN из Render. Пароль отправляется только в POST-запросе.</p>
+        <form method="post"><input type="password" name="token" required autocomplete="off"
+        placeholder="TELEGRAM_TEST_TOKEN" style="box-sizing:border-box;width:100%;padding:12px">
+        <button style="margin-top:12px;padding:12px 18px">Отправить одно тестовое сообщение</button></form></body></html>"""
+
+    expected = os.getenv("TELEGRAM_TEST_TOKEN", "").strip()
+    provided = request.form.get("token", "").strip()
+    if not expected or not hmac.compare_digest(provided, expected):
+        return "Неверный токен или TELEGRAM_TEST_TOKEN не настроен.", 401
+
+    from telegram_notifier import is_configured, send_message
+    if not is_configured():
+        return "Telegram не настроен: проверь TELEGRAM_BOT_TOKEN и TELEGRAM_CHAT_ID.", 503
+    try:
+        send_message("JobAutoApplyAlerts: тестовое подключение Telegram успешно.")
+        return "Готово: тестовое сообщение отправлено в Telegram."
+    except Exception:
+        app.logger.exception("Telegram connectivity test failed")
+        return "Не удалось отправить тест. Проверь логи Render.", 502
+
+
 @app.post("/run")
 def run_hunter():
     # Never allow anonymous internet requests to submit real job applications.
