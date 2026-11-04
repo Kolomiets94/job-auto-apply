@@ -197,6 +197,92 @@ def public_database_status():
         return jsonify({"database": "unavailable"}), 503
 
 
+
+@app.get("/dashboard")
+def dashboard():
+    """Read-only mobile dashboard. Protected with HTTP Basic Auth over HTTPS."""
+    expected = os.getenv("DASHBOARD_PASSWORD", "").strip()
+    if not expected:
+        return jsonify({"error": "dashboard_password_not_configured"}), 503
+
+    auth = request.authorization
+    username = os.getenv("DASHBOARD_USER", "candidate").strip()
+    provided_user = auth.username if auth and auth.username else ""
+    provided_password = auth.password if auth and auth.password else ""
+    if not (hmac.compare_digest(provided_user, username) and
+            hmac.compare_digest(provided_password, expected)):
+        response = jsonify({"error": "authentication_required"})
+        response.status_code = 401
+        response.headers["WWW-Authenticate"] = 'Basic realm="Job Auto Apply Dashboard"'
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    import json
+    from flask import render_template_string
+    rows = list_queue(limit=100)
+    items = []
+    counts = {}
+    for row in rows:
+        state = str(row.get("state") or "UNKNOWN")
+        counts[state] = counts.get(state, 0) + 1
+        try:
+            payload = json.loads(row.get("payload") or "{}")
+        except (TypeError, ValueError):
+            payload = {}
+        url = str(row.get("url") or payload.get("url") or "")
+        if not url.startswith(("https://", "http://")):
+            url = ""
+        items.append({
+            "title": str(row.get("title") or payload.get("title") or "Без названия"),
+            "source": str(row.get("source") or payload.get("source") or "—"),
+            "url": url,
+            "score": row.get("score") or 0,
+            "state": state,
+            "updated": str(row.get("updated_at") or ""),
+            "location": str(payload.get("location") or payload.get("country") or "Не указано"),
+            "salary": str(payload.get("salary") or payload.get("salary_text") or "Не указана"),
+            "eligibility": str(payload.get("eligibility_status") or payload.get("russia_eligibility") or "Не подтверждена — нужна проверка"),
+        })
+
+    page = """<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Job Auto Apply — вакансии</title>
+<style>
+:root{color-scheme:light dark}*{box-sizing:border-box}
+body{font:16px/1.45 system-ui,-apple-system,sans-serif;margin:0;padding:18px;
+max-width:850px;margin-inline:auto;background:Canvas;color:CanvasText}
+h1{font-size:1.35rem;margin:.2rem 0}.muted{opacity:.72;font-size:.9rem}
+.stats{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}
+.stat{border:1px solid #8886;border-radius:12px;padding:8px 12px}
+.card{border:1px solid #8886;border-radius:14px;padding:14px;margin:10px 0}
+.card h2{font-size:1.04rem;margin:0 0 8px}
+.meta{display:flex;gap:8px;flex-wrap:wrap;font-size:.9rem}
+.pill{border:1px solid #8887;border-radius:99px;padding:2px 8px}
+a{color:LinkText;overflow-wrap:anywhere}.line{margin:6px 0}
+</style></head><body>
+<h1>Job Auto Apply</h1>
+<div class="muted">Последние {{ items|length }} записей · только просмотр, без отправки откликов</div>
+<div class="stats">{% for state,count in counts.items() %}
+<div class="stat"><b>{{ count }}</b><div class="muted">{{ state }}</div></div>
+{% else %}<div class="muted">Очередь пока пуста</div>{% endfor %}</div>
+{% for item in items %}
+<article class="card"><h2>{% if item.url %}<a href="{{ item.url }}" target="_blank" rel="noopener noreferrer">{{ item.title }}</a>{% else %}{{ item.title }}{% endif %}</h2>
+<div class="meta"><span class="pill">{{ item.state }}</span><span class="pill">Оценка: {{ item.score }}</span><span class="pill">{{ item.source }}</span></div>
+<div class="line">🌍 {{ item.location }}</div><div class="line">💰 {{ item.salary }}</div>
+<div class="line">Проверка работы из России: {{ item.eligibility }}</div>
+<div class="muted">{{ item.updated }}</div></article>
+{% endfor %}
+</body></html>"""
+    response = app.make_response(render_template_string(page, items=items, counts=counts))
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
+
+
 def _start_one_shot_from_deploy():
     """Run a requested diagnostic pass once per ID, even across worker restarts."""
     marker = os.getenv("HUNTER_ONE_SHOT_ID", "").strip()
