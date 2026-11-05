@@ -239,7 +239,18 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     resume_match = lead.get("match_score")
     resume_score = (resume_match / 100.0) if isinstance(resume_match, (int, float)) else 0
 
+    # Prefer Russian-market vacancies when otherwise comparable. Explicit Russian
+    # sources, Russian-language listings, and listings located in Russia receive
+    # a modest ranking bonus; this does not exclude international remote roles.
+    location_text = " ".join(str(lead.get(k) or "") for k in ("location", "region", "city")).lower()
+    is_russian_market = (
+        source in RUSSIA_SOURCES
+        or str(lead.get("language") or "").lower() in ("ru", "русский", "russian")
+        or any(term in location_text for term in ("россия", "russia", "рф"))
+    )
     score = round(min(100, (fit * .45 + budget_score * .25 + quick + comp_score + resume_score * .25) * 100))
+    if is_russian_market:
+        score = min(100, score + 15)
     category = _role_category(lead)
     return {
         **lead,
