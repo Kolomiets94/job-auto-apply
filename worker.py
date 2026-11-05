@@ -169,21 +169,17 @@ def prioritize_actionable_leads(ranked):
     return sorted(ranked, key=priority)
 
 
+def _suppress_telegram_message(_text):
+    """Keep discovery alerts out of Telegram; the run summary is the sole message."""
+    return {"status": "SKIPPED", "reason": "summary_only_mode"}
+
+
 def deliver_notifications(notifications):
-    deliveries = []
-    for notification in notifications:
-        try:
-            deliveries.append({
-                "title": notification.get("title"),
-                **send_notification(notification),
-            })
-        except Exception as exc:
-            deliveries.append({
-                "title": notification.get("title"),
-                "status": "FAILED",
-                "reason": type(exc).__name__,
-            })
-    return deliveries
+    # Retain notification counts for diagnostics, but never send per-vacancy alerts.
+    return [
+        {"title": item.get("title"), "status": "SKIPPED", "reason": "summary_only_mode"}
+        for item in notifications
+    ]
 
 
 def _application_limit(name):
@@ -227,7 +223,7 @@ def run():
     COLLECTION_RAW_COUNT = 0
     reset_origin_diagnostics()
     try:
-        started = send_message("Job Auto Apply: поиск вакансий и заказов запущен.")
+        started = _suppress_telegram_message("Job Auto Apply: поиск вакансий и заказов запущен.")
     except Exception as exc:
         started = {"status": "FAILED", "reason": type(exc).__name__}
     print(f"[telegram] start notification: {started}", flush=True)
@@ -515,7 +511,7 @@ def run():
         for lead in job_review:
             lines.append(f"- {str(lead.get('title') or 'Вакансия')[:85]} [{lead.get('source') or '?'}]\n{lead['url']}")
         try:
-            send_message('\n'.join(lines))
+            _suppress_telegram_message('\n'.join(lines))
         except Exception as exc:
             print(f'[telegram] job shortlist: {type(exc).__name__}', flush=True)
 
@@ -538,7 +534,7 @@ def run():
         for lead in freelance_review:
             lines.append(f"- {str(lead.get('title') or 'Заказ')[:100]}\n{lead['url']}")
         try:
-            freelance_review_delivery = send_message("\n".join(lines))
+            freelance_review_delivery = _suppress_telegram_message("\n".join(lines))
         except Exception as exc:
             freelance_review_delivery = {"status": "FAILED", "reason": type(exc).__name__}
 
@@ -714,6 +710,17 @@ def run():
         summary_message += "\nSource errors: " + "; ".join(f"{item['source']}: {item['reason']}" for item in COLLECTION_ERRORS)
     if not stats["resume_configured"]:
         summary_message += "\nResume matching: not configured"
+    summary_message = (
+        "Job Auto Apply — сводка\n"
+        f"Найдено объявлений: {stats['found']}\n"
+        f"Подходящих после фильтров: {stats['ranked']}\n"
+        f"Отправлено откликов: {stats['submitted']}\n"
+        f"Подготовлено черновиков: {stats['drafted']}\n"
+        f"Требуется ваше участие: {stats['needs_human'] + stats['needs_confirmation']}\n"
+        f"Пропущено: {stats['skipped'] + stats['duplicate_skipped'] + stats['daily_limit_skipped'] + stats['hourly_limit_skipped']}\n"
+        f"Ошибок: {stats['failed']}\n"
+        "Отдельные вакансии и фриланс-заказы в Telegram не отправляются."
+    )
     try:
         summary_delivery = send_message(summary_message)
     except Exception as exc:
