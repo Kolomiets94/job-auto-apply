@@ -45,7 +45,7 @@ def salary_ok(v):
     if currency not in ("RUR", "RUB"):
         return True
 
-    minimum = int(os.getenv("HH_MIN_SALARY_RUB", "60000"))
+    minimum = int(os.getenv("HH_MIN_SALARY_RUB", "40000"))
     salary_from = salary.get("from")
     salary_to = salary.get("to")
 
@@ -58,6 +58,15 @@ def salary_ok(v):
     return True
 
 
+def workplace_ok(v):
+    """Allow any workplace format in Yekaterinburg; elsewhere require remote work."""
+    area = str((v.get("area") or {}).get("name") or v.get("location") or "").lower()
+    schedule = str((v.get("schedule") or {}).get("name") or v.get("schedule") or "").lower()
+    local = any(x in area for x in ("екатеринбург", "yekaterinburg", "ekaterinburg"))
+    remote = any(x in schedule for x in ("удален", "удалён", "дистанцион", "remote"))
+    return local or remote
+
+
 def ok(v):
     text=((v.get("name") or "")+" "+" ".join(str(x or "") for x in (v.get("snippet") or {}).values())).lower()
     title = (v.get("name") or "").lower()
@@ -67,8 +76,8 @@ def ok(v):
     if any(x in title for x in level_terms): return False
     if any(x in text for x in EXCLUDE if x not in level_terms): return False
     if not salary_ok(v): return False
+    if not workplace_ok(v): return False
     if re.search(r"\b(?:intern|internship|trainee)\b|стаж[её]р|стажиров|практикант", title): return False
-    if any(x in title for x in ("офис", "гибрид", "hybrid", "onsite", "on-site")): return False
     return True
 
 
@@ -80,7 +89,7 @@ def hh_search(tag, q):
     for page in range(6):
         params = {
             "text": q, "per_page": 50, "page": page,
-            "order_by": "publication_time", "schedule": "remote",
+            "order_by": "publication_time",
         }
         for attempt in range(3):
             try:
@@ -114,6 +123,7 @@ def hh_search(tag, q):
              "salary": v.get("salary"),
              "description": " ".join(str(x or "") for x in (v.get("snippet") or {}).values()),
              "experience": (v.get("experience") or {}).get("name"),
+             "schedule": (v.get("schedule") or {}).get("name"),
              "location": (v.get("area") or {}).get("name")}
             for v in items if ok(v)]
 
