@@ -331,4 +331,60 @@ def _start_one_shot_from_deploy():
     threading.Thread(target=run_in_background, name="hunter-one-shot", daemon=True).start()
 
 
+
+def _start_telegram_diagnostic():
+    """Send exactly one harmless connectivity test when explicitly enabled by env."""
+    marker = os.getenv("TELEGRAM_DIAGNOSTIC_ID", "").strip()
+    if not marker:
+        return
+    try:
+        from queue_store import _db
+        with _db() as connection:
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS hunter_telegram_diagnostics "
+                "(id TEXT PRIMARY KEY, started_at TEXT NOT NULL, outcome TEXT)"
+            )
+            claim = connection.execute(
+                "INSERT INTO hunter_telegram_diagnostics (id, started_at) "
+                "VALUES (?, ?) ON CONFLICT (id) DO NOTHING",
+                (marker, datetime.now(timezone.utc).isoformat()),
+            )
+            claimed = claim.rowcount == 1
+    except Exception:
+        app.logger.exception("Could not claim Telegram diagnostic")
+        return
+    if not claimed:
+        return
+
+    def send_test():
+        outcome = "failed"
+        try:
+            from telegram_notifier import is_configured, send_message
+            if not is_configured():
+                print("[telegram-diagnostic] disabled: bot token or chat id missing", flush=True)
+                outcome = "not_configured"
+            else:
+                send_message("JobAutoApplyAlerts: проверка подключения Telegram. Это тестовое сообщение.")
+                print("[telegram-diagnostic] sent successfully", flush=True)
+                outcome = "sent"
+        except Exception as exc:
+            # Never print exception text: request URLs may contain the bot token.
+            print("[telegram-diagnostic] failed:", type(exc).__name__, flush=True)
+        finally:
+            try:
+                from queue_store import _db
+                with _db() as connection:
+                    connection.execute(
+                        "UPDATE hunter_telegram_diagnostics SET outcome=? WHERE id=?",
+                        (outcome, marker),
+                    )
+            except Exception:
+                app.logger.exception("Could not record Telegram diagnostic outcome")
+
+    threading.Thread(target=send_test, name="telegram-diagnostic", daemon=True).start()
+    print("[telegram-diagnostic] claimed", marker, flush=True)
+
+
+_start_telegram_diagnostic()
+
 _start_one_shot_from_deploy()
