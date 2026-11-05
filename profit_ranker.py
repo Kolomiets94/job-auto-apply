@@ -84,12 +84,15 @@ def _explicit_salary_rejected(lead: Dict[str, Any]) -> bool:
     source = str(lead.get("source") or "").lower()
     if isinstance(salary, dict):
         currency = str(salary.get("currency") or "").upper()
-        vals = [x for x in (salary.get("from"), salary.get("to"), salary.get("amount")) if isinstance(x, (int, float))]
-        amount = max(vals) if vals else None
-        if amount is None:
+        salary_from = salary.get("from")
+        salary_to = salary.get("to")
+        amount = salary_from if isinstance(salary_from, (int, float)) else salary_to
+        if not isinstance(amount, (int, float)):
+            amount = salary.get("amount")
+        if not isinstance(amount, (int, float)):
             return False
         if currency in ("RUR", "RUB"):
-            return amount < 60000
+            return amount < 40000
         if currency in ("USD", "$"):
             # RemoteOK-style annual salaries are converted to a monthly comparison.
             period = str(salary.get("period") or "").lower()
