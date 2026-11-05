@@ -92,7 +92,13 @@ def _explicit_salary_rejected(lead: Dict[str, Any]) -> bool:
         if not isinstance(amount, (int, float)):
             return False
         if currency in ("RUR", "RUB"):
-            return amount < 40000
+            minimum = 40000
+            maximum = 80000
+            if isinstance(salary_from, (int, float)) and salary_from < minimum:
+                return True
+            if isinstance(salary_to, (int, float)) and salary_to > maximum:
+                return True
+            return not (minimum <= amount <= maximum)
         if currency in ("USD", "$"):
             # RemoteOK-style annual salaries are converted to a monthly comparison.
             period = str(salary.get("period") or "").lower()
