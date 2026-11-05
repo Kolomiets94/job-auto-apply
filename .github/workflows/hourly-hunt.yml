@@ -40,7 +40,7 @@ jobs:
       # Authorized automatic applications; existing limits and safety filters remain active.
       DRY_RUN: "0"
       DAILY_TOTAL_LIMIT: "10"
-      WEEKLY_TOTAL_LIMIT: "20"
+      WEEKLY_TOTAL_LIMIT: "70"
       HOURLY_TOTAL_LIMIT: "2"
       DAILY_JOB_LIMIT: "10"
       DAILY_FREELANCE_LIMIT: "5"
