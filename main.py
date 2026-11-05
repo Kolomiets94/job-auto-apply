@@ -30,10 +30,10 @@ class HHAccessUnavailable(RuntimeError):
 
 
 def salary_ok(v):
-    """Keep hh.ru vacancies paying at least the configured RUB floor when salary is explicit.
+    """Keep hh.ru vacancies with an explicit RUB salary not exceeding the configured ceiling.
 
     Regular vacancies without salary remain eligible. Placements require confirmed
-    payment and may pay below the regular-job salary floor.
+    payment and may pay below the regular-job salary ceiling.
     """
     if is_placement(v.get("name")):
         return placement_is_paid({**v, "title": v.get("name"), "description": " ".join(str(x or "") for x in (v.get("snippet") or {}).values())})
