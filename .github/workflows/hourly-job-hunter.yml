@@ -1,0 +1,29 @@
+name: Hourly job hunter
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hourly-job-hunter
+  cancel-in-progress: false
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger draft-only scheduled run
+        env:
+          SCHEDULER_TOKEN: ${{ secrets.SCHEDULER_TOKEN }}
+        run: |
+          test -n "$SCHEDULER_TOKEN" || { echo "Missing SCHEDULER_TOKEN repository secret"; exit 1; }
+          curl --fail-with-body --silent --show-error \
+            --retry 2 --retry-delay 10 \
+            -X POST \
+            -H "Authorization: Bearer $SCHEDULER_TOKEN" \
+            "https://job-auto-apply-5wmf.onrender.com/run/scheduled"
