@@ -142,8 +142,6 @@ ROLE_PRIORITY = {"frontend": 0, "layout": 1}
 def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     text = _text(lead)
     title = str(lead.get("title") or "").lower()
-    if is_placement(title):
-        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "internship/trainee excluded"}
     if re.search(r"\bqa\b|tester|тестиров|quality assurance|автотест", title, re.I):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "non-target QA role"}
     # Exclude non-Junior roles by title, not incidental descriptions.
