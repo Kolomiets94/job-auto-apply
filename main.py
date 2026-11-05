@@ -46,14 +46,20 @@ def salary_ok(v):
         return True
 
     minimum = int(os.getenv("HH_MIN_SALARY_RUB", "40000"))
+    maximum = int(os.getenv("HH_MAX_SALARY_RUB", "80000"))
     salary_from = salary.get("from")
     salary_to = salary.get("to")
 
-    if isinstance(salary_from, (int, float)):
-        return salary_from >= minimum
+    # Enforce the configured salary band when the corresponding bound is known.
+    if isinstance(salary_from, (int, float)) and salary_from < minimum:
+        return False
+    if isinstance(salary_to, (int, float)) and salary_to > maximum:
+        return False
 
-    if isinstance(salary_to, (int, float)):
-        return salary_to >= minimum
+    # If only one bound is supplied, use it as the available salary signal.
+    amount = salary_from if isinstance(salary_from, (int, float)) else salary_to
+    if isinstance(amount, (int, float)):
+        return minimum <= amount <= maximum
 
     return True
 
