@@ -319,6 +319,7 @@ def run():
     }
     results = []
     notifications = []
+    placement_processed = 0
     browser_challenge_streak = {}
     browser_pause_active = False
     challenge_reasons = {'remote_job_turnstile_required', 'security_challenge',
@@ -326,6 +327,13 @@ def run():
 
     for lead in ranked:
         freelance = is_freelance(lead)
+        placement = is_placement(lead.get("title")) and not freelance
+        if placement and placement_processed >= 2:
+            stats["skipped"] += 1
+            results.append({"title": lead.get("title"), "source": lead.get("source"),
+                            "url": lead.get("url"), "status": "SKIPPED",
+                            "reason": "hourly_paid_placement_limit_2"})
+            continue
         # QA applications are opt-in: prioritize the candidate's primary
         # Frontend / HTML-CSS roles instead of silently submitting QA.
         # QA vacancies remain visible in reports for later review.
@@ -355,6 +363,8 @@ def run():
             continue
 
         lid = enqueue(lead)
+        if placement:
+            placement_processed += 1
 
         if was_submitted(lid):
             stats["duplicate_skipped"] += 1
