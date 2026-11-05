@@ -37,8 +37,8 @@ jobs:
       REMOTE_JOB_EMAIL: ${{ secrets.REMOTE_JOB_EMAIL || secrets.SMTP_USER }}
       REMOTE_JOB_PHONE: ${{ secrets.REMOTE_JOB_PHONE }}
       HH_STORAGE_STATE_JSON: ${{ secrets.HH_STORAGE_STATE_JSON }}
-      # Safe validation mode: collect vacancies and prepare drafts; do not send applications.
-      DRY_RUN: "1"
+      # Authorized automatic applications; existing limits and safety filters remain active.
+      DRY_RUN: "0"
       DAILY_TOTAL_LIMIT: "5"
       WEEKLY_TOTAL_LIMIT: "20"
       HOURLY_TOTAL_LIMIT: "2"
@@ -106,9 +106,9 @@ jobs:
               )
               try:
                   with urllib.request.urlopen(request, timeout=15) as response:
-                      print("[telegram] workflow failure alert HTTP", response.status)
+                      print("[telegram] failure alert HTTP", response.status)
               except urllib.error.HTTPError as exc:
-                  print("[telegram] workflow failure alert HTTP", exc.code)
+                  print("[telegram] failure alert HTTP", exc.code)
               except Exception as exc:
-                  print("[telegram] workflow failure alert error", type(exc).__name__)
+                  print("[telegram] failure alert error", type(exc).__name__)
           PY
