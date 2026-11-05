@@ -545,7 +545,7 @@ def run():
         for item in budget_review:
             lines.append(f"- {str(item.get('title') or 'Проект')[:90]}\n{item.get('url') or ''}")
         try:
-            send_message("\n".join(lines))
+            _suppress_telegram_message("\n".join(lines))
         except Exception as exc:
             print(f"[telegram] budget review notification: {type(exc).__name__}", flush=True)
 
@@ -560,7 +560,7 @@ def run():
                 f"{item.get('apply_url') or item.get('url') or ''}"
             )
         try:
-            send_message("\n".join(lines))
+            _suppress_telegram_message("\n".join(lines))
         except Exception as exc:
             print(f"[telegram] blocked notification: {type(exc).__name__}", flush=True)
 
