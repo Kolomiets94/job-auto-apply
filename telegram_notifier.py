@@ -46,7 +46,19 @@ def send_message(text: str, timeout: int = 10) -> Dict[str, str]:
             json={"chat_id": chat_id, "text": chunk, "disable_web_page_preview": True},
             timeout=timeout,
         )
-        response.raise_for_status()
+        if not response.ok:
+            # Telegram's error description is safe to log; never include the request URL,
+            # which contains the bot token.
+            try:
+                detail = response.json().get("description", "")
+            except (ValueError, AttributeError):
+                detail = ""
+            print(
+                f"[telegram] API rejected message: HTTP {response.status_code}"
+                + (f" — {str(detail)[:240]}" if detail else ""),
+                flush=True,
+            )
+            response.raise_for_status()
     return {"status": "SENT", "parts": len(chunks)}
 
 
