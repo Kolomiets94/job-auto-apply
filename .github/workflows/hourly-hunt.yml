@@ -39,10 +39,10 @@ jobs:
       HH_STORAGE_STATE_JSON: ${{ secrets.HH_STORAGE_STATE_JSON }}
       # Authorized automatic applications; existing limits and safety filters remain active.
       DRY_RUN: "0"
-      DAILY_TOTAL_LIMIT: "5"
+      DAILY_TOTAL_LIMIT: "10"
       WEEKLY_TOTAL_LIMIT: "20"
       HOURLY_TOTAL_LIMIT: "2"
-      DAILY_JOB_LIMIT: "5"
+      DAILY_JOB_LIMIT: "10"
       DAILY_FREELANCE_LIMIT: "5"
       HOURLY_JOB_LIMIT: "2"
       HOURLY_FREELANCE_LIMIT: "2"
