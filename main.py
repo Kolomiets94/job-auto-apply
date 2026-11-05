@@ -45,7 +45,7 @@ def salary_ok(v):
     if currency not in ("RUR", "RUB"):
         return True
 
-    minimum = int(os.getenv("HH_MIN_SALARY_RUB", "40000"))
+    minimum = int(os.getenv("HH_MIN_SALARY_RUB", "20000"))
     maximum = int(os.getenv("HH_MAX_SALARY_RUB", "80000"))
     salary_from = salary.get("from")
     salary_to = salary.get("to")
