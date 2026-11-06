@@ -82,8 +82,4 @@ def dispatch(lead, proposal):
     # AUTO_BROWSER_APPLY and the worker's DRY_RUN gate remain authoritative.
     if lead.get("apply_url"):
         return apply_external(lead, proposal)
-
-    if lead.get("apply_url"):
-        return {"status": "NEEDS_CONFIRMATION", "reason": "external_application_form_not_supported",
-                "apply_url": lead["apply_url"]}
     return {"status": "NEEDS_CONFIRMATION", "reason": "no_free_direct_channel"}
