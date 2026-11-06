@@ -77,15 +77,15 @@ def ok(v):
 
 def _hh_rss_text(value):
     import html
-    return re.sub(r"\\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", str(value or "")))).strip()
+    return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", str(value or "")))).strip()
 
 
 def _hh_rss_salary(description):
     match = re.search(
-        r"Предполагаемый уровень месячного дохода:\\s*(.*?)(?:$|\\n)",
+        r"Предполагаемый уровень месячного дохода:\s*(.*?)(?:$|\n)",
         description, re.I,
     )
-    value = (match.group(1) if match else "").replace("\\xa0", " ").strip()
+    value = (match.group(1) if match else "").replace("\xa0", " ").strip()
     if not value or "не указан" in value.lower():
         return None
     currency = "RUR" if re.search(r"₽|руб", value, re.I) else (
@@ -93,7 +93,7 @@ def _hh_rss_salary(description):
     )
     if not currency:
         return None
-    nums = [int(x.replace(" ", "")) for x in re.findall(r"\\d[\\d\\s]*", value)]
+    nums = [int(x.replace(" ", "")) for x in re.findall(r"\d[\d\s]*", value)]
     if not nums:
         return None
     return {
@@ -149,8 +149,8 @@ def hh_search(tag, q):
         if not title or not url.startswith("https://hh.ru/vacancy/"):
             continue
 
-        company_match = re.search(r"Вакансия компании:\\s*(.*?)(?=\\s+Создана:|\\s+Регион:|$)", description, re.I)
-        location_match = re.search(r"Регион:\\s*(.*?)(?=\\s+Предполагаемый уровень|$)", description, re.I)
+        company_match = re.search(r"Вакансия компании:\s*(.*?)(?=\s+Создана:|\s+Регион:|$)", description, re.I)
+        location_match = re.search(r"Регион:\s*(.*?)(?=\s+Предполагаемый уровень|$)", description, re.I)
         salary = _hh_rss_salary(description)
         vacancy = {
             "name": title,
