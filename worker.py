@@ -175,11 +175,19 @@ def _suppress_telegram_message(_text):
 
 
 def deliver_notifications(notifications):
-    # Retain notification counts for diagnostics, but never send per-vacancy alerts.
-    return [
-        {"title": item.get("title"), "status": "SKIPPED", "reason": "summary_only_mode"}
-        for item in notifications
-    ]
+    """Send each matched employment vacancy as its own Telegram message."""
+    deliveries = []
+    for item in notifications:
+        if is_freelance({"source": item.get("source")}):
+            continue
+        try:
+            result = send_notification(item)
+            deliveries.append({"title": item.get("title"), **result})
+        except Exception as exc:
+            print(f"[telegram] vacancy alert failed: {type(exc).__name__}", flush=True)
+            deliveries.append({"title": item.get("title"), "status": "FAILED",
+                               "reason": type(exc).__name__})
+    return deliveries
 
 
 def _application_limit(name):
@@ -538,15 +546,18 @@ def run():
             -lead.get("profit_score", 0),
         ),
     )[:5]
-    freelance_review_delivery = None
-    if freelance_review:
-        lines = ["Фриланс: подходящие заказы (ссылки; отклики НЕ отправлены):"]
-        for lead in freelance_review:
-            lines.append(f"- {str(lead.get('title') or 'Заказ')[:100]}\n{lead['url']}")
+    freelance_review_delivery = []
+    for lead in freelance_review:
+        message = format_notification(lead)
+        if not message or lead.get("url") not in message:
+            message = f"Фриланс-заказ: {str(lead.get('title') or 'Заказ')[:100]}\\n{lead['url']}\\nОтклик не отправлен."
         try:
-            freelance_review_delivery = _suppress_telegram_message("\n".join(lines))
+            delivery = send_message(message)
+            freelance_review_delivery.append({"title": lead.get("title"), **delivery})
         except Exception as exc:
-            freelance_review_delivery = {"status": "FAILED", "reason": type(exc).__name__}
+            print(f"[telegram] freelance alert failed: {type(exc).__name__}", flush=True)
+            freelance_review_delivery.append({"title": lead.get("title"), "status": "FAILED",
+                                               "reason": type(exc).__name__})
 
     # Alert about blocked applications with the direct destination URL.
     budget_review = [item for item in results if item.get("reason") == "bid_price_missing_or_invalid"]
@@ -729,7 +740,7 @@ def run():
         f"Требуется ваше участие: {stats['needs_human'] + stats['needs_confirmation']}\n"
         f"Пропущено: {stats['skipped'] + stats['duplicate_skipped'] + stats['daily_limit_skipped'] + stats['hourly_limit_skipped']}\n"
         f"Ошибок: {stats['failed']}\n"
-        "Отдельные вакансии и фриланс-заказы в Telegram не отправляются."
+        "Подходящие вакансии и фриланс-заказы отправляются отдельными сообщениями."
     )
     try:
         summary_delivery = send_message(summary_message)
