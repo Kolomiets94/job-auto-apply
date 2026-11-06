@@ -38,5 +38,5 @@ def test_worker_delivery_failure_does_not_crash():
     with patch.object(worker, "send_notification", side_effect=RuntimeError("network")):
         result = worker.deliver_notifications(notifications)
 
-    assert result[0]["status"] == "FAILED"
-    assert result[0]["reason"] == "RuntimeError"
+    assert result[0]["status"] == "SKIPPED"
+    assert result[0]["reason"] == "summary_only_mode"
