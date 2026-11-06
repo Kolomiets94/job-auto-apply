@@ -7,6 +7,7 @@ Uses stdlib only; marks a message read only after Telegram confirms delivery.
 from __future__ import annotations
 
 import email
+import json
 import imaplib
 import os
 import re
@@ -42,7 +43,7 @@ def _plain_text(message: Message, limit: int = 500) -> str:
         if not payload:
             continue
         charset = part.get_content_charset() or "utf-8"
-        value = re.sub(r"\\s+", " ", payload.decode(charset, errors="replace")).strip()
+        value = re.sub(r"\s+", " ", payload.decode(charset, errors="replace")).strip()
         return value[:limit] + ("…" if len(value) > limit else "")
     return ""
 
@@ -61,6 +62,9 @@ def _telegram_send(token: str, chat_id: str, text: str) -> None:
     with urllib.request.urlopen(request, timeout=20) as response:
         if response.status != 200:
             raise RuntimeError(f"Telegram returned HTTP {response.status}")
+        result = json.loads(response.read().decode("utf-8"))
+        if not result.get("ok"):
+            raise RuntimeError("Telegram did not accept the notification")
 
 
 def main() -> int:
