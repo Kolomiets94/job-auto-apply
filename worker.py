@@ -141,7 +141,9 @@ def _application_priority(lead):
         ) else 1
     source = str(lead.get("source") or "").lower()
     if source == "hh":
-        return 0 if os.getenv("AUTO_BROWSER_APPLY") == "1" and os.getenv("HH_STORAGE_STATE_JSON") else 1
+        # HH applicant-side API access is no longer supported; keep vacancies
+        # in the Telegram shortlist instead of prioritizing browser submissions.
+        return 1
     if source == "remote_job_ru":
         return 0 if os.getenv("AUTO_BROWSER_APPLY") == "1" and all(
             os.getenv(key) for key in ("REMOTE_JOB_NAME", "REMOTE_JOB_PHONE")
