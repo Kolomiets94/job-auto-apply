@@ -59,7 +59,23 @@ def _send_email(lead, proposal):
     return {"status": "SUBMITTED", "reason": "email_sent"}
 
 
+def _is_hh_lead(lead):
+    if str(lead.get("source") or lead.get("site") or "").strip().lower() == "hh":
+        return True
+    for value in (lead.get("url"), lead.get("apply_url")):
+        host = (urlsplit(str(value or "")).hostname or "").lower()
+        if host == "hh.ru" or host.endswith(".hh.ru"):
+            return True
+    return False
+
+
 def dispatch(lead, proposal):
+    # HH discontinued support for applicant-side API integrations. Do not
+    # submit through browser automation or email from HH-sourced listings.
+    # Keep the lead shortlisted; the worker still sends its Telegram alert.
+    if _is_hh_lead(lead):
+        return {"status": "SHORTLISTED", "reason": "hh_applicant_api_unavailable"}
+
     if not application_time_allowed():
         return {"status": "SKIPPED", "reason": "outside_application_hours"}
 
