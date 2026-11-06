@@ -385,6 +385,36 @@ def _start_telegram_diagnostic():
     print("[telegram-diagnostic] claimed", marker, flush=True)
 
 
+
+def _start_gmail_reply_monitor():
+    """Poll Gmail for application replies while the Render process is awake."""
+    required = (
+        os.getenv("IMAP_USER") or os.getenv("SMTP_USER"),
+        os.getenv("IMAP_PASSWORD") or os.getenv("SMTP_PASSWORD"),
+        os.getenv("TELEGRAM_BOT_TOKEN"),
+        os.getenv("TELEGRAM_CHAT_ID"),
+    )
+    if not all(required):
+        print("[gmail-replies] monitor disabled: Gmail/Telegram credentials are not configured", flush=True)
+        return
+
+    def monitor():
+        interval = max(300, int(os.getenv("GMAIL_REPLY_POLL_SECONDS", "900")))
+        while True:
+            try:
+                from gmail_replies import main as check_gmail_replies
+                result = check_gmail_replies()
+                print(f"[gmail-replies] poll finished with code {result}", flush=True)
+            except Exception as exc:
+                print(f"[gmail-replies] monitor error: {type(exc).__name__}", flush=True)
+            threading.Event().wait(interval)
+
+    threading.Thread(target=monitor, name="gmail-reply-monitor", daemon=True).start()
+    print("[gmail-replies] monitor started; polling interval is at least 5 minutes", flush=True)
+
+
+_start_gmail_reply_monitor()
+
 _start_telegram_diagnostic()
 
 _start_one_shot_from_deploy()
