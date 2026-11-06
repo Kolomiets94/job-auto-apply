@@ -175,11 +175,25 @@ def _suppress_telegram_message(_text):
 
 
 def deliver_notifications(notifications):
-    # Retain notification counts for diagnostics, but never send per-vacancy alerts.
-    return [
-        {"title": item.get("title"), "status": "SKIPPED", "reason": "summary_only_mode"}
-        for item in notifications
-    ]
+    """Send each matched vacancy/order as its own Telegram message."""
+    deliveries = []
+    for item in notifications:
+        title = item.get("title")
+        try:
+            result = send_message(item.get("message") or format_notification(item))
+            deliveries.append({
+                "title": title,
+                "status": result.get("status", "SENT") if isinstance(result, dict) else "SENT",
+                **(result if isinstance(result, dict) else {}),
+            })
+        except Exception as exc:
+            print(f"[telegram] vacancy notification failed ({title}): {type(exc).__name__}", flush=True)
+            deliveries.append({
+                "title": title,
+                "status": "FAILED",
+                "reason": type(exc).__name__,
+            })
+    return deliveries
 
 
 def _application_limit(name):
