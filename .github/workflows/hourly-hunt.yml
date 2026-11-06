@@ -26,10 +26,15 @@ jobs:
       FREELANCE_QUOTE_CURRENCY: "UAH"
       FREELANCEHUNT_TOKEN: ${{ secrets.FREELANCEHUNT_TOKEN }}
       AUTO_SEND_EMAIL: "1"
-      SMTP_HOST: ${{ secrets.SMTP_HOST || 'smtp.yandex.ru' }}
-      SMTP_PORT: ${{ secrets.SMTP_PORT || '465' }}
+      # Gmail SMTP and IMAP use the same Google App Password stored in SMTP_PASSWORD.
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: "465"
       SMTP_USER: ${{ secrets.SMTP_USER }}
       SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      IMAP_HOST: imap.gmail.com
+      IMAP_PORT: "993"
+      IMAP_USER: ${{ secrets.SMTP_USER }}
+      IMAP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
       AUTO_BROWSER_APPLY: "1"
       EXTERNAL_APPLY_HOSTS: ${{ vars.EXTERNAL_APPLY_HOSTS }}
       AUTO_APPLY_QA: "0"
@@ -71,6 +76,17 @@ jobs:
 
       - name: Run hunter
         run: python worker.py
+
+      - name: Check Gmail replies and notify Telegram
+        if: always()
+        env:
+          IMAP_HOST: imap.gmail.com
+          IMAP_PORT: "993"
+          IMAP_USER: ${{ secrets.SMTP_USER }}
+          IMAP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python gmail_replies.py
 
       - name: Save hunter history
         if: always()
