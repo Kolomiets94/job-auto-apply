@@ -182,8 +182,8 @@ def test_draft_run_prepares_letter_without_dispatch_or_state_change(monkeypatch)
     assert report["stats"]["drafted"] == 1
     assert report["results"][0]["status"] == "DRAFT"
     assert "https://github.com/Kolomiets94/" in report["results"][0]["proposal"]
-    assert report["stats"]["notifications_sent"] == 1
-    assert alert.call_args.args[0]["url"] == lead["url"]
+    assert report["stats"]["notifications_sent"] == 0
+    alert.assert_not_called()
     dispatch.assert_not_called()
     set_state.assert_not_called()
 
