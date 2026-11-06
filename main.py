@@ -4,7 +4,7 @@ import requests
 from freelance_sources import collect_freelance
 from entry_level import is_placement, placement_is_paid
 
-HH_API="https://api.hh.ru/vacancies"
+HH_RSS_URL="https://hh.ru/search/vacancy/rss"
 QUERIES=[
     ("frontend","junior frontend"),
     ("frontend","junior React"),
@@ -22,19 +22,15 @@ QUERIES=[
     ("layout","junior HTML"),
 ]
 EXCLUDE=("full stack","fullstack","full-stack","vue","angular","react native","react-native","flutter","middle","senior","lead","head of","manager","director")
-UA={"User-Agent":"JobFreelanceHunter/1.1"}
+UA={"User-Agent":"Mozilla/5.0 (compatible; JobFreelanceHunter/1.2; vacancy-feed)"}
 
 
 class HHAccessUnavailable(RuntimeError):
-    """Public API is blocked and there is no usable browser search session."""
+    """Public HH vacancy feed is unavailable."""
 
 
 def salary_ok(v):
-    """Keep hh.ru vacancies with explicit RUB salary in the configured 20k-80k band.
-
-    Regular vacancies without salary remain eligible. Placements require confirmed
-    payment and may pay below the regular-job salary floor.
-    """
+    """Keep vacancies with explicit RUB salary in the configured 20k-80k band."""
     if is_placement(v.get("name")):
         return placement_is_paid({**v, "title": v.get("name"), "description": " ".join(str(x or "") for x in (v.get("snippet") or {}).values())})
     salary = v.get("salary")
@@ -49,23 +45,18 @@ def salary_ok(v):
     maximum = int(os.getenv("HH_MAX_SALARY_RUB", "80000"))
     salary_from = salary.get("from")
     salary_to = salary.get("to")
-
-    # Enforce the configured salary band when the corresponding bound is known.
     if isinstance(salary_from, (int, float)) and salary_from < minimum:
         return False
     if isinstance(salary_to, (int, float)) and salary_to > maximum:
         return False
-
-    # If only one bound is supplied, use it as the available salary signal.
     amount = salary_from if isinstance(salary_from, (int, float)) else salary_to
     if isinstance(amount, (int, float)):
         return minimum <= amount <= maximum
-
     return True
 
 
 def workplace_ok(v):
-    """Allow any workplace format in Yekaterinburg; elsewhere require remote work."""
+    """HH RSS query is explicitly restricted to remote vacancies."""
     area = str((v.get("area") or {}).get("name") or v.get("location") or "").lower()
     schedule = str((v.get("schedule") or {}).get("name") or v.get("schedule") or "").lower()
     local = any(x in area for x in ("екатеринбург", "yekaterinburg", "ekaterinburg"))
@@ -77,8 +68,6 @@ def ok(v):
     text=((v.get("name") or "")+" "+" ".join(str(x or "") for x in (v.get("snippet") or {}).values())).lower()
     title = (v.get("name") or "").lower()
     level_terms = ("middle", "senior", "lead", "head of", "manager", "director")
-    # Team descriptions may mention senior colleagues or a team lead.
-    # The target vacancy's title determines its advertised seniority.
     if any(x in title for x in level_terms): return False
     if any(x in text for x in EXCLUDE if x not in level_terms): return False
     if not salary_ok(v): return False
@@ -86,51 +75,109 @@ def ok(v):
     return True
 
 
-def hh_search(tag, q):
-    """Fetch public HH vacancies with bounded retries and no browser fallback."""
-    import time
+def _hh_rss_text(value):
+    import html
+    return re.sub(r"\\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", str(value or "")))).strip()
 
-    items = []
-    for page in range(6):
-        params = {
-            "text": q, "per_page": 50, "page": page,
-            "order_by": "publication_time",
-        }
-        for attempt in range(3):
+
+def _hh_rss_salary(description):
+    match = re.search(
+        r"Предполагаемый уровень месячного дохода:\\s*(.*?)(?:$|\\n)",
+        description, re.I,
+    )
+    value = (match.group(1) if match else "").replace("\\xa0", " ").strip()
+    if not value or "не указан" in value.lower():
+        return None
+    currency = "RUR" if re.search(r"₽|руб", value, re.I) else (
+        "USD" if "$" in value else ("EUR" if "€" in value else None)
+    )
+    if not currency:
+        return None
+    nums = [int(x.replace(" ", "")) for x in re.findall(r"\\d[\\d\\s]*", value)]
+    if not nums:
+        return None
+    return {
+        "from": nums[0],
+        "to": nums[1] if len(nums) > 1 else None,
+        "currency": currency,
+    }
+
+
+def hh_search(tag, q):
+    """Collect public remote HH listings from the site's RSS search feed."""
+    import time
+    import xml.etree.ElementTree as ET
+
+    params = {"text": q, "schedule": "remote"}
+    for attempt in range(3):
+        try:
+            response = requests.get(
+                HH_RSS_URL, params=params, headers=UA, timeout=25,
+            )
+        except (requests.Timeout, requests.ConnectionError) as exc:
+            if attempt == 2:
+                raise HHAccessUnavailable("HH RSS network unavailable") from exc
+            time.sleep(2 ** attempt)
+            continue
+
+        if response.status_code == 429 or 500 <= response.status_code < 600:
+            if attempt == 2:
+                raise HHAccessUnavailable(f"HH RSS HTTP {response.status_code} after retries")
+            retry_after = response.headers.get("Retry-After", "")
             try:
-                r = requests.get(HH_API, params=params, headers=UA, timeout=20)
-            except (requests.Timeout, requests.ConnectionError) as exc:
-                if attempt == 2:
-                    raise HHAccessUnavailable("HH API network unavailable") from exc
-                time.sleep(2 ** attempt)
-                continue
-            if r.status_code in (401, 403):
-                raise HHAccessUnavailable(f"HH API HTTP {r.status_code}; stop queries")
-            if r.status_code == 429 or 500 <= r.status_code < 600:
-                if attempt == 2:
-                    raise HHAccessUnavailable(f"HH API HTTP {r.status_code} after retries")
-                retry_after = r.headers.get("Retry-After", "")
-                try:
-                    delay = min(30, max(1, float(retry_after)))
-                except (TypeError, ValueError):
-                    delay = 2 ** attempt
-                time.sleep(delay)
-                continue
-            r.raise_for_status()
-            break
-        payload = r.json()
-        items.extend(payload.get("items", []))
-        if page >= int(payload.get("pages", 1)) - 1:
-            break
-    return [{"source": "hh", "category": tag, "title": v["name"],
-             "company": (v.get("employer") or {}).get("name"),
-             "url": v.get("alternate_url"), "published": v.get("published_at"),
-             "salary": v.get("salary"),
-             "description": " ".join(str(x or "") for x in (v.get("snippet") or {}).values()),
-             "experience": (v.get("experience") or {}).get("name"),
-             "schedule": (v.get("schedule") or {}).get("name"),
-             "location": (v.get("area") or {}).get("name")}
-            for v in items if ok(v)]
+                delay = min(30, max(1, float(retry_after)))
+            except (TypeError, ValueError):
+                delay = 2 ** attempt
+            time.sleep(delay)
+            continue
+        if response.status_code in (401, 403):
+            raise HHAccessUnavailable(f"HH RSS HTTP {response.status_code}")
+        response.raise_for_status()
+        break
+
+    try:
+        root = ET.fromstring(response.content)
+    except ET.ParseError as exc:
+        raise HHAccessUnavailable("HH RSS returned invalid XML") from exc
+
+    results = []
+    for item in root.findall(".//item"):
+        title = _hh_rss_text(item.findtext("title"))
+        url = (item.findtext("link") or "").strip()
+        description = _hh_rss_text(item.findtext("description"))
+        published = (item.findtext("pubDate") or "").strip()
+        if not title or not url.startswith("https://hh.ru/vacancy/"):
+            continue
+
+        company_match = re.search(r"Вакансия компании:\\s*(.*?)(?=\\s+Создана:|\\s+Регион:|$)", description, re.I)
+        location_match = re.search(r"Регион:\\s*(.*?)(?=\\s+Предполагаемый уровень|$)", description, re.I)
+        salary = _hh_rss_salary(description)
+        vacancy = {
+            "name": title,
+            "snippet": {"description": description},
+            "salary": salary,
+            "location": location_match.group(1).strip() if location_match else "",
+            "schedule": {"name": "Удаленная работа"},
+        }
+        if not ok(vacancy):
+            continue
+        results.append({
+            "source": "hh",
+            "category": tag,
+            "title": title,
+            "company": company_match.group(1).strip() if company_match else None,
+            "url": url,
+            "published": published,
+            "salary": salary,
+            "description": description,
+            "experience": None,
+            "schedule": "Удаленная работа",
+            "location": vacancy["location"],
+        })
+
+    # Avoid hammering HH while iterating over the configured keyword list.
+    time.sleep(float(os.getenv("HH_RSS_REQUEST_DELAY", "1")))
+    return results
 
 
 def remoteok():
