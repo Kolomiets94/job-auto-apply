@@ -13,6 +13,7 @@ from email.message import EmailMessage
 from application_schedule import application_time_allowed
 from browser_apply import dispatch_browser
 from freelancehunt_adapter import add_bid
+from external_form_apply import apply_external
 
 
 def _send_email(lead, proposal):
@@ -76,6 +77,11 @@ def dispatch(lead, proposal):
     browser_result = dispatch_browser(lead, proposal)
     if browser_result.get("reason") != "unsupported_browser_source":
         return browser_result
+
+    # Use the conservative allowlisted handler for supported employer ATS forms.
+    # AUTO_BROWSER_APPLY and the worker's DRY_RUN gate remain authoritative.
+    if lead.get("apply_url"):
+        return apply_external(lead, proposal)
 
     if lead.get("apply_url"):
         return {"status": "NEEDS_CONFIRMATION", "reason": "external_application_form_not_supported",
