@@ -147,4 +147,4 @@ def test_hh_live_requirements_override_search_snippet():
         result = browser_apply._hh_live_filter(page, {"source": "hh", "title": "Junior QA Engineer",
                                                      "description": "QA"})
     assert not result["eligible"]
-    assert result["rank_reason"] == "SQL outside confirmed stack"
+    assert result["rank_reason"] == "non-target QA role"
