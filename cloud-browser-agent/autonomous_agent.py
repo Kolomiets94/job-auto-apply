@@ -205,6 +205,8 @@ def _run_loop(task, previous=None):
             return {"status": "needs_user", "message": str(action.get("reason") or
                     "Требуется ручной вход, пароль, CAPTCHA или код подтверждения."), "url": page.url}
         result = _execute(page, action)
+        if result.startswith("Нужно вручную"):
+            return {"status": "needs_user", "message": result, "url": page.url}
         if _runtime["pending"]:
             return {"status": "needs_confirmation", "message": result,
                     "pending_action": _runtime["pending"], "url": page.url}
