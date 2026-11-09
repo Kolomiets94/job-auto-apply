@@ -23,3 +23,10 @@
 `pip install -r requirements.txt`, затем `python worker.py`. GitHub Actions запускает поиск каждый час круглосуточно (`0 * * * *`). Поиск охватывает Россию и международные источники; международные вакансии проходят только при явно указанной доступности из России либо worldwide/anywhere/global и без ограничений права на работу. Повторные отклики исключаются. Интеграции почты, Telegram и сайтов используют секреты окружения; их значения не должны попадать в репозиторий. Перед реальным использованием проверьте источники, фильтры, авторизацию и правила конкретной площадки.
 
 Автор: [Alexander Kolomiets](https://github.com/Kolomiets94).
+
+
+## Autonomous browser agent
+
+The Flask service now includes an LLM-guided Playwright agent at `/agent`. It can inspect and navigate arbitrary public websites, interact with ordinary controls, and keep a persistent Chromium profile (cookies and localStorage) when the profile directory is stored on durable disk. Setup instructions and security limits are in [cloud-browser-agent/README.md](cloud-browser-agent/README.md).
+
+The agent requires an OpenAI-compatible model endpoint and a private `AGENT_ACCESS_TOKEN`. Passwords, OTPs, CAPTCHA and payment data are not automated; high-impact form submissions pause for confirmation. For durable sessions on the free Render filesystem, do not assume browser profile data will survive restarts; local execution is recommended.
