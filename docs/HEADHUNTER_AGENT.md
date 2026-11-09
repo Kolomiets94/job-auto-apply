@@ -1,34 +1,34 @@
-# HeadHunter agent (GitHub Actions)
+# HeadHunter resume review (read-only)
 
-This is the first, deliberately read-only stage of the autonomous browser agent.
-It runs Chromium on GitHub-hosted runners, so your computer can be off.
+Run **Actions → HeadHunter Resume Agent → Run workflow**. The agent opens the
+existing resume pages and extracts their visible text into a JSON report.
+Optionally provide an HTTPS hh.ru/vacancy/... URL in the **Target vacancy URL**
+field to compare the resume with one vacancy and prepare a conservative draft.
 
-## Configure the session once
+## One-time setup for a downloadable report
 
-1. Sign in to HeadHunter in a trusted local browser.
-2. Export a Playwright storage-state JSON for the HH domain using the existing
-   `hh-bootstrap` session-export flow in this repository. The export contains
-   account credentials in the form of session cookies; treat it like a password.
-3. In the GitHub repository, open **Settings → Secrets and variables → Actions**
-   and create an Actions secret named `HH_STORAGE_STATE_JSON` with the complete
-   storage-state JSON as its value. Do not commit this file, paste it into issues,
-   or send it in chat.
-4. Open **Actions → HeadHunter Resume Agent → Run workflow**.
+The repository is public, so the report is encrypted before upload. In
+**Settings → Secrets and variables → Actions**, add a strong random secret
+named **HH_REPORT_ENCRYPTION_KEY**. Keep the key private and do not commit it.
+Without this secret, the workflow will still report safe counts but will not
+upload resume contents. The encrypted artifact is retained for 7 days.
 
-The workflow uses the existing `browser_apply._storage_state()` parser and the
-project's pinned Playwright dependency. It checks whether the session is still
-valid and lists the existing resume titles. It does not print cookies, edit a
-resume, submit an application, or bypass CAPTCHA/2FA. If HH asks for a security
-challenge or a fresh login, the run stops and reports that status; refresh the
-secret locally and retry.
+After downloading hh-resume-review-encrypted, decrypt it locally with OpenSSL:
 
-## Important limitations
+    openssl enc -d -aes-256-cbc -pbkdf2 -in hh-resume-result.json.enc -out hh-resume-result.json -pass env:HH_REPORT_ENCRYPTION_KEY
 
-- GitHub Actions provides an ephemeral runner. Browser profile files do not
-  persist between runs; the Actions secret is the durable input.
-- HH may expire or revoke sessions, so re-authentication can be needed.
-- This stage does not yet use a generative model and does not edit resume fields.
-  Editing safely requires the recruiter's guide and an explicit review/approval
-  step. No paid model/API key is used in this first stage.
-- The workflow is manual-only. Existing job search and application workflows
-  are unchanged.
+Set HH_REPORT_ENCRYPTION_KEY in your local shell to the same value before
+running the command. Treat the decrypted JSON as confidential personal data.
+
+Recommendations are deterministic checklist prompts, not claims about
+candidate qualifications. Keyword matches are not proof of experience. Review
+all suggestions and drafts manually before using them.
+
+Safety:
+- Read-only browser navigation; no resume edits or saves.
+- No application or response submission.
+- No CAPTCHA/2FA bypass.
+- Session remains in the HH_STORAGE_STATE_JSON Actions secret and is never
+  written to the report.
+- Plaintext resume text is never uploaded or printed to Actions logs.
+- Existing Auto Apply workflows and business logic are unchanged.
