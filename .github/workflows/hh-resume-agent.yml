@@ -33,8 +33,8 @@ jobs:
           python -m playwright install --with-deps chromium
       - name: Inspect and review existing HeadHunter resumes (read-only)
         env:
-          HH_STORAGE_STATE_JSON: ${{ secrets.HH_STORAGE_STATE_JSON }}
-          HH_TARGET_VACANCY_URL: ${{ inputs.vacancy_url }}
+          HH_STORAGE_STATE_JSON: \${{ secrets.HH_STORAGE_STATE_JSON }}
+          HH_TARGET_VACANCY_URL: \${{ inputs.vacancy_url }}
         run: python hh_resume_agent.py > hh-resume-result.json
       - name: Publish safe summary
         if: always()
@@ -55,10 +55,23 @@ jobs:
           print("- No resume changes or applications were made.")
           PY
           fi
-      - name: Upload private resume review report
+      - name: Encrypt private resume review report
         if: always() && hashFiles('hh-resume-result.json') != ''
+        env:
+          HH_REPORT_ENCRYPTION_KEY: \${{ secrets.HH_REPORT_ENCRYPTION_KEY }}
+        run: |
+          if [ -z "$HH_REPORT_ENCRYPTION_KEY" ]; then
+            echo "::warning::Set HH_REPORT_ENCRYPTION_KEY to receive an encrypted resume report. Plaintext report will not be uploaded."
+            exit 0
+          fi
+          openssl enc -aes-256-cbc -salt -pbkdf2 \
+            -pass env:HH_REPORT_ENCRYPTION_KEY \
+            -in hh-resume-result.json -out hh-resume-result.json.enc
+          rm -f hh-resume-result.json
+      - name: Upload encrypted resume review report
+        if: always() && hashFiles('hh-resume-result.json.enc') != ''
         uses: actions/upload-artifact@v4
         with:
-          name: hh-resume-review
-          path: hh-resume-result.json
+          name: hh-resume-review-encrypted
+          path: hh-resume-result.json.enc
           retention-days: 7
