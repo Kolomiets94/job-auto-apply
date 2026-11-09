@@ -91,7 +91,7 @@ def _snapshot(page):
         return {id:i,tag:e.tagName.toLowerCase(),type:e.getAttribute('type')||'',
           role:e.getAttribute('role')||'',label:(label||'').trim().slice(0,120),
           placeholder:(e.getAttribute('placeholder')||'').slice(0,120),
-          text:(e.innerText||e.value||'').trim().slice(0,160),
+          text:(e.tagName==='INPUT'?'':(e.innerText||'')).trim().slice(0,160),
           href:e.href||''};
       });
     }""")
