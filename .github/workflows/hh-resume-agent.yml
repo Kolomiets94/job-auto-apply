@@ -50,10 +50,7 @@ jobs:
           print("## HeadHunter agent")
           print(f"- Status: **{status}**")
           print(f"- Resumes found: **{count}**")
-          if status == "authenticated":
-              for item in data.get("resumes", []):
-                  print(f"- {item.get('title', 'Untitled')}")
-          else:
-              print("- No resume changes were made.")
+          print("- Resume titles and links are intentionally omitted from logs.")
+          print("- No resume changes were made.")
           PY
           fi
