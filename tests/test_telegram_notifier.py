@@ -32,11 +32,10 @@ def test_send_message_posts_to_telegram(monkeypatch):
     assert kwargs["timeout"] == 3
 
 
-def test_worker_delivery_failure_does_not_crash():
+def test_worker_suppresses_per_vacancy_delivery_in_summary_only_mode():
     notifications = [{"title": "React Job", "message": "test"}]
 
-    with patch.object(worker, "send_notification", side_effect=RuntimeError("network")):
-        result = worker.deliver_notifications(notifications)
+    result = worker.deliver_notifications(notifications)
 
-    assert result[0]["status"] == "FAILED"
-    assert result[0]["reason"] == "RuntimeError"
+    assert result[0]["status"] == "SKIPPED"
+    assert result[0]["reason"] == "summary_only_mode"
