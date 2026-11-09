@@ -166,7 +166,7 @@ def _execute(page, action):
             locator.fill(str(action.get("value", "")))
             return "Заполнил поле."
         if kind == "click":
-            dangerous = info["type"] == "submit" or any(x in info["text"] for x in
+            dangerous = locator.evaluate("e => e.type === 'submit' || (!!e.closest('form') && (e.tagName === 'BUTTON' || e.tagName === 'INPUT'))") or any(x in info["text"] for x in
                 ("submit", "apply", "send", "отправ", "отклик", "создать аккаунт", "зарегистр", "оплат", "купить", "удалить", "подтвердить"))
             if dangerous:
                 _runtime["pending"] = {"kind": "click", "target": target, "reason": action.get("reason", "")}
@@ -247,6 +247,9 @@ def agent_run():
 def agent_confirm():
     if not _authorized():
         return jsonify(error="Нет доступа."), 401
+    data = request.get_json(silent=True) or {}
+    if data.get("confirm") is not True:
+        return jsonify(error="Для продолжения нужно явное подтверждение."), 400
     with _lock:
         pending = _runtime.get("pending")
         if not pending or not _runtime.get("task"):
