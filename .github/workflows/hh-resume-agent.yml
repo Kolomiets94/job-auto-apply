@@ -32,7 +32,7 @@ jobs:
       - name: Inspect existing HeadHunter resumes (read-only)
         env:
           HH_STORAGE_STATE_JSON: ${{ secrets.HH_STORAGE_STATE_JSON }}
-        run: python hh_resume_agent.py | tee hh-resume-result.json
+        run: python hh_resume_agent.py > hh-resume-result.json
 
       - name: Publish safe summary
         if: always()
