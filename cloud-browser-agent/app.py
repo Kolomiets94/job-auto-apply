@@ -2,11 +2,13 @@ import os
 from flask import Flask, request, jsonify, render_template_string
 from urllib.parse import urlparse
 from browserbase_routes import browserbase_bp
-from assistant_routes import assistant_bp\nfrom autonomous_agent import agent_bp
+from assistant_routes import assistant_bp
+from autonomous_agent import agent_bp
 
 app = Flask(__name__)
 app.register_blueprint(browserbase_bp)
-app.register_blueprint(assistant_bp)\napp.register_blueprint(agent_bp)
+app.register_blueprint(assistant_bp)
+app.register_blueprint(agent_bp)
 PROFILE = {
     "name": os.getenv("CANDIDATE_NAME", "Alexander Kolomiets"),
     "email": os.getenv("CANDIDATE_EMAIL", "kolomiets94@yandex.ru"),
