@@ -58,3 +58,25 @@ def test_daily_count_uses_yekaterinburg_calendar_day_by_default(tmp_path, monkey
         )
 
     assert queue_store.submitted_today() == 1
+
+
+def test_weekly_count_uses_yekaterinburg_week_start_by_default(tmp_path, monkeypatch):
+    from datetime import datetime as RealDateTime
+
+    monkeypatch.setattr(queue_store, 'DB_PATH', str(tmp_path / 'history.db'))
+    monkeypatch.delenv('APPLICATION_TIMEZONE', raising=False)
+
+    class FrozenDateTime(RealDateTime):
+        @classmethod
+        def now(cls, tz=None):
+            return RealDateTime(2026, 11, 10, 0, 30, tzinfo=tz)
+
+    monkeypatch.setattr(queue_store, 'datetime', FrozenDateTime)
+    lid = queue_store.enqueue({'url': 'https://example.com/monday-yekaterinburg', 'source': 'hh'})
+    with queue_store._db() as conn:
+        conn.execute(
+            "UPDATE leads SET state='SUBMITTED', submitted_at=? WHERE id=?",
+            ('2026-11-08T20:30:00+00:00', lid),
+        )
+
+    assert queue_store.submitted_this_week() == 1
