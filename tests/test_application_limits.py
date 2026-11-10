@@ -42,7 +42,7 @@ def test_respects_daily_application_limit(monkeypatch):
          patch.object(worker, "dispatch") as dispatch:
         result = worker.run()
 
-    assert result["results"][0]["reason"] == "daily_application_limit"
+    assert result["results"][0]["reason"] == "daily_total_limit"
     assert result["stats"]["daily_limit_skipped"] == 1
     dispatch.assert_not_called()
 
