@@ -31,14 +31,14 @@ def test_reply_status_change_preserves_original_submission_day(tmp_path, monkeyp
 
 
 
-def test_daily_count_uses_amsterdam_calendar_day_by_default(tmp_path, monkeypatch):
+def test_daily_count_uses_yekaterinburg_calendar_day_by_default(tmp_path, monkeypatch):
     from datetime import datetime as RealDateTime
     from zoneinfo import ZoneInfo
 
     monkeypatch.setattr(queue_store, 'DB_PATH', str(tmp_path / 'history.db'))
     monkeypatch.delenv('APPLICATION_TIMEZONE', raising=False)
 
-    # 00:30 in Amsterdam on 10 November 2026 (CET, UTC+1).
+    # 00:30 in Yekaterinburg on 10 November 2026 (UTC+5).
     class FrozenDateTime(RealDateTime):
         @classmethod
         def now(cls, tz=None):
@@ -50,11 +50,11 @@ def test_daily_count_uses_amsterdam_calendar_day_by_default(tmp_path, monkeypatc
     with queue_store._db() as conn:
         conn.execute(
             "UPDATE leads SET state='SUBMITTED', submitted_at=? WHERE id=?",
-            ('2026-11-09T23:20:00+00:00', before),
+            ('2026-11-09T18:20:00+00:00', before),
         )
         conn.execute(
             "UPDATE leads SET state='SUBMITTED', submitted_at=? WHERE id=?",
-            ('2026-11-09T23:40:00+00:00', after),
+            ('2026-11-09T19:40:00+00:00', after),
         )
 
     assert queue_store.submitted_today() == 1
