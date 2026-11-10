@@ -269,7 +269,8 @@ def run():
     submitted_count = sum(daily_counts.values())
     # One shared daily quota across every job and freelance platform.
     # Count only confirmed SUBMITTED applications from the persistent queue.
-    total_daily_limit = 10
+    # One non-configurable-by-platform shared cap; default and workflow setting are both 10.
+    total_daily_limit = max(1, int(os.getenv("DAILY_TOTAL_LIMIT", "10") or "10"))
     weekly_total_limit = _application_limit("WEEKLY_TOTAL_LIMIT")
     weekly_submitted_count = submitted_this_week()
     total_hourly_limit = _application_limit("HOURLY_TOTAL_LIMIT")
