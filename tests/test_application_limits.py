@@ -63,6 +63,10 @@ def test_submitted_result_increments_daily_total(monkeypatch):
 
 
 def test_full_jobs_bucket_blocks_freelance_at_shared_daily_cap(monkeypatch):
+    monkeypatch.setenv("AUTO_SEND_EMAIL", "1")
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+    monkeypatch.setenv("SMTP_USER", "alex@example.com")
+    monkeypatch.setenv("SMTP_PASSWORD", "test")
     job = _lead()
     freelance = {**_lead("https://freelance.habr.com/tasks/1"), "source": "habr_freelance",
                  "apply_email": "client@example.com"}
