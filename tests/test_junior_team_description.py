@@ -5,7 +5,8 @@ import main
 class JuniorDescriptionTests(unittest.TestCase):
     def test_senior_mentor_does_not_exclude_junior(self):
         vacancy = {'name': 'Junior Frontend Developer', 'snippet': {
-            'responsibility': 'Work with senior developers and a team lead on React interfaces'}}
+            'responsibility': 'Work with senior developers and a team lead on React interfaces'},
+                   'schedule': {'name': 'Удаленная работа'}}
         self.assertTrue(main.ok(vacancy))
 
     def test_senior_vacancy_stays_excluded(self):
