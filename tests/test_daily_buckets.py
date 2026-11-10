@@ -28,3 +28,33 @@ def test_reply_status_change_preserves_original_submission_day(tmp_path, monkeyp
     with queue_store._db() as conn:
         row = conn.execute('SELECT submitted_at FROM leads WHERE id=?', (lid,)).fetchone()
     assert row[0] == original_submitted_at
+
+
+
+def test_daily_count_uses_amsterdam_calendar_day_by_default(tmp_path, monkeypatch):
+    from datetime import datetime as RealDateTime
+    from zoneinfo import ZoneInfo
+
+    monkeypatch.setattr(queue_store, 'DB_PATH', str(tmp_path / 'history.db'))
+    monkeypatch.delenv('APPLICATION_TIMEZONE', raising=False)
+
+    # 00:30 in Amsterdam on 10 November 2026 (CET, UTC+1).
+    class FrozenDateTime(RealDateTime):
+        @classmethod
+        def now(cls, tz=None):
+            return RealDateTime(2026, 11, 10, 0, 30, tzinfo=tz)
+
+    monkeypatch.setattr(queue_store, 'datetime', FrozenDateTime)
+    before = queue_store.enqueue({'url': 'https://example.com/before-midnight', 'source': 'hh'})
+    after = queue_store.enqueue({'url': 'https://example.com/after-midnight', 'source': 'hh'})
+    with queue_store._db() as conn:
+        conn.execute(
+            "UPDATE leads SET state='SUBMITTED', submitted_at=? WHERE id=?",
+            ('2026-11-09T23:20:00+00:00', before),
+        )
+        conn.execute(
+            "UPDATE leads SET state='SUBMITTED', submitted_at=? WHERE id=?",
+            ('2026-11-09T23:40:00+00:00', after),
+        )
+
+    assert queue_store.submitted_today() == 1
