@@ -53,13 +53,24 @@ def _db():
         conn = psycopg.connect(url, connect_timeout=10)
         conn.execute("""CREATE TABLE IF NOT EXISTS leads(
           id TEXT PRIMARY KEY, url TEXT, source TEXT, title TEXT, state TEXT,
-          score INTEGER DEFAULT 0, payload TEXT, updated_at TEXT)""")
+          score INTEGER DEFAULT 0, payload TEXT, updated_at TEXT, submitted_at TEXT)""")
+        conn.execute("ALTER TABLE leads ADD COLUMN IF NOT EXISTS submitted_at TEXT")
+        conn.execute("""UPDATE leads SET submitted_at=updated_at
+                        WHERE submitted_at IS NULL AND state IN ('SUBMITTED','REPLIED','WON')""")
         conn.commit()
         return _PgConnection(conn)
     c = sqlite3.connect(DB_PATH)
     c.execute("""CREATE TABLE IF NOT EXISTS leads(
       id TEXT PRIMARY KEY, url TEXT, source TEXT, title TEXT, state TEXT,
-      score INTEGER DEFAULT 0, payload TEXT, updated_at TEXT)""")
+      score INTEGER DEFAULT 0, payload TEXT, updated_at TEXT, submitted_at TEXT)""")
+    try:
+        c.execute("ALTER TABLE leads ADD COLUMN submitted_at TEXT")
+    except Exception:
+        # Existing databases already have the column.
+        pass
+    # Backfill legacy delivered rows once; future state changes retain this timestamp.
+    c.execute("""UPDATE leads SET submitted_at=updated_at
+                 WHERE submitted_at IS NULL AND state IN ('SUBMITTED','REPLIED','WON')""")
     c.commit()
     return c
 
@@ -134,8 +145,13 @@ def set_state(lid, state):
         raise ValueError("invalid state")
     with _db() as c:
         c.execute(
-            "UPDATE leads SET state=?,updated_at=? WHERE id=?",
-            (state, datetime.now(timezone.utc).isoformat(), lid),
+            """UPDATE leads SET state=?,updated_at=?,
+               submitted_at=CASE
+                 WHEN ?='SUBMITTED' AND submitted_at IS NULL THEN ?
+                 ELSE submitted_at END
+               WHERE id=?""",
+            (state, datetime.now(timezone.utc).isoformat(), state,
+             datetime.now(timezone.utc).isoformat(), lid),
         )
 
 
@@ -175,7 +191,7 @@ def submitted_today(bucket=None):
         rows = c.execute(
             """SELECT source FROM leads
                WHERE state IN ('SUBMITTED','REPLIED','WON')
-               AND updated_at>=? AND updated_at<?""",
+               AND submitted_at>=? AND submitted_at<?""",
             (start_utc, end_utc),
         ).fetchall()
     if bucket is None:
@@ -198,7 +214,7 @@ def submitted_this_week(bucket=None):
     with _db() as c:
         rows = c.execute(
             """SELECT source FROM leads
-               WHERE state IN ('SUBMITTED','REPLIED','WON') AND updated_at>=?""",
+               WHERE state IN ('SUBMITTED','REPLIED','WON') AND submitted_at>=?""",
             (start_utc,),
         ).fetchall()
     if bucket is None:
