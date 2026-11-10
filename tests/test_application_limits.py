@@ -62,29 +62,23 @@ def test_submitted_result_increments_daily_total(monkeypatch):
     assert result["stats"]["submitted_today_total"] == 3
 
 
-def test_full_jobs_bucket_does_not_block_freelance(monkeypatch):
-    monkeypatch.setenv("DAILY_JOB_LIMIT", "10")
+def test_full_jobs_bucket_blocks_freelance_at_shared_daily_cap(monkeypatch):
     job = _lead()
     freelance = {**_lead("https://freelance.habr.com/tasks/1"), "source": "habr_freelance",
                  "apply_email": "client@example.com"}
-    monkeypatch.setenv("AUTO_SEND_EMAIL", "1")
-    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
-    monkeypatch.setenv("SMTP_USER", "alex@example.com")
-    monkeypatch.setenv("SMTP_PASSWORD", "test")
     with patch.object(worker, "collect_all", return_value=[job, freelance]), \
          patch.object(worker, "rank_leads", return_value=[job, freelance]), \
-         patch.object(worker, "enqueue", side_effect=lambda lead: "freelance-1" if lead["source"] == "habr_freelance" else "job-1"), \
+         patch.object(worker, "enqueue", side_effect=lambda lead: lead["url"]), \
          patch.object(worker, "was_submitted", return_value=False), \
          patch.object(worker, "submitted_today", side_effect=[10, 0]), \
          patch.object(worker, "set_state"), \
-         patch.object(worker, "dispatch", return_value={"status":"SUBMITTED"}) as send:
+         patch.object(worker, "dispatch") as send:
         result = worker.run()
-    assert send.call_count == 1
-    assert result["stats"]["jobs_submitted_today"] == 10
-    assert result["stats"]["freelance_submitted_today"] == 1
+    assert send.call_count == 0
+    assert result["stats"]["daily_limit_skipped"] == 2
+    assert result["stats"]["submitted_today_total"] == 10
 
-
-def test_full_freelance_bucket_does_not_block_jobs():
+def test_full_freelance_bucket_blocks_jobs_at_shared_daily_cap():
     job = _lead()
     with patch.object(worker, "collect_all", return_value=[job]), \
          patch.object(worker, "rank_leads", return_value=[job]), \
@@ -92,14 +86,13 @@ def test_full_freelance_bucket_does_not_block_jobs():
          patch.object(worker, "was_submitted", return_value=False), \
          patch.object(worker, "submitted_today", side_effect=[0, 10]), \
          patch.object(worker, "set_state"), \
-         patch.object(worker, "dispatch", return_value={"status":"SUBMITTED"}) as send:
+         patch.object(worker, "dispatch") as send:
         result = worker.run()
-    assert send.call_count == 1
-    assert result["stats"]["jobs_submitted_today"] == 1
-    assert result["stats"]["freelance_submitted_today"] == 10
+    assert send.call_count == 0
+    assert result["stats"]["daily_limit_skipped"] == 1
+    assert result["stats"]["submitted_today_total"] == 10
 
-
-def test_zero_limits_do_not_cap_hourly_or_daily_submissions(monkeypatch):
+def test_zero_bucket_limits_do_not_disable_shared_daily_cap(monkeypatch):
     for name in ("DAILY_JOB_LIMIT", "DAILY_FREELANCE_LIMIT",
                  "HOURLY_JOB_LIMIT", "HOURLY_FREELANCE_LIMIT"):
         monkeypatch.setenv(name, "0")
@@ -110,11 +103,12 @@ def test_zero_limits_do_not_cap_hourly_or_daily_submissions(monkeypatch):
          patch.object(worker, "was_submitted", return_value=False), \
          patch.object(worker, "submitted_today", side_effect=[20, 0]), \
          patch.object(worker, "set_state"), \
-         patch.object(worker, "dispatch", return_value={"status": "SUBMITTED"}) as send:
+         patch.object(worker, "dispatch") as send:
         result = worker.run()
-    assert send.call_count == 5
-    assert result["stats"]["jobs_submitted_today"] == 25
-    assert result["stats"]["daily_limit_skipped"] == 0
+    assert send.call_count == 0
+    assert result["stats"]["jobs_submitted_today"] == 20
+    assert result["stats"]["daily_limit_skipped"] == 5
     assert result["stats"]["hourly_limit_skipped"] == 0
     assert result["stats"]["daily_job_limit"] is None
     assert result["stats"]["hourly_job_limit"] is None
+
