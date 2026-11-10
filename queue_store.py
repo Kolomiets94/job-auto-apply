@@ -206,7 +206,7 @@ def submitted_today(bucket=None):
 def submitted_this_week(bucket=None):
     """Count confirmed submissions since Monday 00:00 in the configured application timezone."""
     from profit_ranker import FREELANCE_SOURCES
-    local = datetime.now(ZoneInfo(os.getenv("APPLICATION_TIMEZONE", "Europe/Amsterdam")))
+    local = datetime.now(ZoneInfo(os.getenv("APPLICATION_TIMEZONE", "Asia/Yekaterinburg")) )
     monday = (local - timedelta(days=local.weekday())).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
