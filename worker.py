@@ -267,7 +267,9 @@ def run():
     daily_limit = (sum(daily_limits.values())
                    if all(v is not None for v in daily_limits.values()) else None)
     submitted_count = sum(daily_counts.values())
-    total_daily_limit = _application_limit("DAILY_TOTAL_LIMIT")
+    # One shared daily quota across every job and freelance platform.
+    # Count only confirmed SUBMITTED applications from the persistent queue.
+    total_daily_limit = 10
     weekly_total_limit = _application_limit("WEEKLY_TOTAL_LIMIT")
     weekly_submitted_count = submitted_this_week()
     total_hourly_limit = _application_limit("HOURLY_TOTAL_LIMIT")
