@@ -183,7 +183,7 @@ def was_submitted(lid):
 def submitted_today(bucket=None):
     """Count each category separately using the candidate's local calendar day."""
     from profit_ranker import FREELANCE_SOURCES
-    local = datetime.now(ZoneInfo(os.getenv("APPLICATION_TIMEZONE", "Europe/Amsterdam")))
+    local = datetime.now(ZoneInfo(os.getenv("APPLICATION_TIMEZONE", "Asia/Yekaterinburg")))
     start = local.replace(hour=0, minute=0, second=0, microsecond=0)
     start_utc = start.astimezone(timezone.utc).isoformat()
     end_utc = (start + timedelta(days=1)).astimezone(timezone.utc).isoformat()
