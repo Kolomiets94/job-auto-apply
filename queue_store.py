@@ -53,13 +53,28 @@ def _db():
         conn = psycopg.connect(url, connect_timeout=10)
         conn.execute("""CREATE TABLE IF NOT EXISTS leads(
           id TEXT PRIMARY KEY, url TEXT, source TEXT, title TEXT, state TEXT,
-          score INTEGER DEFAULT 0, payload TEXT, updated_at TEXT)""")
+          score INTEGER DEFAULT 0, payload TEXT, updated_at TEXT, submitted_at TEXT)""")
+        conn.execute("ALTER TABLE leads ADD COLUMN IF NOT EXISTS submitted_at TEXT")
+        conn.execute("""UPDATE leads SET submitted_at=updated_at
+                        WHERE submitted_at IS NULL AND state IN ('SUBMITTED','REPLIED','WON')""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS daily_application_reservations(
+          lead_id TEXT NOT NULL, application_day TEXT NOT NULL, reserved_at TEXT NOT NULL,
+          PRIMARY KEY (lead_id, application_day))""")
         conn.commit()
         return _PgConnection(conn)
     c = sqlite3.connect(DB_PATH)
     c.execute("""CREATE TABLE IF NOT EXISTS leads(
       id TEXT PRIMARY KEY, url TEXT, source TEXT, title TEXT, state TEXT,
-      score INTEGER DEFAULT 0, payload TEXT, updated_at TEXT)""")
+      score INTEGER DEFAULT 0, payload TEXT, updated_at TEXT, submitted_at TEXT)""")
+    try:
+        c.execute("ALTER TABLE leads ADD COLUMN submitted_at TEXT")
+    except sqlite3.OperationalError:
+        pass
+    c.execute("""UPDATE leads SET submitted_at=updated_at
+                 WHERE submitted_at IS NULL AND state IN ('SUBMITTED','REPLIED','WON')""")
+    c.execute("""CREATE TABLE IF NOT EXISTS daily_application_reservations(
+      lead_id TEXT NOT NULL, application_day TEXT NOT NULL, reserved_at TEXT NOT NULL,
+      PRIMARY KEY (lead_id, application_day))""")
     c.commit()
     return c
 
@@ -134,8 +149,13 @@ def set_state(lid, state):
         raise ValueError("invalid state")
     with _db() as c:
         c.execute(
-            "UPDATE leads SET state=?,updated_at=? WHERE id=?",
-            (state, datetime.now(timezone.utc).isoformat(), lid),
+            """UPDATE leads SET state=?,updated_at=?,
+               submitted_at=CASE
+                 WHEN ?='SUBMITTED' AND submitted_at IS NULL THEN ?
+                 ELSE submitted_at END
+               WHERE id=?""",
+            (state, datetime.now(timezone.utc).isoformat(), state,
+             datetime.now(timezone.utc).isoformat(), lid),
         )
 
 
@@ -164,10 +184,54 @@ def was_submitted(lid):
         return any(_vacancy_key(url) == key for (url,) in history)
 
 
+def _application_day(timezone_name=None):
+    timezone_name = timezone_name or os.getenv("APPLICATION_TIMEZONE", "Europe/Amsterdam")
+    local = datetime.now(ZoneInfo(timezone_name))
+    return local.date().isoformat(), local
+
+
+def reserve_daily_slot(lid, limit, timezone_name=None):
+    """Atomically reserve one daily application slot across concurrent workers.
+
+    Reservations are retained after uncertain outcomes or crashes. This can
+    under-use the quota, but prevents blind retries from exceeding the cap.
+    """
+    if limit is None:
+        return True
+    limit = int(limit)
+    if limit < 1:
+        return False
+    day, local = _application_day(timezone_name)
+    reserved_at = datetime.now(timezone.utc).isoformat()
+    with _db() as c:
+        if isinstance(c, sqlite3.Connection):
+            c.execute("BEGIN IMMEDIATE")
+        else:
+            c.execute("SELECT pg_advisory_xact_lock(hashtext(?))", (day,))
+        existing = c.execute(
+            "SELECT 1 FROM daily_application_reservations WHERE lead_id=? AND application_day=?",
+            (lid, day),
+        ).fetchone()
+        if existing:
+            return False
+        count = c.execute(
+            "SELECT COUNT(*) FROM daily_application_reservations WHERE application_day=?",
+            (day,),
+        ).fetchone()[0]
+        if count >= limit:
+            return False
+        c.execute(
+            """INSERT INTO daily_application_reservations
+               (lead_id,application_day,reserved_at) VALUES(?,?,?)""",
+            (lid, day, reserved_at),
+        )
+    return True
+
+
 def submitted_today(bucket=None):
-    """Count each category separately using the candidate's local calendar day."""
+    """Count confirmed submissions by the configured local calendar day."""
     from profit_ranker import FREELANCE_SOURCES
-    local = datetime.now(ZoneInfo("Asia/Yekaterinburg"))
+    _, local = _application_day()
     start = local.replace(hour=0, minute=0, second=0, microsecond=0)
     start_utc = start.astimezone(timezone.utc).isoformat()
     end_utc = (start + timedelta(days=1)).astimezone(timezone.utc).isoformat()
@@ -175,7 +239,7 @@ def submitted_today(bucket=None):
         rows = c.execute(
             """SELECT source FROM leads
                WHERE state IN ('SUBMITTED','REPLIED','WON')
-               AND updated_at>=? AND updated_at<?""",
+               AND submitted_at>=? AND submitted_at<?""",
             (start_utc, end_utc),
         ).fetchall()
     if bucket is None:
@@ -186,11 +250,10 @@ def submitted_today(bucket=None):
                if ((str(source or "").lower() in FREELANCE_SOURCES) == (bucket == "freelance")))
 
 
-
 def submitted_this_week(bucket=None):
     """Count confirmed submissions since Monday 00:00 in Yekaterinburg."""
     from profit_ranker import FREELANCE_SOURCES
-    local = datetime.now(ZoneInfo("Asia/Yekaterinburg"))
+    _, local = _application_day()
     monday = (local - timedelta(days=local.weekday())).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
@@ -198,7 +261,7 @@ def submitted_this_week(bucket=None):
     with _db() as c:
         rows = c.execute(
             """SELECT source FROM leads
-               WHERE state IN ('SUBMITTED','REPLIED','WON') AND updated_at>=?""",
+               WHERE state IN ('SUBMITTED','REPLIED','WON') AND submitted_at>=?""",
             (start_utc,),
         ).fetchall()
     if bucket is None:
