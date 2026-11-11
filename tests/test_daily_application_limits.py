@@ -107,3 +107,49 @@ def test_postgres_advisory_lock_query_uses_psycopg_placeholders():
         "SELECT pg_advisory_xact_lock(hashtext(%s))"
     )
     assert raw.last_cursor.params == (day,)
+
+
+def test_postgres_concurrent_reservations_never_exceed_daily_cap(
+    monkeypatch,
+):
+    import os
+    from concurrent.futures import ThreadPoolExecutor
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    import pytest
+
+    database_url = os.getenv("POSTGRES_TEST_DATABASE_URL")
+    if not database_url:
+        pytest.skip("POSTGRES_TEST_DATABASE_URL is not configured")
+
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    local = datetime.now(ZoneInfo("Europe/Amsterdam"))
+    monkeypatch.setattr(
+        queue_store,
+        "_application_day",
+        lambda timezone_name=None: (local.date().isoformat(), local),
+    )
+
+    # Initialize schema before the concurrent section so this test measures
+    # transaction-level reservation locking, not concurrent DDL initialization.
+    with queue_store._db():
+        pass
+
+    limit = 10
+
+    def reserve(number):
+        return queue_store.reserve_daily_slot(
+            f"postgres-parallel-lead-{number}", limit
+        )
+
+    with ThreadPoolExecutor(max_workers=20) as pool:
+        outcomes = list(pool.map(reserve, range(40)))
+
+    assert sum(outcomes) == limit
+    with queue_store._db() as conn:
+        reserved = conn.execute(
+            "SELECT COUNT(*) FROM daily_application_reservations WHERE application_day=?",
+            (local.date().isoformat(),),
+        ).fetchone()[0]
+    assert reserved == limit
