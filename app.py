@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, redirect, session
 import hmac
 import os
 import threading
@@ -10,6 +10,8 @@ from proposal_writer import make_proposal
 from worker import run as run_worker
 
 app=Flask(__name__)
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "")
+app.config.update(SESSION_COOKIE_SECURE=True, SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax")
 
 
 def _authorized():
