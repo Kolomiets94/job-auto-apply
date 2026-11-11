@@ -202,6 +202,9 @@ def reserve_daily_slot(lid, limit, timezone_name=None):
     if limit < 1:
         return False
     day, local = _application_day(timezone_name)
+    start = local.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_utc = start.astimezone(timezone.utc).isoformat()
+    end_utc = (start + timedelta(days=1)).astimezone(timezone.utc).isoformat()
     reserved_at = datetime.now(timezone.utc).isoformat()
     with _db() as c:
         if isinstance(c, sqlite3.Connection):
@@ -215,8 +218,14 @@ def reserve_daily_slot(lid, limit, timezone_name=None):
         if existing:
             return False
         count = c.execute(
-            "SELECT COUNT(*) FROM daily_application_reservations WHERE application_day=?",
-            (day,),
+            """SELECT COUNT(*) FROM (
+                 SELECT lead_id AS id FROM daily_application_reservations WHERE application_day=?
+                 UNION
+                 SELECT id FROM leads
+                  WHERE state IN ('SUBMITTED','REPLIED','WON')
+                    AND submitted_at>=? AND submitted_at<?
+               ) AS daily_used""",
+            (day, start_utc, end_utc),
         ).fetchone()[0]
         if count >= limit:
             return False
@@ -251,7 +260,7 @@ def submitted_today(bucket=None):
 
 
 def submitted_this_week(bucket=None):
-    """Count confirmed submissions since Monday 00:00 in Yekaterinburg."""
+    """Count confirmed submissions since Monday 00:00 in the configured timezone."""
     from profit_ranker import FREELANCE_SOURCES
     _, local = _application_day()
     monday = (local - timedelta(days=local.weekday())).replace(
