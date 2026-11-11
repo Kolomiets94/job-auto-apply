@@ -15,7 +15,7 @@ from job_matcher import JobMatcher
 from profit_ranker import rank_leads, FREELANCE_SOURCES, ROLE_PRIORITY, _role_category
 from proposal_writer import make_proposal
 from application_dispatcher import dispatch
-from queue_store import enqueue, enqueue_many, set_state, submitted_today, submitted_this_week, was_submitted, queued_leads
+from queue_store import enqueue, enqueue_many, set_state, submitted_today, submitted_this_week, was_submitted, queued_leads, reserve_daily_slot
 from notification_rules import format_notification, should_notify
 from telegram_notifier import send_message, send_notification
 from publication_filter import is_new_publication
@@ -440,6 +440,18 @@ def run():
             results.append({"id": lid, "title": lead.get("title"), "source": lead.get("source"),
                             "url": lead.get("url"), "status": "DRAFT", "reason": "dry_run",
                             "proposal": proposal})
+            continue
+
+        # Reserve the global daily slot atomically immediately before dispatch.
+        # A retained reservation after a crash/uncertain result is intentionally
+        # conservative: it prevents an automatic retry from exceeding the cap.
+        if total_daily_limit is not None and not reserve_daily_slot(
+            lid, total_daily_limit, os.getenv("APPLICATION_TIMEZONE", "Europe/Amsterdam")
+        ):
+            stats["daily_limit_skipped"] += 1
+            results.append({"id": lid, "title": lead.get("title"), "source": lead.get("source"),
+                            "url": lead.get("url"), "status": "SKIPPED",
+                            "reason": "daily_limit_reserved_or_reached"})
             continue
 
         try:
