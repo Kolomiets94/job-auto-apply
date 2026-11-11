@@ -14,6 +14,10 @@ services:
         value: "1"
       - key: DRY_RUN
         value: "1"
+      - key: DAILY_TOTAL_LIMIT
+        value: "10"
+      - key: APPLICATION_TIMEZONE
+        value: Europe/Amsterdam
       - key: AUTO_BROWSER_APPLY
         value: "0"
       - key: AUTO_SEND_EMAIL
