@@ -110,15 +110,13 @@ def run_hunter():
 
 @app.post("/run/scheduled")
 def run_scheduled():
-    """A fast, idempotent trigger for a free external HTTP scheduler.
-
-    The endpoint is intentionally draft-only until live sending, persistent
-    storage, and the application channels have been reviewed together.
-    """
+    """Idempotent trigger for scheduled draft or explicitly enabled live runs."""
     if not _scheduler_authorized():
         return jsonify({"error": "unauthorized"}), 401
-    if os.getenv("DRY_RUN", "").strip().lower() not in ("1", "true", "yes"):
-        return jsonify({"error": "draft_mode_required"}), 409
+    dry_run = os.getenv("DRY_RUN", "").strip().lower() in ("1", "true", "yes")
+    live_allowed = os.getenv("ALLOW_SCHEDULED_LIVE_APPLY", "").strip().lower() in ("1", "true", "yes")
+    if not dry_run and not live_allowed:
+        return jsonify({"error": "scheduled_live_apply_not_enabled"}), 409
     if not os.getenv("DATABASE_URL", "").strip():
         return jsonify({"error": "persistent_database_required"}), 503
 
