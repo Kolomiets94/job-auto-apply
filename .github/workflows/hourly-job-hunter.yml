@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Trigger draft-only scheduled run
+      - name: Trigger scheduled hunter run
         env:
           SCHEDULER_TOKEN: ${{ secrets.SCHEDULER_TOKEN }}
         run: |
