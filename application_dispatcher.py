@@ -85,7 +85,7 @@ def dispatch(lead, proposal):
     # FL.ru's RSS does not expose whether a bid is free. Never risk a paid bid:
     # only proceed when a source explicitly verifies free access.
     if lead.get("source") == "fl_ru" and lead.get("free_to_apply") is not True:
-        return {"status": "NEEDS_CONFIRMATION", "reason": "fl_free_bid_not_verified"}
+        return {"status": "NEEDS_CONFIRMATION", "reason": "no_free_direct_channel", "detail": "FL.ru RSS does not verify free bid access"}
 
     # The user authorized automatic applications; report outcomes via the worker.
     if lead.get("source") == "freelancehunt" and lead.get("can_api_bid"):
