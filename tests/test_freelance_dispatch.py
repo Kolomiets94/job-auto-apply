@@ -52,16 +52,14 @@ def test_fl_ru_unknown_bid_access_is_not_misreported_as_paid(monkeypatch):
     assert result["reason"] == "no_free_direct_channel"
 
 
-def test_dispatch_submits_without_telegram_interaction(monkeypatch):
+def test_hh_uses_authenticated_browser_without_telegram_interaction(monkeypatch):
     monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
     monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
-    with patch.object(dispatcher, "_send_email", return_value=None), \
-         patch.object(dispatcher, "dispatch_browser",
+    with patch.object(dispatcher, "dispatch_browser",
                       return_value={"status": "SUBMITTED", "reason": "browser_hh_sent"}) as send:
         result = dispatch({"source": "hh", "title": "Junior React"}, "Draft")
-    assert result["status"] == "SHORTLISTED"
-    assert result["reason"] == "hh_applicant_api_unavailable"
-    send.assert_not_called()
+    assert result["status"] == "SUBMITTED"
+    send.assert_called_once()
 
 
 @pytest.mark.parametrize("code", [404, 410])
