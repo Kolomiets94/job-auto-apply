@@ -70,17 +70,22 @@ def _is_hh_lead(lead):
 
 
 def dispatch(lead, proposal):
-    # HH discontinued support for applicant-side API integrations. Do not
-    # submit through browser automation or email from HH-sourced listings.
-    # Keep the lead shortlisted; the worker still sends its Telegram alert.
+    # HH applicant-side API access is unavailable, but the authenticated
+    # browser flow can submit applications. It fails closed without a session,
+    # matching résumé, known answers, or a confirmed post-submit state.
     if _is_hh_lead(lead):
-        return {"status": "SHORTLISTED", "reason": "hh_applicant_api_unavailable"}
+        return dispatch_browser(lead, proposal)
 
     if not application_time_allowed():
         return {"status": "SKIPPED", "reason": "outside_application_hours"}
 
     if lead.get("paid_bid") is True:
         return {"status": "SKIPPED", "reason": "paid_bid"}
+
+    # FL.ru's RSS does not expose whether a bid is free. Never risk a paid bid:
+    # only proceed when a source explicitly verifies free access.
+    if lead.get("source") == "fl_ru" and lead.get("free_to_apply") is not True:
+        return {"status": "NEEDS_CONFIRMATION", "reason": "fl_free_bid_not_verified"}
 
     # The user authorized automatic applications; report outcomes via the worker.
     if lead.get("source") == "freelancehunt" and lead.get("can_api_bid"):
