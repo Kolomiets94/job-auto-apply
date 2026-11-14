@@ -34,6 +34,12 @@ NON_TARGET_TITLE_TERMS = (
 # Frameworks and specialties outside the candidate's demonstrated frontend stack.
 # Check the project title rather than incidental words in its description.
 FREELANCE_TITLE_EXCLUDE = (
+    # Exclude design-only, editorial, SEO/audit and security-specialist work.
+    "landing page design", "web design", "figma design", "design in figma",
+    "дизайн лендинга", "дизайн сайта", "дизайн в фигме", "дизайнер",
+    "security review", "security audit", "penetration test", "pentest",
+    "аудит безопасности", "проверка безопасности", "seo", "поисковая оптимизация",
+    "аудит сайтов", "аудит сайта", "журнал", "редакционная верстка", "редакционная вёрстка",
     "angular", "mean stack", "knowledge of mean", "ms access", "microsoft access",
     "ui ux designer", "ui/ux designer", "ux designer", "mongodb", "wordpress", "woocommerce",
     "arcgis", "jquery", "drupal", "shopify", "webflow",
@@ -233,7 +239,7 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "freelance title outside demonstrated stack"}
 
     if source in FREELANCE_SOURCES and any(x in title for x in FREELANCE_TITLE_EXCLUDE):
-        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "freelance title requires unsupported technology"}
+        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "freelance title is design/editorial/audit/security or unsupported work"}
 
     if source in FREELANCE_SOURCES and any(x in text for x in FREELANCE_TOO_COMPLEX):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "freelance project too complex/out of scope"}
@@ -251,15 +257,32 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
 
     score = round(min(100, (fit * .45 + budget_score * .25 + quick + comp_score + resume_score * .25) * 100))
     category = _role_category(lead)
+    # Freelance tasks need concrete frontend/layout evidence, not generic words
+    # such as "website" or "landing page". Keep simple HTML/CSS work eligible.
+    core_skills = {
+        "react", "typescript", "javascript", "html", "css", "scss",
+        "frontend", "front-end", "верстка", "вёрстка", "верстка сайта",
+        "вёрстка сайта", "верстальщик",
+    }
+    has_core_skill = bool(core_skills.intersection(matched))
+    freelance_eligible = (
+        source not in FREELANCE_SOURCES
+        or (has_core_skill and score >= 25)
+    )
     return {
         **lead,
         "category": category,
         "role_priority": ROLE_PRIORITY.get(category, 99),
         "profit_score": score,
-        # One relevant skill is enough to enter the shortlist; safety filters above still apply.
-        "eligible": bool(matched) and score >= 8,
+        # Freelance: require a demonstrated frontend/layout signal and a modest
+        # minimum score; non-freelance vacancy rules remain unchanged.
+        "eligible": bool(matched) and score >= 8 and freelance_eligible,
         "matched_skills": matched,
-        "rank_reason": "role priority + skill fit + budget + speed + competition + resume fit",
+        "rank_reason": (
+            "frontend/layout evidence + minimum freelance score + fit/budget/speed"
+            if source in FREELANCE_SOURCES
+            else "role priority + skill fit + budget + speed + competition + resume fit"
+        ),
     }
 
 
