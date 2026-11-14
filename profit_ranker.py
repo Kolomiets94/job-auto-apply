@@ -267,7 +267,7 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     has_core_skill = bool(core_skills.intersection(matched))
     freelance_eligible = (
         source not in FREELANCE_SOURCES
-        or (has_core_skill and score >= 25)
+        or (has_core_skill and score >= 15)
     )
     return {
         **lead,
