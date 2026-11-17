@@ -58,8 +58,9 @@ def diagnose_hh_session():
     state = _storage_state()
     print('[hh-session-diagnostic] storage state read', flush=True)
     if not isinstance(state, dict):
-        return {"configured": bool(os.getenv("HH_STORAGE_STATE_JSON", "").strip() or os.getenv("HH_STORAGE_STATE", "").strip()),
-                "valid_json": False, "authenticated": None, "status": "missing_or_invalid"}
+        configured = bool(os.getenv("HH_STORAGE_STATE_JSON", "").strip() or os.getenv("HH_STORAGE_STATE", "").strip())
+        print("[hh-session-diagnostic] state is not a dict; configured=%s status=missing_or_invalid" % configured, flush=True)
+        return {"configured": configured, "valid_json": False, "authenticated": None, "status": "missing_or_invalid"}
     print("[hh-session-diagnostic] validating state structure", flush=True)
     cookies = state.get("cookies")
     origins = state.get("origins")
