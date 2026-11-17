@@ -9,6 +9,7 @@ def test_collect_all_deduplicates_urls(monkeypatch):
     other = {"source": "remoteok", "title": "Frontend", "url": "https://example.com/2"}
 
     with patch.object(worker, "hh_search", return_value=[same]), \
+         patch.object(worker, "hh_search_hybrid", return_value=[]), \
          patch.object(worker, "remoteok", return_value=[same, other]), \
          patch.object(worker, "collect_freelance", return_value=[]), \
          patch.object(worker, "collect_peopleperhour", return_value=[]), \
@@ -28,6 +29,7 @@ def test_collect_all_isolates_source_failures(monkeypatch):
     lead = {"source": "remoteok", "title": "React", "url": "https://example.com/ok"}
 
     with patch.object(worker, "hh_search", side_effect=RuntimeError("boom")), \
+         patch.object(worker, "hh_search_hybrid", return_value=[]), \
          patch.object(worker, "remoteok", return_value=[lead]), \
          patch.object(worker, "collect_freelance", side_effect=RuntimeError("boom")), \
          patch.object(worker, "collect_peopleperhour", return_value=[]), \
@@ -44,6 +46,7 @@ def test_hh_block_without_session_stops_repeated_queries_but_other_sources_conti
     monkeypatch.setattr(worker, "JOB_COLLECTORS", ())
     lead = {"source": "remoteok", "title": "Junior React", "url": "https://example.com/job"}
     with patch.object(worker, "hh_search", side_effect=worker.HHAccessUnavailable("HH API HTTP 403; browser session missing")) as hh, \
+         patch.object(worker, "hh_search_hybrid", return_value=[]), \
          patch.object(worker, "remoteok", return_value=[lead]), \
          patch.object(worker, "collect_freelance", return_value=[]), \
          patch.object(worker, "collect_freelancehunt", return_value=[]), \
@@ -94,6 +97,19 @@ def test_prioritize_actionable_leads(monkeypatch):
         "Email project", "Paid bid",
     ]
 
+
+
+def test_freelance_is_only_a_fallback_when_no_employment_matches():
+    job = {"source": "hh", "title": "Junior React Developer", "profit_score": 65}
+    freelance = {"source": "freelancer_com", "title": "React landing page", "profit_score": 99}
+
+    selected, jobs, freelance_leads = worker.select_primary_leads([freelance, job])
+    assert selected == jobs == [job]
+    assert freelance_leads == [freelance]
+
+    selected, jobs, freelance_leads = worker.select_primary_leads([freelance])
+    assert selected == freelance_leads == [freelance]
+    assert jobs == []
 
 def test_freelancehunt_api_priority_requires_token(monkeypatch):
     lead = {"source": "freelancehunt", "can_api_bid": True}
@@ -215,4 +231,5 @@ def test_total_hourly_cap_counts_across_job_and_freelance(monkeypatch):
     assert dispatch.call_count == 1
     assert report["stats"]["submitted"] == 1
     assert report["stats"]["submitted_by_role"]["frontend"] == 1
-    assert report["results"][1]["reason"] == "hourly_total_limit"
+    assert report["stats"]["freelance_held_back"] == 1
+    assert len(report["results"]) == 1

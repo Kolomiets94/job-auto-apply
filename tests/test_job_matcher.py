@@ -33,6 +33,7 @@ def test_ranker_rewards_resume_fit():
         "title": "Junior Frontend React TypeScript",
         "description": "React TypeScript HTML CSS landing",
         "budget": 30000,
+        "work_mode": "REMOTE",
     }
 
     weak = rank_lead({**base, "match_score": 20})

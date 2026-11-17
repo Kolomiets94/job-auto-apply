@@ -79,7 +79,8 @@ def test_full_jobs_bucket_blocks_freelance_at_shared_daily_cap(monkeypatch):
          patch.object(worker, "dispatch") as send:
         result = worker.run()
     assert send.call_count == 0
-    assert result["stats"]["daily_limit_skipped"] == 2
+    assert result["stats"]["daily_limit_skipped"] == 1
+    assert result["stats"]["freelance_held_back"] == 1
     assert result["stats"]["submitted_today_total"] == 10
 
 def test_full_freelance_bucket_blocks_jobs_at_shared_daily_cap():

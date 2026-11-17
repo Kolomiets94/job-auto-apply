@@ -21,6 +21,16 @@ QUERIES=[
     ("layout","младший верстальщик"),
     ("layout","junior HTML"),
 ]
+
+# Hybrid is searched separately and only inside Yekaterinburg.
+HYBRID_QUERIES=[
+    ("frontend","junior frontend"),
+    ("frontend","junior React"),
+    ("frontend","React TypeScript"),
+    ("frontend","junior JavaScript"),
+    ("layout","junior верстальщик"),
+    ("layout","junior HTML CSS"),
+]
 EXCLUDE=("full stack","fullstack","full-stack","vue","angular","react native","react-native","flutter","middle","senior","lead","head of","manager","director")
 UA={"User-Agent":"JobFreelanceHunter/1.1"}
 
@@ -68,20 +78,45 @@ def ok(v):
     if any(x in text for x in EXCLUDE if x not in level_terms): return False
     if not salary_ok(v): return False
     if re.search(r"\b(?:intern|internship|trainee)\b|стаж[её]р|стажиров|практикант", title): return False
-    if any(x in title for x in ("офис", "гибрид", "hybrid", "onsite", "on-site")): return False
     return True
 
 
-def hh_search(tag, q):
-    """Fetch public HH vacancies with bounded retries and no browser fallback."""
+_HH_YEKATERINBURG_AREA_ID = None
+
+
+def hh_yekaterinburg_area_id():
+    """Resolve Yekaterinburg's current HH area ID instead of hard-coding it."""
+    global _HH_YEKATERINBURG_AREA_ID
+    configured = os.getenv("HH_YEKATERINBURG_AREA_ID", "").strip()
+    if configured:
+        return configured
+    if _HH_YEKATERINBURG_AREA_ID:
+        return _HH_YEKATERINBURG_AREA_ID
+
+    response = requests.get("https://api.hh.ru/areas/113", headers=UA, timeout=20)
+    response.raise_for_status()
+    stack = [response.json()]
+    while stack:
+        area = stack.pop()
+        if str(area.get("name") or "").strip().casefold() == "екатеринбург":
+            _HH_YEKATERINBURG_AREA_ID = str(area.get("id"))
+            return _HH_YEKATERINBURG_AREA_ID
+        stack.extend(area.get("areas") or [])
+    raise HHAccessUnavailable("Could not resolve Yekaterinburg area ID from HH directory")
+
+
+def _hh_search(tag, q, work_format, area=None, max_pages=6):
+    """Fetch HH vacancies for one explicit work format and optional region."""
     import time
 
     items = []
-    for page in range(6):
+    for page in range(max_pages):
         params = {
             "text": q, "per_page": 50, "page": page,
-            "order_by": "publication_time", "schedule": "remote",
+            "order_by": "publication_time", "work_format": work_format,
         }
+        if area:
+            params["area"] = str(area)
         for attempt in range(3):
             try:
                 r = requests.get(HH_API, params=params, headers=UA, timeout=20)
@@ -108,14 +143,33 @@ def hh_search(tag, q):
         items.extend(payload.get("items", []))
         if page >= int(payload.get("pages", 1)) - 1:
             break
-    return [{"source": "hh", "category": tag, "title": v["name"],
-             "company": (v.get("employer") or {}).get("name"),
-             "url": v.get("alternate_url"), "published": v.get("published_at"),
-             "salary": v.get("salary"),
-             "description": " ".join(str(x or "") for x in (v.get("snippet") or {}).values()),
-             "experience": (v.get("experience") or {}).get("name"),
-             "location": (v.get("area") or {}).get("name")}
-            for v in items if ok(v)]
+
+    return [{
+        "source": "hh",
+        "category": tag,
+        "title": v.get("name"),
+        "company": (v.get("employer") or {}).get("name"),
+        "url": v.get("alternate_url"),
+        "published": v.get("published_at"),
+        "salary": v.get("salary") or v.get("salary_range"),
+        "description": " ".join(str(x or "") for x in (v.get("snippet") or {}).values()),
+        "experience": (v.get("experience") or {}).get("name"),
+        "location": (v.get("area") or {}).get("name"),
+        "work_format": v.get("work_format") or [],
+        "schedule": v.get("schedule") or {},
+        "work_mode": work_format,
+    } for v in items if ok(v)]
+
+
+def hh_search(tag, q):
+    """Search remote HH vacancies across Russia."""
+    return _hh_search(tag, q, work_format="REMOTE")
+
+
+def hh_search_hybrid(tag, q):
+    """Search hybrid HH vacancies only in Yekaterinburg."""
+    area_id = hh_yekaterinburg_area_id()
+    return _hh_search(tag, q, work_format="HYBRID", area=area_id, max_pages=2)
 
 
 def remoteok():
