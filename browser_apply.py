@@ -144,14 +144,6 @@ def _select_resume(page, category):
 def _known_question_answer(question, category):
     """Return only answers grounded in the candidate profile; never guess."""
     q = _norm(question)
-    if ("вуз" in q or "университет" in q or "институт" in q) and any(
-        x in q for x in ("учитесь", "учишься", "обучени", "проходите обучение", "студент")
-    ):
-        return "Нет, сейчас не учусь в вузе."
-    if ("полной" in q and "частичной" in q and any(
-        x in q for x in ("занятост", "работу", "ищете")
-    )):
-        return "Ищу работу с полной занятостью."
     if category == "qa" and any(x in q for x in ("геймдев", "gamedev", "game dev")) and any(
         x in q for x in ("почему", "интерес", "хотите", "привлека")
     ):
@@ -169,8 +161,8 @@ def _known_question_answer(question, category):
         )
     if any(x in q for x in ("react", "typescript", "javascript", "redux", "rest api", "html", "css", "scss")):
         return (
-            "Работаю с React, TypeScript, JavaScript ES6+, Redux Toolkit, REST API, "
-            "HTML5, CSS3/SCSS, Git, Figma и Vite/Webpack."
+            "Работаю с React, TypeScript, JavaScript ES6+, Redux Toolkit, React Router, "
+            "Axios/REST API, HTML5, CSS3/SCSS, Git, Vite и Webpack."
         )
     if category == "qa" and any(x in q for x in ("тестирован", "qa", "баг", "bug", "test case", "чек-лист")):
         return (
@@ -179,8 +171,6 @@ def _known_question_answer(question, category):
         )
     if any(x in q for x in ("удален", "удалён", "remote")):
         return "Да, готов работать удалённо."
-    if any(x in q for x in ("когда готовы", "когда можете", "дата выхода", "приступить")):
-        return "Готов приступить в ближайшее время."
     return None
 
 
