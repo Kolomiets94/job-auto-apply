@@ -157,6 +157,7 @@ def _hh_search(tag, q, work_format, area=None, max_pages=6):
         "location": (v.get("area") or {}).get("name"),
         "work_format": v.get("work_format") or [],
         "schedule": v.get("schedule") or {},
+        "work_mode": work_format,
     } for v in items if ok(v)]
 
 
