@@ -5,7 +5,7 @@ import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from job_sources import JOB_COLLECTORS
 
-from main import QUERIES, HHAccessUnavailable, hh_search, remoteok
+from main import QUERIES, HYBRID_QUERIES, HHAccessUnavailable, hh_search, hh_hybrid_search, remoteok
 from freelance_sources import (
     collect_freelance, collect_peopleperhour, collect_prolinker,
     collect_weblancer, collect_freelancer_com,
@@ -75,6 +75,17 @@ def collect_all():
             if isinstance(exc, HHAccessUnavailable):
                 # Every remaining query uses the same unavailable channel.
                 # Avoid repeating a blocked API request for each search term.
+                break
+
+    # HH hybrid vacancies are fetched separately and only from Yekaterinburg.
+    for tag, query in HYBRID_QUERIES:
+        try:
+            matches = hh_hybrid_search(tag, query)
+            print(f"[collector] hh hybrid {tag} / {query}: {len(matches)} leads", flush=True)
+            leads += matches
+        except Exception as exc:
+            record_collection_error(f"hh_hybrid:{tag}:{query}", exc)
+            if isinstance(exc, HHAccessUnavailable):
                 break
 
     for source, collector in (
@@ -154,7 +165,7 @@ def _application_priority(lead):
 
 
 def prioritize_actionable_leads(ranked):
-    """Try React first, then other frontend, layout, and QA leads."""
+    """Try React first, then other frontend, layout, and QA employment leads."""
     def priority(lead):
         role = _role_category(lead)
         title = str(lead.get("title") or "").lower()
@@ -169,6 +180,14 @@ def prioritize_actionable_leads(ranked):
         )
 
     return sorted(ranked, key=priority)
+
+
+def select_primary_leads(ranked):
+    """Freelance is selected only when no eligible employment vacancy exists."""
+    ordered = prioritize_actionable_leads(ranked)
+    jobs = [lead for lead in ordered if not is_freelance(lead)]
+    freelance = [lead for lead in ordered if is_freelance(lead)]
+    return (jobs if jobs else freelance), jobs, freelance
 
 
 def _suppress_telegram_message(_text):
@@ -249,7 +268,8 @@ def run():
         enriched = list(pool.map(enrich_lead, candidates))
     enqueue_many(enriched)
     leads = apply_resume_matching([lead for lead in enriched if not lead.get("unavailable") and is_new_publication(lead)])
-    ranked = prioritize_actionable_leads(rank_leads(leads))
+    ranked, ranked_jobs, ranked_freelance = select_primary_leads(rank_leads(leads))
+    freelance_held_back = bool(ranked_jobs and ranked_freelance)
     # Diagnose why collected Junior Frontend/layout leads never reach dispatch.
     from collections import Counter
     from profit_ranker import rank_lead
@@ -263,7 +283,7 @@ def run():
         )
         eligibility[role] = {
             "found": len(relevant),
-            "eligible": sum(_role_category(lead) == role and not is_freelance(lead) for lead in ranked),
+            "eligible": sum(_role_category(lead) == role for lead in ranked_jobs),
             "rejected_reasons": dict(rejected.most_common(8)),
         }
     print(f"[eligibility] {eligibility}", flush=True)
@@ -292,7 +312,8 @@ def run():
 
     stats = {
         "freelance_found": sum(is_freelance(lead) for lead in leads),
-        "freelance_ranked": sum(is_freelance(lead) for lead in ranked),
+        "freelance_ranked": len(ranked_freelance),
+        "freelance_held_back": len(ranked_freelance) if freelance_held_back else 0,
         "frontend_found": sum(_role_category(lead) == "frontend" and not is_freelance(lead) for lead in leads),
         "layout_found": sum(_role_category(lead) == "layout" and not is_freelance(lead) for lead in leads),
         "qa_found": sum(_role_category(lead) == "qa" and not is_freelance(lead) for lead in leads),
@@ -325,7 +346,7 @@ def run():
         "browser_challenge_paused": 0,
         "paused_browser_hosts": [],
         "email_submitted_after_browser_pause": 0,
-        "paid_placements_ranked": sum(is_placement(lead.get("title")) and not is_freelance(lead) for lead in ranked),
+        "paid_placements_ranked": sum(is_placement(lead.get("title")) and not is_freelance(lead) for lead in ranked_jobs),
     }
     results = []
     notifications = []
@@ -517,8 +538,8 @@ def run():
 
     # Report actual submission capability separately from discovered listings.
     freelance_actionable = [
-        lead for lead in ranked if is_freelance(lead)
-        and _application_priority(lead) == 0
+        lead for lead in ranked_freelance
+        if _application_priority(lead) == 0
     ]
     stats["freelance_actionable"] = len(freelance_actionable)
     stats["freelance_discovery_only"] = stats["freelance_ranked"] - len(freelance_actionable)
@@ -531,12 +552,12 @@ def run():
 
     # Show matching employment vacancies independently of freelance projects.
     job_review = sorted(
-        (lead for lead in ranked if not is_freelance(lead) and lead.get('url')),
+        (lead for lead in ranked_jobs if lead.get('url')),
         key=lambda lead: (ROLE_PRIORITY.get(_role_category(lead), 99),
                           _application_priority(lead), -lead.get('profit_score', 0)),
     )[:10]
-    stats['job_ranked'] = sum(not is_freelance(lead) for lead in ranked)
-    stats['job_actionable'] = sum(not is_freelance(lead) and _application_priority(lead) == 0 for lead in ranked)
+    stats['job_ranked'] = len(ranked_jobs)
+    stats['job_actionable'] = sum(_application_priority(lead) == 0 for lead in ranked_jobs)
     if job_review:
         lines = ['Вакансии Junior Frontend / вёрстка / QA — Россия и мир:',
                  'Ссылки на вакансии; отправка откликов здесь не подтверждается.']
@@ -550,16 +571,18 @@ def run():
     # Report promising freelance projects even when bidding is not supported.
     # Prefer marketplaces where a direct application path may exist, rather
     # than filling the whole shortlist with ProLinker discovery-only cards.
-    freelance_review = sorted(
-        (lead for lead in ranked if is_freelance(lead) and lead.get("url")),
-        key=lambda lead: (
-            0 if lead.get("apply_email") else
-            1 if lead.get("source") == "freelancehunt" and lead.get("can_api_bid") else
-            2 if lead.get("source") in ("fl_ru", "habr_freelance") else
-            3 if lead.get("source") == "peopleperhour" else 4,
-            -lead.get("profit_score", 0),
-        ),
-    )[:5]
+    freelance_review = []
+    if not ranked_jobs:
+        freelance_review = sorted(
+            (lead for lead in ranked_freelance if lead.get("url")),
+            key=lambda lead: (
+                0 if lead.get("apply_email") else
+                1 if lead.get("source") == "freelancehunt" and lead.get("can_api_bid") else
+                2 if lead.get("source") in ("fl_ru", "habr_freelance") else
+                3 if lead.get("source") == "peopleperhour" else 4,
+                -lead.get("profit_score", 0),
+            ),
+        )[:5]
     freelance_review_delivery = []
     for lead in freelance_review:
         message = format_notification(lead)
@@ -754,8 +777,16 @@ def run():
         f"Требуется ваше участие: {stats['needs_human'] + stats['needs_confirmation']}\n"
         f"Пропущено: {stats['skipped'] + stats['duplicate_skipped'] + stats['daily_limit_skipped'] + stats['hourly_limit_skipped']}\n"
         f"Ошибок: {stats['failed']}\n"
-        "Подходящие вакансии и фриланс-заказы отправляются отдельными сообщениями."
+        "Приоритет: вакансии. Фриланс — только если подходящих вакансий нет."
     )
+    if ranked_jobs:
+        summary_message += "\\n\\nПодходящие вакансии:"
+        for lead in ranked_jobs[:5]:
+            summary_message += f"\\n- {str(lead.get('title') or 'Вакансия')[:90]} [{lead.get('source') or '?'}]\\n{lead.get('url') or ''}"
+    elif freelance_review:
+        summary_message += "\\n\\nФриланс — резервный вариант:"
+        for lead in freelance_review[:5]:
+            summary_message += f"\\n- {str(lead.get('title') or 'Заказ')[:90]} [{lead.get('source') or '?'}]\\n{lead.get('url') or ''}"
     try:
         summary_delivery = send_message(summary_message)
     except Exception as exc:
