@@ -93,7 +93,9 @@ def diagnose_hh_session():
                 page.wait_for_timeout(500)
                 current_url = page.url.lower()
                 if any(part in current_url for part in ("/account/login", "/login", "/auth")):
-                    return {"configured": True, "valid_json": True, "authenticated": False, "status": "login_redirect"}
+                    result = {"configured": True, "valid_json": True, "authenticated": False, "status": "login_redirect"}
+                    print("[hh-session-diagnostic] result status=%s authenticated=%s" % (result["status"], result["authenticated"]), flush=True)
+                    return result
                 profile_marker = page.locator('[data-qa="mainmenu_applicantProfile"], [data-qa="header-user-menu"], a[href*="/applicant/profile/"]').first
                 try:
                     authenticated = profile_marker.is_visible(timeout=2500)
@@ -104,7 +106,9 @@ def diagnose_hh_session():
                 else:
                     challenge = _looks_like_challenge(page)
                     status = "security_challenge" if challenge else "indeterminate"
-                return {"configured": True, "valid_json": True, "authenticated": authenticated if status != "indeterminate" else None, "status": status}
+                result = {"configured": True, "valid_json": True, "authenticated": authenticated if status != "indeterminate" else None, "status": status}
+                print("[hh-session-diagnostic] result status=%s authenticated=%s" % (result["status"], result["authenticated"]), flush=True)
+                return result
             finally:
                 browser.close()
     except PlaywrightTimeoutError:
