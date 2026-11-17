@@ -28,11 +28,14 @@ def test_required_sql_rejected_and_explicit_optional_sql_allowed():
     assert rank_lead({**base, "requirements": "SQL будет плюсом"})["eligible"]
 
 
-def test_russia_and_worldwide_jobs_are_eligible_but_restricted_jobs_are_not():
+def test_international_jobs_need_explicit_russia_eligibility():
     base = {"title": "Junior React Developer", "description": "React TypeScript"}
     assert rank_lead({**base, "source": "hh", "location": "Россия"})["eligible"]
-    for location in ("Worldwide", "Anywhere", "Global", "Russia"):
-        assert rank_lead({**base, "source": "remotive", "location": location})["eligible"]
+    assert rank_lead({**base, "source": "remotive", "location": "Russia"})["eligible"]
+    for location in ("Worldwide", "Anywhere", "Global", "Remote"):
+        assert not rank_lead({**base, "source": "remotive", "location": location})["eligible"]
+    assert rank_lead({**base, "source": "remotive", "location": "Worldwide",
+                      "description": "React TypeScript. We accept candidates based in Russia"})["eligible"]
     assert not rank_lead({**base, "source": "remotive", "location": "US only"})["eligible"]
     assert not rank_lead({**base, "source": "remotive", "location": "Worldwide",
                           "description": "React TypeScript. Must reside in the US"})["eligible"]
