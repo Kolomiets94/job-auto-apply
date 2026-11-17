@@ -114,3 +114,46 @@ def test_frontend_accepts_0_to_3_but_not_from_3():
         assert rank_lead({**base, "experience": exp})["eligible"], exp
     for exp in ("от 3 лет", "от 4 лет", "4 года"):
         assert not rank_lead({**base, "experience": exp})["eligible"], exp
+
+
+
+def test_international_europe_listing_is_allowed_only_with_explicit_russia_eligibility():
+    base = {"source": "remotive", "title": "Junior React Developer",
+            "location": "Europe", "work_mode": "REMOTE"}
+    assert rank_lead({**base, "description": "React TypeScript. We accept candidates based in Russia"})["eligible"]
+    assert not rank_lead({**base, "description": "React TypeScript. Europe-based applicants only"})["eligible"]
+
+
+def test_hybrid_and_office_wording_cannot_be_overridden_by_remote_mentions():
+    base = {"source": "hh", "title": "Junior React Developer",
+            "description": "React TypeScript. Remote-friendly team; hybrid schedule.",
+            "location": "Санкт-Петербург"}
+    assert not rank_lead(base)["eligible"]
+
+    office = {**base, "description": "React TypeScript. Remote-friendly team, but work in office.",
+              "location": "Екатеринбург"}
+    assert not rank_lead(office)["eligible"]
+
+
+def test_explicit_hybrid_mode_wins_over_remote_description():
+    lead = {"source": "hh", "title": "Junior React Developer",
+            "description": "React TypeScript. Remote team.",
+            "work_mode": "HYBRID", "location": "Москва"}
+    assert not rank_lead(lead)["eligible"]
+
+
+def test_mandatory_relocation_filter_handles_location_without_name_error():
+    lead = {"source": "hh", "title": "Junior React Developer",
+            "description": "React TypeScript. Relocation required.",
+            "work_mode": "REMOTE", "location": "Москва"}
+    result = rank_lead(lead)
+    assert not result["eligible"]
+    assert result["rank_reason"] == "mandatory nonlocal relocation"
+
+
+
+def test_residence_requirement_accepts_russia_but_rejects_foreign_only():
+    base = {"source": "remotive", "title": "Junior React Developer",
+            "location": "Worldwide", "work_mode": "REMOTE"}
+    assert rank_lead({**base, "description": "React TypeScript. Applicants must reside in Russia."})["eligible"]
+    assert not rank_lead({**base, "description": "React TypeScript. Applicants must reside in the US."})["eligible"]

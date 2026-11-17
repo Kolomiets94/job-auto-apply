@@ -60,7 +60,43 @@ def record_collection_error(source, exc):
     print(f"[collector] {source}: {reason}", flush=True)
 
 
+def _deduplicate_leads(leads):
+    """Deduplicate normalized leads by their canonical source URL."""
+    seen = set()
+    unique = []
+    for lead in leads:
+        key = _lead_key(lead)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(lead)
+    return unique
+
+
+def collect_freelance_all():
+    """Collect freelance projects only after employment vacancies fail the filters."""
+    global COLLECTION_RAW_COUNT
+    leads = []
+    for source, collector in (
+        ("freelance", collect_freelance),
+        # PeoplePerHour and ProLinker do not expose a reliable publication
+        # timestamp, so today's fail-closed filter would discard every card.
+        ("freelancehunt", collect_freelancehunt),
+        ("weblancer", collect_weblancer),
+        ("freelancer_com", collect_freelancer_com),
+    ):
+        try:
+            collected = collector()
+            leads.extend(collected)
+            print(f"[collector] {source}: {len(collected)} leads", flush=True)
+        except Exception as exc:
+            record_collection_error(source, exc)
+    COLLECTION_RAW_COUNT += len(leads)
+    return _deduplicate_leads(leads)
+
+
 def collect_all():
+    """Collect employment vacancies only; freelance discovery is a true fallback."""
     global COLLECTION_RAW_COUNT
     COLLECTION_ERRORS.clear()
     COLLECTION_RAW_COUNT = 0
@@ -89,21 +125,12 @@ def collect_all():
             if isinstance(exc, HHAccessUnavailable):
                 break
 
-    for source, collector in (
-        ("remoteok", remoteok),
-        ("freelance", collect_freelance),
-        # PeoplePerHour and ProLinker do not expose a reliable publication
-        # timestamp, so today's fail-closed filter would discard every card.
-        ("freelancehunt", collect_freelancehunt),
-        ("weblancer", collect_weblancer),
-        ("freelancer_com", collect_freelancer_com),
-    ):
-        try:
-            leads += collector()
-        except Exception as exc:
-            record_collection_error(source, exc)
+    try:
+        leads += remoteok()
+    except Exception as exc:
+        record_collection_error("remoteok", exc)
 
-    # Independent public sources run concurrently with bounded request timeouts.
+    # Independent employment sources run concurrently with bounded request timeouts.
     with ThreadPoolExecutor(max_workers=4) as pool:
         futures = {pool.submit(collector): source for source, collector in JOB_COLLECTORS}
         for future in as_completed(futures):
@@ -116,15 +143,7 @@ def collect_all():
                 record_collection_error(source, exc)
 
     COLLECTION_RAW_COUNT = len(leads)
-    seen = set()
-    unique = []
-    for lead in leads:
-        key = _lead_key(lead)
-        if key in seen:
-            continue
-        seen.add(key)
-        unique.append(lead)
-    return unique
+    return _deduplicate_leads(leads)
 
 
 def apply_resume_matching(leads, resume_text=None):
@@ -247,19 +266,66 @@ def run():
     except Exception as exc:
         started = {"status": "FAILED", "reason": type(exc).__name__}
     print(f"[telegram] start notification: {started}", flush=True)
-    fresh = [lead for lead in collect_all() if is_new_publication(lead)]
-    # Persist discovery before filtering, so previously found leads can benefit
-    # from later description/link adapters instead of disappearing next hour.
-    enqueue_many(fresh)
-    merged = {_lead_key(lead): lead for lead in queued_leads(limit=1000)}
-    merged.update({_lead_key(lead): lead for lead in fresh})
     from lead_enrichment import enrich_lead
-    candidates = [lead for lead in merged.values() if is_new_publication(lead)]
+
+    # First discover, enrich and rank employment vacancies only. Do not spend
+    # requests on freelance marketplaces while any suitable job vacancy exists.
+    fresh_jobs = [lead for lead in collect_all()
+                  if not is_freelance(lead) and is_new_publication(lead)]
+    enqueue_many(fresh_jobs)
+    queued = queued_leads(limit=1000)
+    merged_jobs = {_lead_key(lead): lead for lead in queued if not is_freelance(lead)}
+    merged_jobs.update({_lead_key(lead): lead for lead in fresh_jobs})
+    job_candidates = [lead for lead in merged_jobs.values() if is_new_publication(lead)]
     with ThreadPoolExecutor(max_workers=3) as pool:
-        enriched = list(pool.map(enrich_lead, candidates))
-    enqueue_many(enriched)
-    leads = apply_resume_matching([lead for lead in enriched if not lead.get("unavailable") and is_new_publication(lead)])
-    ranked, ranked_jobs, ranked_freelance = select_primary_leads(rank_leads(leads))
+        enriched_jobs = list(pool.map(enrich_lead, job_candidates))
+    enqueue_many(enriched_jobs)
+    job_leads = apply_resume_matching([
+        lead for lead in enriched_jobs
+        if not lead.get("unavailable") and is_new_publication(lead)
+    ])
+    ranked_jobs = rank_leads(job_leads)
+
+    fresh_freelance = []
+    freelance_candidates = []
+    enriched_freelance = []
+    freelance_leads = []
+    ranked_freelance = []
+
+    # Only when no employment vacancy survives all role, location, work-mode,
+    # salary and experience filters do we search the freelance fallback.
+    if not ranked_jobs:
+        fresh_freelance = [
+            lead for lead in collect_freelance_all() if is_new_publication(lead)
+        ]
+        enqueue_many(fresh_freelance)
+        queued = queued_leads(limit=1000)
+        merged_freelance = {
+            _lead_key(lead): lead for lead in queued if is_freelance(lead)
+        }
+        merged_freelance.update({
+            _lead_key(lead): lead for lead in fresh_freelance
+        })
+        freelance_candidates = [
+            lead for lead in merged_freelance.values()
+            if is_new_publication(lead)
+        ]
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            enriched_freelance = list(pool.map(enrich_lead, freelance_candidates))
+        enqueue_many(enriched_freelance)
+        freelance_leads = apply_resume_matching([
+            lead for lead in enriched_freelance
+            if not lead.get("unavailable") and is_new_publication(lead)
+        ])
+        ranked_freelance = rank_leads(freelance_leads)
+
+    fresh = fresh_jobs + fresh_freelance
+    candidates = job_candidates + freelance_candidates
+    enriched = enriched_jobs + enriched_freelance
+    leads = job_leads + freelance_leads
+    ranked, ranked_jobs, ranked_freelance = select_primary_leads(
+        ranked_jobs + ranked_freelance
+    )
     freelance_held_back = bool(ranked_jobs and ranked_freelance)
     # Diagnose why collected Junior Frontend/layout leads never reach dispatch.
     from collections import Counter
