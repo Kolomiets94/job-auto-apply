@@ -218,9 +218,10 @@ def test_total_hourly_cap_counts_across_job_and_freelance(monkeypatch):
     monkeypatch.setattr(worker, "JOB_COLLECTORS", ())
     monkeypatch.setattr("lead_enrichment.enrich_lead", lambda item: item)
     with patch.object(worker, "collect_all", return_value=leads), \
+         patch.object(worker, "collect_freelance_all", return_value=[]) as freelance_collect, \
          patch.object(worker, "queued_leads", return_value=[]), \
          patch.object(worker, "enqueue", side_effect=lambda item: item["url"]), \
-         patch.object(worker, "rank_leads", return_value=leads), \
+         patch.object(worker, "rank_leads", return_value=[leads[0]]), \
          patch.object(worker, "apply_resume_matching", side_effect=lambda items: items), \
          patch.object(worker, "was_submitted", return_value=False), \
          patch.object(worker, "submitted_today", return_value=0), \
@@ -231,5 +232,32 @@ def test_total_hourly_cap_counts_across_job_and_freelance(monkeypatch):
     assert dispatch.call_count == 1
     assert report["stats"]["submitted"] == 1
     assert report["stats"]["submitted_by_role"]["frontend"] == 1
-    assert report["stats"]["freelance_held_back"] == 1
+    assert report["stats"]["freelance_found"] == 0
+    assert report["stats"]["freelance_ranked"] == 0
     assert len(report["results"]) == 1
+    freelance_collect.assert_not_called()
+
+
+
+def test_collect_all_does_not_touch_freelance_sources(monkeypatch):
+    monkeypatch.setattr(worker, "JOB_COLLECTORS", ())
+    with patch.object(worker, "hh_search", return_value=[]), \
+         patch.object(worker, "hh_hybrid_search", return_value=[]), \
+         patch.object(worker, "remoteok", return_value=[]), \
+         patch.object(worker, "collect_freelance", side_effect=AssertionError("freelance called")), \
+         patch.object(worker, "collect_freelancehunt", side_effect=AssertionError("freelance called")), \
+         patch.object(worker, "collect_weblancer", side_effect=AssertionError("freelance called")), \
+         patch.object(worker, "collect_freelancer_com", side_effect=AssertionError("freelance called")):
+        assert worker.collect_all() == []
+
+
+def test_collect_freelance_all_deduplicates_only_when_requested(monkeypatch):
+    same = {"source": "freelancer_com", "title": "React landing", "url": "https://example.com/project"}
+    monkeypatch.setattr(worker, "COLLECTION_RAW_COUNT", 0)
+    with patch.object(worker, "collect_freelance", return_value=[same]), \
+         patch.object(worker, "collect_freelancehunt", return_value=[same]), \
+         patch.object(worker, "collect_weblancer", return_value=[]), \
+         patch.object(worker, "collect_freelancer_com", return_value=[]):
+        leads = worker.collect_freelance_all()
+    assert leads == [same]
+    assert worker.COLLECTION_RAW_COUNT == 2
