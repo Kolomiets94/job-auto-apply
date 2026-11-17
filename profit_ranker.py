@@ -116,26 +116,26 @@ def _location_rejected(lead: Dict[str, Any], text: str) -> bool:
         location = str(lead.get("location") or "").lower().strip()
         eligibility_text = f"{location} {text}".lower()
         excluded_russia = re.search(
-            r"\\b(?:not|no|excluding|except|outside)\\b.{0,45}\\brussia\\b|"
-            r"\\brussia\\b.{0,45}\\b(?:excluded|not available|not eligible|not supported)\\b|"
-            r"не\\s+(?:нанимаем|принимаем|рассматриваем).{0,45}росси[яию]|"
-            r"росси[яию].{0,45}не\\s+(?:доступна|подходит|принимается)",
+            r"\b(?:not|no|excluding|except|outside)\b.{0,45}\brussia\b|"
+            r"\brussia\b.{0,45}\b(?:excluded|not available|not eligible|not supported)\b|"
+            r"не\s+(?:нанимаем|принимаем|рассматриваем).{0,45}росси[яию]|"
+            r"росси[яию].{0,45}не\s+(?:доступна|подходит|принимается)",
             eligibility_text,
         )
         if excluded_russia:
             return True
 
         explicit_russia = re.search(
-            r"\\b(?:open to|accept(?:ing)?|hire(?:s|d|ing)?|work from|based in|residing in|"
-            r"candidates? in|applicants? in|eligible in|available in|remote in)\\b.{0,45}\\brussia\\b|"
-            r"\\brussia\\b.{0,45}\\b(?:eligible|allowed|accepted|available|remote|based|candidates|applicants|hire)\\b|"
+            r"\b(?:open to|accept(?:ing)?|hire(?:s|d|ing)?|work from|based in|residing in|"
+            r"candidates? in|applicants? in|eligible in|available in|remote in)\b.{0,45}\brussia\b|"
+            r"\brussia\b.{0,45}\b(?:eligible|allowed|accepted|available|remote|based|candidates|applicants|hire)\b|"
             r"(?:можно|доступн[аоы]?|принимаем|нанимаем|кандидат[ыа]?|работать|удал[её]нно|проживать).{0,45}росси[яию]|"
             r"росси[яию].{0,45}(?:можно|доступн[аоы]?|принимаем|нанимаем|кандидат[ыа]?|работать|удал[её]нно|проживать)",
             eligibility_text,
         )
         if explicit_russia:
             return False
-        if re.search(r"\\brussia\\b|росси[яию]", location):
+        if re.search(r"\brussia\b|росси[яию]", location):
             return False
 
         generic_location = any(
@@ -191,12 +191,12 @@ def _work_mode(lead: Dict[str, Any]) -> str:
     Explicit API work_mode wins. When only descriptive text is available,
     hybrid/office wording takes precedence over incidental mentions of remote.
     """
-    remote_pattern = r"\\bremote\\b|удал[её]н|дистанцион"
-    hybrid_pattern = r"\\bhybrid\\b|гибрид"
+    remote_pattern = r"\bremote\b|удал[её]н|дистанцион"
+    hybrid_pattern = r"\bhybrid\b|гибрид"
     office_pattern = (
-        r"\\bon[\\s-]?site\\b|\\bin[\\s-]?office\\b|\\boffice[\\s-]?(?:only|based)\\b|"
-        r"работа\\s+в\\s+офисе|только\\s+(?:в\\s+)?офисе|офисн(?:ый|ая|ое)\\s+формат|"
-        r"на\\s+месте\\s+работодателя"
+        r"\bon[\s-]?site\b|\bin[\s-]?office\b|\boffice[\s-]?(?:only|based)\b|"
+        r"работа\s+в\s+офисе|только\s+(?:в\s+)?офисе|офисн(?:ый|ая|ое)\s+формат|"
+        r"на\s+месте\s+работодателя"
     )
 
     explicit_mode = _field_text(lead.get("work_mode")).casefold()
@@ -204,7 +204,7 @@ def _work_mode(lead: Dict[str, Any]) -> str:
         if re.search(hybrid_pattern, explicit_mode):
             return "hybrid"
         if re.search(office_pattern, explicit_mode) or re.search(
-            r"\\b(?:on[_ -]?site|onsite|office)\\b", explicit_mode
+            r"\b(?:on[_ -]?site|onsite|office)\b", explicit_mode
         ):
             return "office"
         if re.search(remote_pattern, explicit_mode):
@@ -219,14 +219,14 @@ def _work_mode(lead: Dict[str, Any]) -> str:
         if re.search(hybrid_pattern, structured):
             return "hybrid"
         if re.search(office_pattern, structured) or re.search(
-            r"\\b(?:on[_ -]?site|onsite|office)\\b", structured
+            r"\b(?:on[_ -]?site|onsite|office)\b", structured
         ):
             return "office"
         if re.search(remote_pattern, structured):
             return "remote"
 
     title_text = str(lead.get("title") or "").casefold()
-    if re.search(r"\\boffice\\b|офис", title_text):
+    if re.search(r"\boffice\b|офис", title_text):
         return "office"
 
     text = " ".join(
