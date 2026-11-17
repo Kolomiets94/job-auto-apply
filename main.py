@@ -82,6 +82,8 @@ def workplace_ok(v):
     details = " ".join(str(x or "") for x in (v.get("snippet") or {}).values()).lower()
     text = " ".join((title, schedule, formats, details))
 
+    if re.search(r"\\boffice\\b|офис", title):
+        return False
     office = re.search(
         r"\bon[\s-]?site\b|\bin[\s-]?office\b|\boffice[\s-]?(?:only|based)\b|"
         r"работа\s+в\s+офисе|только\s+в\s+офисе|офисн(?:ый|ая|ое)\s+формат|"
