@@ -279,6 +279,9 @@ def _hh_live_filter(page, lead):
     """Recheck live requirements and experience before opening an application."""
     from profit_ranker import rank_lead
     live_lead = {**lead, "source": "hh"}
+    if not live_lead.get("work_mode") and not live_lead.get("work_format"):
+        # Older queue records came from the remote-only HH search.
+        live_lead["work_mode"] = "REMOTE"
     for key, selector in (
         ("experience", '[data-qa="vacancy-experience"]'),
         ("description", '[data-qa="vacancy-description"]'),
