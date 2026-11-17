@@ -29,6 +29,7 @@ def test_collect_all_isolates_source_failures(monkeypatch):
     lead = {"source": "remoteok", "title": "React", "url": "https://example.com/ok"}
 
     with patch.object(worker, "hh_search", side_effect=RuntimeError("boom")), \
+         patch.object(worker, "hh_hybrid_search", return_value=[]), \
          patch.object(worker, "remoteok", return_value=[lead]), \
          patch.object(worker, "collect_freelance", side_effect=RuntimeError("boom")), \
          patch.object(worker, "collect_peopleperhour", return_value=[]), \
@@ -230,4 +231,5 @@ def test_total_hourly_cap_counts_across_job_and_freelance(monkeypatch):
     assert dispatch.call_count == 1
     assert report["stats"]["submitted"] == 1
     assert report["stats"]["submitted_by_role"]["frontend"] == 1
-    assert report["results"][1]["reason"] == "hourly_total_limit"
+    assert report["stats"]["freelance_held_back"] == 1
+    assert len(report["results"]) == 1
