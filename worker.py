@@ -543,17 +543,18 @@ def run():
     # Report promising freelance projects even when bidding is not supported.
     # Prefer marketplaces where a direct application path may exist, rather
     # than filling the whole shortlist with ProLinker discovery-only cards.
-    freelance_review = sorted(
-        (lead for lead in ranked_freelance if lead.get("url")),
-        if not ranked_jobs
-        key=lambda lead: (
-            0 if lead.get("apply_email") else
-            1 if lead.get("source") == "freelancehunt" and lead.get("can_api_bid") else
-            2 if lead.get("source") in ("fl_ru", "habr_freelance") else
-            3 if lead.get("source") == "peopleperhour" else 4,
-            -lead.get("profit_score", 0),
-        ),
-    )[:5]
+    freelance_review = []
+    if not ranked_jobs:
+        freelance_review = sorted(
+            (lead for lead in ranked_freelance if lead.get("url")),
+            key=lambda lead: (
+                0 if lead.get("apply_email") else
+                1 if lead.get("source") == "freelancehunt" and lead.get("can_api_bid") else
+                2 if lead.get("source") in ("fl_ru", "habr_freelance") else
+                3 if lead.get("source") == "peopleperhour" else 4,
+                -lead.get("profit_score", 0),
+            ),
+        )[:5]
     freelance_review_delivery = None
     if freelance_review:
         lines = ["Фриланс: подходящие заказы (ссылки; отклики НЕ отправлены):"]
