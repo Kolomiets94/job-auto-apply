@@ -23,7 +23,11 @@ DEFAULT_FILTERS = {
     'keywords': ['frontend', 'react', 'javascript', 'typescript', 'html', 'css', 'scss'],
     'exclude_keywords': ['senior', 'lead', 'manager', 'director'],
     'min_salary': 60000,
+    # Remote across Russia; hybrid is the only local exception in Yekaterinburg.
     'remote_only': True,
+    'hybrid_cities': ['Екатеринбург'],
+    'office_allowed': False,
+    'freelance_fallback_only': True,
     'experience_level': 'junior',
     'cities': ['Екатеринбург', 'Удаленная работа по России']
 }
