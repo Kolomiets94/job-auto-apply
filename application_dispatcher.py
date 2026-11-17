@@ -1,7 +1,9 @@
 """Application dispatcher.
 
-Uses free direct email when configured, otherwise supported browser automation.
-Paid bids and security challenges are never silently accepted or bypassed.
+Prefers supported browser-based application forms. Uses direct email only
+when a vacancy has no supported browser form and explicitly provides an
+application email address. Paid bids and security challenges are never
+silently accepted or bypassed.
 """
 
 import os
@@ -13,7 +15,6 @@ from email.message import EmailMessage
 from application_schedule import application_time_allowed
 from browser_apply import dispatch_browser
 from freelancehunt_adapter import add_bid
-from external_form_apply import apply_external
 
 
 def _send_email(lead, proposal):
@@ -24,7 +25,7 @@ def _send_email(lead, proposal):
     if not email:
         return None
 
-    if not re.fullmatch(r"[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+", str(email)):
+    if not re.fullmatch(r"[^\\s@,;<>]+@[^\\s@,;<>]+\\.[^\\s@,;<>]+", str(email)):
         return {"status": "NEEDS_CONFIRMATION", "reason": "invalid_application_email"}
 
     if os.getenv("AUTO_SEND_EMAIL", "0") != "1":
@@ -41,7 +42,7 @@ def _send_email(lead, proposal):
     msg["To"] = email
     prefix = "Application" if lead.get("language") == "en" else "Отклик"
     msg["Subject"] = f"{prefix}: {lead.get('title', 'проект')}"
-    msg.set_content(proposal + "\n\nGitHub: https://github.com/Kolomiets94\n"
+    msg.set_content(proposal + "\\n\\nGitHub: https://github.com/Kolomiets94\\n"
                     + str(lead.get("url") or ""))
 
     with smtplib.SMTP_SSL(
@@ -59,54 +60,28 @@ def _send_email(lead, proposal):
     return {"status": "SUBMITTED", "reason": "email_sent"}
 
 
-def _is_hh_lead(lead):
-    if str(lead.get("source") or lead.get("site") or "").strip().lower() == "hh":
-        return True
-    for value in (lead.get("url"), lead.get("apply_url")):
-        host = (urlsplit(str(value or "")).hostname or "").lower()
-        if host == "hh.ru" or host.endswith(".hh.ru"):
-            return True
-    return False
-
-
 def dispatch(lead, proposal):
-    # The current authorization covers employment vacancies only. Freelance
-    # bids and proposals are not submitted automatically, even when free.
-    from profit_ranker import FREELANCE_SOURCES
-    if str(lead.get("source") or "").strip().lower() in FREELANCE_SOURCES:
-        return {"status": "SKIPPED", "reason": "freelance_submission_not_authorized"}
-
-    # HH applicant-side API access is unavailable, but the authenticated
-    # browser flow can submit applications. It fails closed without a session,
-    # matching résumé, known answers, or a confirmed post-submit state.
-    if _is_hh_lead(lead):
-        return dispatch_browser(lead, proposal)
-
     if not application_time_allowed():
         return {"status": "SKIPPED", "reason": "outside_application_hours"}
 
     if lead.get("paid_bid") is True:
         return {"status": "SKIPPED", "reason": "paid_bid"}
 
-    # FL.ru's RSS does not expose whether a bid is free. Never risk a paid bid:
-    # only proceed when a source explicitly verifies free access.
-    if lead.get("source") == "fl_ru" and lead.get("free_to_apply") is not True:
-        return {"status": "NEEDS_CONFIRMATION", "reason": "no_free_direct_channel", "detail": "FL.ru RSS does not verify free bid access"}
-
-    # The user authorized automatic applications; report outcomes via the worker.
+    # The user authorized automatic applications. Prefer clicking through the
+    # supported website form (Playwright/Chromium); do not require Gmail/SMTP.
     if lead.get("source") == "freelancehunt" and lead.get("can_api_bid"):
         return add_bid(lead, proposal)
-
-    email_result = _send_email(lead, proposal)
-    if email_result is not None:
-        return email_result
 
     browser_result = dispatch_browser(lead, proposal)
     if browser_result.get("reason") != "unsupported_browser_source":
         return browser_result
 
-    # Use the conservative allowlisted handler for supported employer ATS forms.
-    # AUTO_BROWSER_APPLY and the worker's DRY_RUN gate remain authoritative.
+    # Email is a last-resort channel only when the site has no supported form.
+    email_result = _send_email(lead, proposal)
+    if email_result is not None:
+        return email_result
+
     if lead.get("apply_url"):
-        return apply_external(lead, proposal)
+        return {"status": "NEEDS_CONFIRMATION", "reason": "external_application_form_not_supported",
+                "apply_url": lead["apply_url"]}
     return {"status": "NEEDS_CONFIRMATION", "reason": "no_free_direct_channel"}
