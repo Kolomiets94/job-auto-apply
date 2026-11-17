@@ -189,8 +189,11 @@ def hh_session_health():
 
 def _run_startup_hh_diagnostic():
     """Run a read-only HH session check after Gunicorn imports the app."""
+    print("[hh-session-diagnostic] started", flush=True)
     try:
+        print("[hh-session-diagnostic] importing checker", flush=True)
         from browser_apply import diagnose_hh_session
+        print("[hh-session-diagnostic] checker imported; inspecting session", flush=True)
         result = diagnose_hh_session()
         # Only safe boolean/status fields are emitted; never log session material.
         app.logger.info(
