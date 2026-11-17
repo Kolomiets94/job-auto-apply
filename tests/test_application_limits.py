@@ -62,7 +62,7 @@ def test_submitted_result_increments_daily_total(monkeypatch):
     assert result["stats"]["submitted_today_total"] == 3
 
 
-def test_full_jobs_bucket_does_not_block_freelance(monkeypatch):
+def test_freelance_is_held_back_when_employment_vacancy_exists(monkeypatch):
     monkeypatch.setenv("DAILY_JOB_LIMIT", "10")
     job = _lead()
     freelance = {**_lead("https://freelance.habr.com/tasks/1"), "source": "habr_freelance",
@@ -79,9 +79,10 @@ def test_full_jobs_bucket_does_not_block_freelance(monkeypatch):
          patch.object(worker, "set_state"), \
          patch.object(worker, "dispatch", return_value={"status":"SUBMITTED"}) as send:
         result = worker.run()
-    assert send.call_count == 1
+    assert send.call_count == 0
     assert result["stats"]["jobs_submitted_today"] == 10
-    assert result["stats"]["freelance_submitted_today"] == 1
+    assert result["stats"]["freelance_submitted_today"] == 0
+    assert result["stats"]["freelance_held_back"] == 1
 
 
 def test_full_freelance_bucket_does_not_block_jobs():
