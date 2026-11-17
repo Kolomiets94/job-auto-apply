@@ -1,15 +1,15 @@
-name: Hourly job hunter
+name: Daily evening job hunter
 
 on:
   schedule:
-    - cron: "0 * * * *"
+    - cron: "0 16 * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: hourly-job-hunter
+  group: daily-evening-job-hunter
   cancel-in-progress: false
 
 jobs:
@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Trigger scheduled hunter run
+      - name: Trigger the daily evening hunter run
         env:
           SCHEDULER_TOKEN: ${{ secrets.SCHEDULER_TOKEN }}
         run: |
