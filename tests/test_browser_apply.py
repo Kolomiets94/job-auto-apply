@@ -148,3 +148,20 @@ def test_hh_live_requirements_override_search_snippet():
                                                      "description": "QA"})
     assert not result["eligible"]
     assert result["rank_reason"] == "SQL outside confirmed stack"
+
+
+def test_unknown_education_and_start_date_questions_are_not_guessed():
+    assert browser_apply._known_question_answer(
+        "Are you currently enrolled at a university?", "frontend"
+    ) is None
+    assert browser_apply._known_question_answer(
+        "When can you start?", "frontend"
+    ) is None
+
+
+def test_verified_candidate_skills_answer_does_not_claim_figma():
+    answer = browser_apply._known_question_answer(
+        "Which React and TypeScript skills do you have?", "frontend"
+    )
+    assert "React" in answer
+    assert "Figma" not in answer
