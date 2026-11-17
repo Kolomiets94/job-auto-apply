@@ -46,12 +46,13 @@ def test_mailto_uses_real_delivery_and_checks_rejection(monkeypatch):
         assert dispatch(lead, 'Hello')['status'] == 'FAILED'
 
 
-def test_international_qa_letter_is_truthful_and_in_english():
+def test_qa_letter_does_not_invent_manual_testing_or_commercial_experience():
     letter = make_proposal({'category':'qa','language':'en','title':'Junior QA','company':'Acme'})
     assert 'Junior QA' in letter
-    assert 'manually tested my own React web applications' in letter
     assert 'https://github.com/Kolomiets94/travel-blog' in letter
+    assert 'manually tested' not in letter.lower()
     assert 'commercial QA experience' not in letter
+    assert 'personal frontend projects' in letter
 
 
 def test_explicit_apply_email_is_extracted_but_generic_contact_is_not():

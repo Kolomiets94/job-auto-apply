@@ -69,26 +69,23 @@ def test_remote_job_requires_phone_before_browser_launch(monkeypatch):
     assert result == {"status": "NEEDS_HUMAN", "reason": "remote_job_identity_missing"}
 
 
-def test_hh_university_enrollment_question_answer():
-    question = "Вы сейчас проходите обучение в вузе? Если да, какая форма обучения (очная/заочная; дневная/вечерняя)?"
-    assert browser_apply._known_question_answer(question, "qa") == "Нет, сейчас не учусь в вузе."
+def test_hh_education_question_is_not_guessed():
+    question = "Вы сейчас проходите обучение в вузе? Если да, какая форма обучения?"
+    assert browser_apply._known_question_answer(question, "frontend") is None
 
 
 def test_hh_unrelated_employer_question_remains_unanswered():
     assert browser_apply._known_question_answer("Какой у вас любимый цвет?", "qa") is None
 
 
-def test_hh_full_time_employment_question_answer():
+def test_hh_employment_preference_question_is_not_guessed():
     question = "Вы ищете работу с полной или частичной занятостью?"
-    assert browser_apply._known_question_answer(question, "qa") == "Ищу работу с полной занятостью."
+    assert browser_apply._known_question_answer(question, "frontend") is None
 
 
-def test_hh_gamedev_motivation_authorized_by_candidate():
+def test_hh_role_motivation_question_is_not_guessed():
     question = "Почему вы хотите работать в геймдеве? писать тут"
-    answer = browser_apply._known_question_answer(question, "qa")
-    assert answer and "своих веб-приложений" in answer
-    assert browser_apply._known_question_answer("Какой у вас коммерческий опыт в геймдеве?", "qa").startswith("Коммерческого опыта пока нет.")
-    assert browser_apply._known_question_answer("Почему вы хотите работать в геймдеве?", "frontend") is None
+    assert browser_apply._known_question_answer(question, "qa") is None
 
 
 def test_choice_question_reads_outer_container_when_nearest_is_empty():
@@ -148,3 +145,41 @@ def test_hh_live_requirements_override_search_snippet():
                                                      "description": "QA"})
     assert not result["eligible"]
     assert result["rank_reason"] == "SQL outside confirmed stack"
+
+
+def test_unknown_education_and_start_date_questions_are_not_guessed():
+    assert browser_apply._known_question_answer(
+        "Are you currently enrolled at a university?", "frontend"
+    ) is None
+    assert browser_apply._known_question_answer(
+        "When can you start?", "frontend"
+    ) is None
+
+
+def test_verified_candidate_skills_answer_does_not_claim_figma():
+    answer = browser_apply._known_question_answer(
+        "Which React and TypeScript skills do you have?", "frontend"
+    )
+    assert "React" in answer
+    assert "Figma" not in answer
+
+
+def test_known_answers_follow_employer_question_language():
+    assert browser_apply._known_question_answer(
+        "What is your English level?", "frontend"
+    ).startswith("B1 (Intermediate)")
+    assert browser_apply._known_question_answer(
+        "Where are you currently based?", "frontend"
+    ).startswith("Yekaterinburg, Russia")
+    assert browser_apply._known_question_answer(
+        "Do you have commercial experience?", "frontend"
+    ).startswith("I do not have commercial experience")
+    assert browser_apply._known_question_answer(
+        "Какой у вас уровень английского?", "frontend"
+    ).startswith("B1 (Intermediate)")
+
+
+def test_qa_testing_experience_question_is_not_invented():
+    assert browser_apply._known_question_answer(
+        "Do you have manual QA experience?", "qa"
+    ) is None

@@ -142,45 +142,39 @@ def _select_resume(page, category):
 
 
 def _known_question_answer(question, category):
-    """Return only answers grounded in the candidate profile; never guess."""
+    """Return only language-matched answers grounded in the candidate profile."""
     q = _norm(question)
-    if ("вуз" in q or "университет" in q or "институт" in q) and any(
-        x in q for x in ("учитесь", "учишься", "обучени", "проходите обучение", "студент")
-    ):
-        return "Нет, сейчас не учусь в вузе."
-    if ("полной" in q and "частичной" in q and any(
-        x in q for x in ("занятост", "работу", "ищете")
-    )):
-        return "Ищу работу с полной занятостью."
-    if category == "qa" and any(x in q for x in ("геймдев", "gamedev", "game dev")) and any(
-        x in q for x in ("почему", "интерес", "хотите", "привлека")
-    ):
-        return "Хочу развиваться в ручном тестировании и применять опыт проверки своих веб-приложений. В геймдеве меня привлекает разнообразие пользовательских сценариев и возможность улучшать качество продукта для пользователей. Готов изучать особенности тестирования игр и начинать с задач уровня Junior."
+    english = not bool(re.search(r"[а-яё]", q))
     if any(x in q for x in ("английск", "english", "уровень языка")):
-        return "B1 (Intermediate): читаю техническую документацию и могу базово общаться в команде."
-    if any(x in q for x in ("город", "где вы жив", "где прожива", "локац")):
-        return "Екатеринбург. Рассматриваю удалённую работу."
-    if any(x in q for x in ("ожидания по зарплат", "зарплатные ожидания", "желаемая зарплат", "salary expectation")):
+        return ("B1 (Intermediate). I can read technical documentation and communicate at a basic level."
+                if english else
+                "B1 (Intermediate): читаю техническую документацию и могу базово общаться в команде.")
+    if any(x in q for x in ("город", "где вы жив", "где прожива", "локац", "current location", "where are you based", "where are you currently based", "where are you located")):
+        return ("Yekaterinburg, Russia. I am looking for remote work."
+                if english else
+                "Екатеринбург, Россия. Рассматриваю удалённую работу.")
+    if any(x in q for x in ("ожидания по зарплат", "зарплатные ожидания", "желаемая зарплат")):
         return "От 60 000 ₽ в месяц для вакансий в России; готов обсуждать условия."
-    if any(x in q for x in ("коммерческ", "опыт работы", "сколько лет опыта", "years of experience")):
+    if any(x in q for x in ("salary expectation", "expected salary", "salary requirements")):
+        return None
+    if any(x in q for x in ("коммерческ", "опыт работы", "сколько лет опыта", "years of experience", "commercial experience")):
         return (
+            "I do not have commercial experience yet. I have been building personal projects with React, "
+            "TypeScript, REST APIs, authentication, CRUD, validation, error handling and responsive layouts."
+            if english else
             "Коммерческого опыта пока нет. Есть практические проекты: React, TypeScript, "
             "REST API, авторизация, CRUD, валидация, обработка ошибок и адаптивная вёрстка."
         )
     if any(x in q for x in ("react", "typescript", "javascript", "redux", "rest api", "html", "css", "scss")):
         return (
-            "Работаю с React, TypeScript, JavaScript ES6+, Redux Toolkit, REST API, "
-            "HTML5, CSS3/SCSS, Git, Figma и Vite/Webpack."
-        )
-    if category == "qa" and any(x in q for x in ("тестирован", "qa", "баг", "bug", "test case", "чек-лист")):
-        return (
-            "В своих веб-проектах вручную проверял формы, API-интеграции, валидацию "
-            "и обработку ошибок. Понимаю клиентскую часть благодаря опыту с React и TypeScript."
+            "I work with React, TypeScript, JavaScript ES6+, Redux Toolkit, React Router, "
+            "Axios/REST APIs, HTML5, CSS3/SCSS, Git, Vite and Webpack."
+            if english else
+            "Работаю с React, TypeScript, JavaScript ES6+, Redux Toolkit, React Router, "
+            "Axios/REST API, HTML5, CSS3/SCSS, Git, Vite и Webpack."
         )
     if any(x in q for x in ("удален", "удалён", "remote")):
-        return "Да, готов работать удалённо."
-    if any(x in q for x in ("когда готовы", "когда можете", "дата выхода", "приступить")):
-        return "Готов приступить в ближайшее время."
+        return ("Yes, I am available for remote work." if english else "Да, готов работать удалённо.")
     return None
 
 

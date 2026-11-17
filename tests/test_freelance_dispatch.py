@@ -10,27 +10,27 @@ def lead():
             'budget':{'amount':3000,'currency':'RUB'}}
 
 
-def test_api_dispatch_and_confirmed_response(monkeypatch):
+def test_api_dispatch_is_blocked_for_freelance_even_when_token_exists(monkeypatch):
     monkeypatch.setenv('AUTO_FREELANCE_APPLY','1')
     monkeypatch.setenv('FREELANCEHUNT_TOKEN','test-token')
-    comment = 'Hello\nСтоимость: 3000 RUB. Срок: 3 дн.'
-    response = Mock(status_code=201, json=lambda:{'data':{'id':456,'attributes':{'comment':comment}}})
-    with patch.object(fh.requests,'post',return_value=response) as post:
-        assert dispatch(lead(),'Hello')['status'] == 'SUBMITTED'
-    assert post.call_args.kwargs['json']['safe_type'] == 'employer'
+    with patch.object(fh.requests,'post') as post:
+        result = dispatch(lead(),'Hello')
+    assert result == {'status': 'SKIPPED', 'reason': 'freelance_submission_not_authorized'}
+    post.assert_not_called()
 
 
-def test_plain_http_success_is_not_counted_as_sent(monkeypatch):
+def test_plain_http_freelance_submission_is_blocked(monkeypatch):
     monkeypatch.setenv('AUTO_FREELANCE_APPLY','1')
     monkeypatch.setenv('FREELANCEHUNT_TOKEN','test-token')
-    with patch.object(fh.requests,'post',return_value=Mock(status_code=200,json=lambda:{})):
-        assert dispatch(lead(),'Hello')['status'] == 'NEEDS_CONFIRMATION'
+    with patch.object(fh.requests,'post') as post:
+        assert dispatch(lead(),'Hello')['status'] == 'SKIPPED'
+    post.assert_not_called()
 
 
-def test_missing_token_is_explicit(monkeypatch):
+def test_missing_token_does_not_change_freelance_authorization(monkeypatch):
     monkeypatch.setenv('AUTO_FREELANCE_APPLY','1')
     monkeypatch.delenv('FREELANCEHUNT_TOKEN',raising=False)
-    assert dispatch(lead(),'Hello')['reason'] == 'freelancehunt_token_missing'
+    assert dispatch(lead(),'Hello')['reason'] == 'freelance_submission_not_authorized'
 
 
 def test_fl_ru_rss_does_not_mark_every_order_paid():
@@ -43,13 +43,11 @@ def test_fl_ru_rss_does_not_mark_every_order_paid():
     assert project.get("paid_bid") is not True
 
 
-def test_fl_ru_unknown_bid_access_is_not_misreported_as_paid(monkeypatch):
-    monkeypatch.setenv("AUTO_BROWSER_APPLY", "0")
-    from application_dispatcher import dispatch
+def test_fl_ru_freelance_is_not_submitted_automatically(monkeypatch):
+    monkeypatch.setenv("AUTO_BROWSER_APPLY", "1")
     project = {"source": "fl_ru", "title": "React landing", "url": "https://www.fl.ru/projects/123/test/", "bid_access_unknown": True}
     result = dispatch(project, "I can build this React landing page.")
-    assert result["status"] == "NEEDS_CONFIRMATION"
-    assert result["reason"] == "no_free_direct_channel"
+    assert result == {"status": "SKIPPED", "reason": "freelance_submission_not_authorized"}
 
 
 def test_hh_uses_authenticated_browser_without_telegram_interaction(monkeypatch):
@@ -63,9 +61,10 @@ def test_hh_uses_authenticated_browser_without_telegram_interaction(monkeypatch)
 
 
 @pytest.mark.parametrize("code", [404, 410])
-def test_closed_freelancehunt_project_is_not_reported_as_failed(code, monkeypatch):
+def test_closed_freelancehunt_project_is_not_contacted(code, monkeypatch):
     monkeypatch.setenv("AUTO_FREELANCE_APPLY", "1")
     monkeypatch.setenv("FREELANCEHUNT_TOKEN", "test-token")
-    with patch.object(fh.requests, "post", return_value=Mock(status_code=code)):
+    with patch.object(fh.requests, "post") as post:
         result = dispatch(lead(), "Hello")
-    assert result == {"status": "SKIPPED", "reason": "project_unavailable"}
+    assert result == {"status": "SKIPPED", "reason": "freelance_submission_not_authorized"}
+    post.assert_not_called()

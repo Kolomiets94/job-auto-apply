@@ -31,3 +31,25 @@ def test_qa_letter_describes_only_manual_testing_of_own_apps():
         assert "обработку ошибок API" not in text
         assert "commercial" not in text.lower()
         assert "команде работал" not in text.lower()
+
+
+def test_english_vacancy_gets_english_personal_project_letter():
+    text = make_proposal({
+        "title": "Junior React Developer",
+        "description": "Build React and TypeScript interfaces with REST APIs",
+    })
+    assert text.startswith("Hello!")
+    assert "Since August 2024" in text
+    assert "TravelBlog" in text
+    assert "personal frontend projects" in text
+
+
+def test_letter_never_claims_unverified_commercial_or_figma_experience():
+    text = make_proposal({
+        "title": "Junior Frontend Developer",
+        "language": "en",
+        "description": "React, TypeScript, Figma",
+    })
+    assert "commercial experience" not in text.lower()
+    assert "Figma" not in text
+    assert "personal" in text.lower()

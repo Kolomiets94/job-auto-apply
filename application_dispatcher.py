@@ -70,6 +70,12 @@ def _is_hh_lead(lead):
 
 
 def dispatch(lead, proposal):
+    # The current authorization covers employment vacancies only. Freelance
+    # bids and proposals are not submitted automatically, even when free.
+    from profit_ranker import FREELANCE_SOURCES
+    if str(lead.get("source") or "").strip().lower() in FREELANCE_SOURCES:
+        return {"status": "SKIPPED", "reason": "freelance_submission_not_authorized"}
+
     # HH applicant-side API access is unavailable, but the authenticated
     # browser flow can submit applications. It fails closed without a session,
     # matching résumé, known answers, or a confirmed post-submit state.

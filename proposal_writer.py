@@ -1,5 +1,6 @@
-"""Short, evidence-based cover letters for the candidate's verified projects."""
+"""Personalized, evidence-based cover letters from verified candidate projects."""
 
+import re
 from profit_ranker import _role_category
 
 PROJECTS = {
@@ -9,49 +10,54 @@ PROJECTS = {
 }
 
 
+def _is_english(lead, context):
+    language = str(lead.get("language") or "").strip().lower()
+    if language.startswith("en"):
+        return True
+    if language.startswith("ru"):
+        return False
+    title = str(lead.get("title") or "")
+    description = str(lead.get("description") or "")
+    return not bool(re.search(r"[А-Яа-яЁё]", title + " " + description))
+
+
 def make_proposal(lead):
-    """Draft from known portfolio facts; never infer commercial experience."""
-    title = str(lead.get("title") or "позиция Junior").strip()
+    """Match the letter to the vacancy while using only verified personal-project facts."""
+    title = str(lead.get("title") or "Junior Frontend Developer").strip()
     context = " ".join(str(lead.get(k) or "") for k in
                        ("title", "description", "requirements")).lower()
     category = _role_category(lead)
-    english = lead.get("language") == "en"
-
-    if category == "qa":
-        name, url = PROJECTS["travel"]
-        if english:
-            return (f"Hello! I'm applying for {title}. "
-                    "I have manually tested my own React web applications, including form validation and navigation. "
-                    f"One project is {name}: {url}. "
-                    "I would be glad to discuss my testing approach and learn your QA process.")
-        return (f"Здравствуйте! Откликаюсь на вакансию «{title}». "
-                "Проводил ручное тестирование собственных веб-приложений на React: проверял формы и навигацию. "
-                f"Пример проекта — {name}: {url}. "
-                "Готов рассказать о проверках и освоить процессы тестирования вашей команды.")
+    english = _is_english(lead, context)
 
     if category == "layout":
         name, url = PROJECTS["travel"]
-        detail_ru = "адаптивный интерфейс на SCSS" if "адаптив" in context or "responsive" in context else "интерфейс на SCSS"
-        detail_en = "a responsive SCSS interface" if "responsive" in context else "an SCSS interface"
-    elif "redux" in context or "поиск" in context or "search" in context:
+        detail_ru = "адаптивную вёрстку на HTML, CSS и SCSS"
+        detail_en = "responsive layouts with HTML, CSS and SCSS"
+    elif any(word in context for word in ("redux", "поиск", "search", "избран")):
         name, url = PROJECTS["movie"]
-        detail_ru = "поиск с задержкой ввода и избранное на Redux Toolkit"
-        detail_en = "debounced search and favorites with Redux Toolkit"
-    elif "audio" in context or "аудио" in context:
+        detail_ru = "поиск с debounce и работу с избранным на Redux Toolkit"
+        detail_en = "debounced search and favourites with Redux Toolkit"
+    elif any(word in context for word in ("audio", "аудио", "player", "плеер")):
         name, url = PROJECTS["audio"]
         detail_ru = "управление воспроизведением через HTML5 Audio API"
         detail_en = "playback controls using the HTML5 Audio API"
     else:
         name, url = PROJECTS["travel"]
-        detail_ru = "маршруты с защитой доступа и взаимодействие с REST API"
-        detail_en = "protected routes and REST API interaction"
+        detail_ru = "авторизацию, защищённые маршруты, CRUD и работу с REST API"
+        detail_en = "authentication, protected routes, CRUD and REST API integration"
 
     if english:
-        return (f"Hello! I'm applying for {title}. "
-                "I have practiced frontend development in personal projects. "
-                f"In {name}, I implemented {detail_en}: {url}. "
-                "I would be glad to discuss how this example relates to your task.")
-    return (f"Здравствуйте! Откликаюсь на вакансию «{title}». "
-            "Практиковался в разработке интерфейсов на личных проектах. "
-            f"В проекте {name} реализовал {detail_ru}: {url}. "
-            "Готов обсудить, как этот пример соотносится с вашей задачей.")
+        return (
+            f"Hello! I'm applying for {title}. "
+            "Since August 2024, I've been developing personal frontend projects with React, "
+            "TypeScript, JavaScript, Redux Toolkit and REST APIs. "
+            f"In {name}, I implemented {detail_en}: {url}. "
+            "My experience is project-based, and I'd be glad to discuss how it matches your team's needs."
+        )
+    return (
+        f"Здравствуйте! Откликаюсь на вакансию «{title}». "
+        "С августа 2024 года развиваю личные frontend-проекты на React, TypeScript, JavaScript "
+        "и Redux Toolkit, работаю с REST API. "
+        f"В проекте {name} реализовал {detail_ru}: {url}. "
+        "Мой опыт получен на собственных проектах; буду рад обсудить, чем могу быть полезен вашей команде."
+    )
