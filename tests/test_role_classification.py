@@ -19,6 +19,6 @@ def test_qa_automation_with_javascript_is_not_frontend():
 
 def test_react_developer_stays_frontend():
     title = "Junior React Developer (TypeScript)"
-    lead = rank_lead({"title": title, "source": "hh", "description": "React"})
+    lead = rank_lead({"title": title, "source": "hh", "description": "React", "work_mode": "REMOTE"})
     assert lead["category"] == "frontend"
     assert title_matches_category(title, "frontend")
