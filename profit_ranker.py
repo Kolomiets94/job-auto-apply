@@ -202,7 +202,8 @@ def _work_mode(lead: Dict[str, Any]) -> str:
         return "office"
 
     source = str(lead.get("source") or "").lower()
-    if source in FREELANCE_SOURCES or source in REMOTE_ONLY_SOURCES:
+    # HH RSS was remote-only before structured work-mode fields were added.
+    if source == "hh" or source in FREELANCE_SOURCES or source in REMOTE_ONLY_SOURCES:
         return "remote"
     return "unknown"
 
