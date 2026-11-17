@@ -135,6 +135,18 @@ def _location_rejected(lead: Dict[str, Any], text: str) -> bool:
         if restricted_foreign:
             return True
 
+        # A country-specific foreign location remains a hard restriction,
+        # even if a separate sentence mentions Russia. Broad regions such as
+        # Europe/EMEA can be accepted when Russia eligibility is explicit.
+        broad_location = any(term in location for term in (
+            "worldwide", "anywhere", "global", "remote", "all locations",
+            "europe", "emea", "asia", "north america", "latin america", "americas",
+        ))
+        if location and not broad_location and not re.search(
+            r"\\brussia\\b|росси[яию]", location
+        ):
+            return True
+
         # Residence in Russia is itself a valid geographic match, including
         # listings whose location field is broader (for example, Europe).
         explicit_russia = re.search(
