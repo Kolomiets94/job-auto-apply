@@ -33,7 +33,7 @@ async function ensureBrowser() {
 }
 
 
-app.get("/prepare-session", guard, (_req, res) => {
+app.get("/prepare-session", (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
   res.type("html").send(`<!doctype html>
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -43,9 +43,9 @@ app.get("/prepare-session", guard, (_req, res) => {
 <p>Выбери сохранённый hh-state.json. Файл обрабатывается только в браузере телефона и никуда не отправляется.</p>
 <input id="file" type="file" accept=".json,application/json">\n<label><input id="cookiesOnly" type="checkbox" style="width:auto"> Только cookies HH (если полный файл слишком большой)</label>\n<p>Этот вариант исключает локальные данные страниц. После переноса нужно проверить вход в HH. Исходный файл не меняется.</p>
 <p id="status" role="status"></p>
-<textarea id="result" readonly placeholder="Здесь появится значение для GitHub Secret"></textarea>
+<textarea id="result" readonly placeholder="Здесь появится сжатое значение для Render"></textarea>
 <button id="copy" disabled>Скопировать для GitHub</button>
-<p>Имя секрета: <b>HH_STORAGE_STATE_JSON</b>. После вставки нажми Add secret. Сжатая строка тоже содержит данные доступа: не публикуй её.</p>
+<p>Переменная Render: <b>HH_STORAGE_STATE_JSON</b>. Вставь скопированное значение в Environment основного сервиса job-auto-apply. Сжатая строка тоже содержит данные доступа: не публикуй её.</p>
 <script>
 const file=document.getElementById('file'), result=document.getElementById('result'), status=document.getElementById('status'), copy=document.getElementById('copy');
 const cookiesOnly=document.getElementById('cookiesOnly');\nasync function prepare(){
