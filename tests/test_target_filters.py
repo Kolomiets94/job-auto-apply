@@ -112,3 +112,43 @@ def test_frontend_accepts_0_to_3_but_not_from_3():
         assert rank_lead({**base, "experience": exp})["eligible"], exp
     for exp in ("от 3 лет", "от 4 лет", "4 года"):
         assert not rank_lead({**base, "experience": exp})["eligible"], exp
+
+
+
+def test_international_broad_region_requires_explicit_russia_eligibility():
+    base = {"source": "remotive", "title": "Junior React Developer",
+            "location": "Europe", "work_mode": "REMOTE"}
+    assert rank_lead({**base, "description": "React TypeScript. We accept candidates based in Russia"})["eligible"]
+    assert not rank_lead({**base, "description": "React TypeScript. Europe-based applicants only"})["eligible"]
+
+
+def test_russia_residence_is_allowed_but_foreign_only_residence_is_rejected():
+    base = {"source": "remotive", "title": "Junior React Developer",
+            "location": "Worldwide", "work_mode": "REMOTE"}
+    assert rank_lead({**base, "description": "React TypeScript. Applicants must reside in Russia."})["eligible"]
+    assert not rank_lead({**base, "description": "React TypeScript. Applicants must reside in the US."})["eligible"]
+
+
+def test_hybrid_or_office_text_cannot_be_overridden_by_remote_mentions():
+    base = {"source": "hh", "title": "Junior React Developer",
+            "description": "React TypeScript. Remote-friendly team; hybrid schedule.",
+            "location": "Москва"}
+    assert not rank_lead(base)["eligible"]
+
+    office = {**base, "description": "React TypeScript. Remote-friendly team, but work in office.",
+              "location": "Екатеринбург"}
+    assert not rank_lead(office)["eligible"]
+
+
+def test_explicit_hybrid_mode_wins_over_remote_description():
+    lead = {"source": "hh", "title": "Junior React Developer",
+            "description": "React TypeScript. Remote team.",
+            "work_mode": "HYBRID", "location": "Москва"}
+    assert not rank_lead(lead)["eligible"]
+
+
+def test_salary_floor_has_no_upper_limit_in_ranker():
+    base = {"source": "hh", "title": "Junior React Developer",
+            "description": "React TypeScript", "work_mode": "REMOTE"}
+    assert rank_lead({**base, "salary": {"from": 60000, "to": 120000, "currency": "RUB"}})["eligible"]
+    assert not rank_lead({**base, "salary": {"from": 50000, "to": 120000, "currency": "RUB"}})["eligible"]
