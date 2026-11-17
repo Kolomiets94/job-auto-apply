@@ -54,7 +54,9 @@ def _storage_state(storage_state=None):
 
 def diagnose_hh_session():
     """Read-only HH session check. Never returns or logs cookie/token contents."""
+    print('[hh-session-diagnostic] reading storage state', flush=True)
     state = _storage_state()
+    print('[hh-session-diagnostic] storage state read', flush=True)
     if not isinstance(state, dict):
         return {"configured": bool(os.getenv("HH_STORAGE_STATE_JSON", "").strip() or os.getenv("HH_STORAGE_STATE", "").strip()),
                 "valid_json": False, "authenticated": None, "status": "missing_or_invalid"}
@@ -67,16 +69,22 @@ def diagnose_hh_session():
         and str(c.get("domain") or "").lstrip(".").lower() in ("hh.ru",)
         or isinstance(c, dict) and str(c.get("domain") or "").lstrip(".").lower().endswith(".hh.ru")
     ]
+    print("[hh-session-diagnostic] hh cookie count=%s" % len(hh_cookies), flush=True)
     if not hh_cookies:
         return {"configured": True, "valid_json": True, "authenticated": False, "status": "no_hh_cookies"}
     try:
+        print("[hh-session-diagnostic] starting Playwright", flush=True)
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+            print("[hh-session-diagnostic] launching Chromium", flush=True)
+            browser = p.chromium.launch(headless=True, timeout=15000)
+            print("[hh-session-diagnostic] Chromium launched", flush=True)
             try:
                 context = browser.new_context(storage_state=state, locale="ru-RU")
                 page = context.new_page()
-                page.goto("https://hh.ru/applicant/profile/me", wait_until="domcontentloaded", timeout=35000)
-                page.wait_for_timeout(1200)
+                print("[hh-session-diagnostic] opening HH profile", flush=True)
+                page.goto("https://hh.ru/applicant/profile/me", wait_until="domcontentloaded", timeout=15000)
+                print("[hh-session-diagnostic] HH profile loaded", flush=True)
+                page.wait_for_timeout(500)
                 current_url = page.url.lower()
                 if any(part in current_url for part in ("/account/login", "/login", "/auth")):
                     return {"configured": True, "valid_json": True, "authenticated": False, "status": "login_redirect"}
