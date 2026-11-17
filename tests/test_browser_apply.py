@@ -162,3 +162,24 @@ def test_verified_candidate_skills_answer_does_not_claim_figma():
     )
     assert "React" in answer
     assert "Figma" not in answer
+
+
+def test_known_answers_follow_employer_question_language():
+    assert browser_apply._known_question_answer(
+        "What is your English level?", "frontend"
+    ).startswith("B1 (Intermediate)")
+    assert browser_apply._known_question_answer(
+        "Where are you currently based?", "frontend"
+    ).startswith("Yekaterinburg, Russia")
+    assert browser_apply._known_question_answer(
+        "Do you have commercial experience?", "frontend"
+    ).startswith("I do not have commercial experience")
+    assert browser_apply._known_question_answer(
+        "Какой у вас уровень английского?", "frontend"
+    ).startswith("B1 (Intermediate)")
+
+
+def test_qa_testing_experience_question_is_not_invented():
+    assert browser_apply._known_question_answer(
+        "Do you have manual QA experience?", "qa"
+    ) is None
