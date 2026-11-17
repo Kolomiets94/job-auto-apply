@@ -179,7 +179,7 @@ def _work_mode(lead: Dict[str, Any]) -> str:
             return "office"
 
     title_text = str(lead.get("title") or "").casefold()
-    if re.search(r"\\boffice\\b|офис", title_text):
+    if re.search(r"\boffice\b|офис", title_text):
         return "office"
 
     text = " ".join(
