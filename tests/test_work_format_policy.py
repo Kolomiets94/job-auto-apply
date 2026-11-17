@@ -46,3 +46,21 @@ def test_hh_hybrid_search_uses_yekaterinburg_and_hybrid_format():
     assert get.call_args.kwargs["params"]["work_format"] == "HYBRID"
     assert leads[0]["work_mode"] == "HYBRID"
     assert leads[0]["location"] == "Екатеринбург"
+
+
+
+def test_hybrid_and_office_modes_take_precedence_over_incidental_remote_text():
+    assert not main.workplace_ok({
+        "location": "Москва",
+        "schedule": {"name": "Удаленная работа"},
+        "work_mode": "HYBRID",
+    })
+    assert not main.workplace_ok({
+        "location": "Екатеринбург",
+        "work_mode": "ON_SITE",
+    })
+    assert not main.workplace_ok({
+        "location": "Москва",
+        "schedule": {"name": "Удаленная работа"},
+        "snippet": {"description": "Hybrid schedule; React TypeScript"},
+    })
