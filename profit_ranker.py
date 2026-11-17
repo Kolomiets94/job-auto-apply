@@ -178,6 +178,10 @@ def _work_mode(lead: Dict[str, Any]) -> str:
         if re.search(office_pattern, structured):
             return "office"
 
+    title_text = str(lead.get("title") or "").casefold()
+    if re.search(r"\\boffice\\b|офис", title_text):
+        return "office"
+
     text = " ".join(
         str(lead.get(key) or "")
         for key in ("title", "description", "requirements", "schedule", "employment_format")
