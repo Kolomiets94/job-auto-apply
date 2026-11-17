@@ -101,20 +101,11 @@ def _explicit_salary_rejected(lead: Dict[str, Any]) -> bool:
 
 
 def _location_rejected(lead: Dict[str, Any], text: str) -> bool:
-    # Restrictions override broad promotional worldwide wording.
-    restricted = (
-        "must reside in", "must be located in", "must live in", "residents only",
-        "us only", "u.s. only", "uk only", "eu only", "europe only",
-        "right to work in", "work authorization", "work authorisation",
-        "visa sponsorship is not available", "no visa sponsorship",
-    )
-    if any(x in text for x in restricted):
-        return True
-
     source = str(lead.get("source") or "").lower()
     if source in INTERNATIONAL_SOURCES and source not in FREELANCE_SOURCES:
         location = str(lead.get("location") or "").lower().strip()
         eligibility_text = f"{location} {text}".lower()
+
         excluded_russia = re.search(
             r"\b(?:not|no|excluding|except|outside)\b.{0,45}\brussia\b|"
             r"\brussia\b.{0,45}\b(?:excluded|not available|not eligible|not supported)\b|"
@@ -125,24 +116,34 @@ def _location_rejected(lead: Dict[str, Any], text: str) -> bool:
         if excluded_russia:
             return True
 
+        # A country-specific residence restriction is compatible with this
+        # candidate only when it explicitly names Russia.
+        restricted_foreign = re.search(
+            r"\b(?:must reside in|must be located in|must live in|residents? of|"
+            r"based in|located in)\b.{0,45}\b(?:the\s+)?(?:us|u\.s\.|united states|"
+            r"uk|united kingdom|eu|europe|canada|australia|new zealand|singapore)\b|"
+            r"\b(?:us only|u\.s\. only|uk only|eu only|europe only|canada only|"
+            r"australia only|new zealand only)\b",
+            eligibility_text,
+        )
+        if restricted_foreign:
+            return True
+
+        # Residence in Russia is itself a valid geographic match, including
+        # listings whose location field is broader (for example, Europe).
         explicit_russia = re.search(
             r"\b(?:open to|accept(?:ing)?|hire(?:s|d|ing)?|work from|based in|residing in|"
+            r"must reside in|must be located in|must live in|residents? of|"
             r"candidates? in|applicants? in|eligible in|available in|remote in)\b.{0,45}\brussia\b|"
             r"\brussia\b.{0,45}\b(?:eligible|allowed|accepted|available|remote|based|candidates|applicants|hire)\b|"
             r"(?:можно|доступн[аоы]?|принимаем|нанимаем|кандидат[ыа]?|работать|удал[её]нно|проживать).{0,45}росси[яию]|"
             r"росси[яию].{0,45}(?:можно|доступн[аоы]?|принимаем|нанимаем|кандидат[ыа]?|работать|удал[её]нно|проживать)",
             eligibility_text,
         )
-        if explicit_russia:
-            return False
-        if re.search(r"\brussia\b|росси[яию]", location):
+        if explicit_russia or re.search(r"\brussia\b|росси[яию]", location):
             return False
 
-        generic_location = any(
-            term in location for term in ("worldwide", "anywhere", "global", "remote", "all locations")
-        )
-        # A foreign-specific or generic location is not enough: explicit Russian
-        # eligibility is required, and was checked above.
+        # Worldwide/remote labels do not establish hiring eligibility by themselves.
         return True
 
     return False
