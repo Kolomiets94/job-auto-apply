@@ -23,7 +23,7 @@ services:
       - key: AUTO_BROWSER_APPLY
         value: "1"
       - key: AUTO_SEND_EMAIL
-        value: "1"
+        value: "0"
       - key: AUTO_FREELANCE_APPLY
         value: "0"
       - key: AUTO_APPLY_QA
