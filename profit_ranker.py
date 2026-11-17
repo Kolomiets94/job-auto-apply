@@ -140,6 +140,11 @@ def _location_rejected(lead: Dict[str, Any], text: str) -> bool:
             return True
         if re.search(r"\brussia\b|росси[яию]", location):
             return False
+        generic_location = any(
+            term in location for term in ("worldwide", "anywhere", "global", "remote", "all locations")
+        )
+        if location and not generic_location:
+            return True
         explicit_russia = re.search(
             r"\b(?:open to|accept(?:ing)?|hire(?:s|d|ing)?|work from|based in|residing in|"
             r"candidates? in|applicants? in|eligible in|available in|remote in)\b.{0,45}\brussia\b|"
