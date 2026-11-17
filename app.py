@@ -4,7 +4,7 @@ import os
 import threading
 from datetime import datetime, timezone
 from main import collect
-from profit_ranker import rank_leads
+from profit_ranker import rank_leads, FREELANCE_SOURCES
 from queue_store import enqueue, list_queue
 from proposal_writer import make_proposal
 from worker import run as run_worker
@@ -33,7 +33,13 @@ def home():
 def jobs():
     if not _authorized():
         return jsonify({"error": "unauthorized"}), 401
-    return jsonify(collect())
+    data = collect()
+    data["items"] = [
+        item for item in data.get("items", [])
+        if str(item.get("source") or "").lower() not in FREELANCE_SOURCES
+    ]
+    data["count"] = len(data["items"])
+    return jsonify(data)
 
 @app.get("/freelance")
 def freelance():
