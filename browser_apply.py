@@ -51,6 +51,54 @@ def _storage_state(storage_state=None):
     return os.getenv("HH_STORAGE_STATE", "").strip() or None
 
 
+
+def diagnose_hh_session():
+    """Read-only HH session check. Never returns or logs cookie/token contents."""
+    state = _storage_state()
+    if not isinstance(state, dict):
+        return {"configured": bool(os.getenv("HH_STORAGE_STATE_JSON", "").strip() or os.getenv("HH_STORAGE_STATE", "").strip()),
+                "valid_json": False, "authenticated": None, "status": "missing_or_invalid"}
+    cookies = state.get("cookies")
+    origins = state.get("origins")
+    if not isinstance(cookies, list) or not isinstance(origins, list):
+        return {"configured": True, "valid_json": False, "authenticated": None, "status": "invalid_storage_state"}
+    hh_cookies = [
+        c for c in cookies if isinstance(c, dict)
+        and str(c.get("domain") or "").lstrip(".").lower() in ("hh.ru",)
+        or isinstance(c, dict) and str(c.get("domain") or "").lstrip(".").lower().endswith(".hh.ru")
+    ]
+    if not hh_cookies:
+        return {"configured": True, "valid_json": True, "authenticated": False, "status": "no_hh_cookies"}
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            try:
+                context = browser.new_context(storage_state=state, locale="ru-RU")
+                page = context.new_page()
+                page.goto("https://hh.ru/applicant/profile/me", wait_until="domcontentloaded", timeout=35000)
+                page.wait_for_timeout(1200)
+                current_url = page.url.lower()
+                if any(part in current_url for part in ("/account/login", "/login", "/auth")):
+                    return {"configured": True, "valid_json": True, "authenticated": False, "status": "login_redirect"}
+                profile_marker = page.locator('[data-qa="mainmenu_applicantProfile"], [data-qa="header-user-menu"], a[href*="/applicant/profile/"]').first
+                try:
+                    authenticated = profile_marker.is_visible(timeout=2500)
+                except Exception:
+                    authenticated = False
+                if authenticated:
+                    status = "authenticated"
+                else:
+                    challenge = _looks_like_challenge(page)
+                    status = "security_challenge" if challenge else "indeterminate"
+                return {"configured": True, "valid_json": True, "authenticated": authenticated if status != "indeterminate" else None, "status": status}
+            finally:
+                browser.close()
+    except PlaywrightTimeoutError:
+        return {"configured": True, "valid_json": True, "authenticated": None, "status": "browser_timeout"}
+    except Exception as exc:
+        # Log only the exception class; never include URLs, headers, or browser state.
+        return {"configured": True, "valid_json": True, "authenticated": None, "status": "diagnostic_error", "error_type": type(exc).__name__}
+
 def _visible(locator):
     try:
         return locator.is_visible(timeout=700)
