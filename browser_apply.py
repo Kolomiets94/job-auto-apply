@@ -60,15 +60,20 @@ def diagnose_hh_session():
     if not isinstance(state, dict):
         return {"configured": bool(os.getenv("HH_STORAGE_STATE_JSON", "").strip() or os.getenv("HH_STORAGE_STATE", "").strip()),
                 "valid_json": False, "authenticated": None, "status": "missing_or_invalid"}
+    print("[hh-session-diagnostic] validating state structure", flush=True)
     cookies = state.get("cookies")
     origins = state.get("origins")
     if not isinstance(cookies, list) or not isinstance(origins, list):
         return {"configured": True, "valid_json": False, "authenticated": None, "status": "invalid_storage_state"}
-    hh_cookies = [
-        c for c in cookies if isinstance(c, dict)
-        and str(c.get("domain") or "").lstrip(".").lower() in ("hh.ru",)
-        or isinstance(c, dict) and str(c.get("domain") or "").lstrip(".").lower().endswith(".hh.ru")
-    ]
+    print("[hh-session-diagnostic] state structure valid; cookie_count=%s" % len(cookies), flush=True)
+    hh_cookies = []
+    for c in cookies[:5000]:
+        if not isinstance(c, dict):
+            continue
+        domain = str(c.get("domain") or "").lstrip(".").lower()
+        if domain == "hh.ru" or domain.endswith(".hh.ru"):
+            hh_cookies.append(c)
+    print("[hh-session-diagnostic] cookie scan complete; hh_cookie_count=%s" % len(hh_cookies), flush=True)
     print("[hh-session-diagnostic] hh cookie count=%s" % len(hh_cookies), flush=True)
     if not hh_cookies:
         return {"configured": True, "valid_json": True, "authenticated": False, "status": "no_hh_cookies"}
