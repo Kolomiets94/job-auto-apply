@@ -83,16 +83,16 @@ def workplace_ok(v):
     text = " ".join((title, schedule, formats, details))
 
     office = re.search(
-        r"\\bon[\\s-]?site\\b|\\bin[\\s-]?office\\b|\\boffice[\\s-]?(?:only|based)\\b|"
-        r"работа\\s+в\\s+офисе|только\\s+в\\s+офисе|офисн(?:ый|ая|ое)\\s+формат|"
-        r"на\\s+месте\\s+работодателя",
+        r"\bon[\s-]?site\b|\bin[\s-]?office\b|\boffice[\s-]?(?:only|based)\b|"
+        r"работа\s+в\s+офисе|только\s+в\s+офисе|офисн(?:ый|ая|ое)\s+формат|"
+        r"на\s+месте\s+работодателя",
         text,
     )
     if office:
         return False
-    if re.search(r"\\bremote\\b|удал[её]н|дистанцион", text):
+    if re.search(r"\bremote\b|удал[её]н|дистанцион", text):
         return True
-    if re.search(r"\\bhybrid\\b|гибрид", text):
+    if re.search(r"\bhybrid\b|гибрид", text):
         return local
     return False
 
