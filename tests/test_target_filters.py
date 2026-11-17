@@ -83,13 +83,17 @@ def test_entry_level_layout_without_junior_title():
 def test_work_format_policy_is_remote_everywhere_and_hybrid_only_in_yekaterinburg():
     base = {"source": "hh", "title": "Junior React Developer", "description": "React TypeScript", "work_mode": "REMOTE"}
     assert rank_lead({**base, "work_mode": "REMOTE", "location": "Москва"})["eligible"]
-    assert rank_lead({**base, "work_format": [{"id": "HYBRID", "name": "Гибридный формат"}],
+    assert rank_lead({**base, "work_mode": "HYBRID",
+                      "work_format": [{"id": "HYBRID", "name": "Гибридный формат"}],
                       "location": "Екатеринбург"})["eligible"]
-    assert not rank_lead({**base, "work_format": [{"id": "HYBRID", "name": "Гибридный формат"}],
+    assert not rank_lead({**base, "work_mode": "HYBRID",
+                          "work_format": [{"id": "HYBRID", "name": "Гибридный формат"}],
                           "location": "Санкт-Петербург"})["eligible"]
-    assert not rank_lead({**base, "work_format": [{"id": "ON_SITE", "name": "На месте работодателя"}],
+    assert not rank_lead({**base, "work_mode": "ON_SITE",
+                          "work_format": [{"id": "ON_SITE", "name": "На месте работодателя"}],
                           "location": "Екатеринбург"})["eligible"]
-    assert not rank_lead({**base, "location": "Екатеринбург"})["eligible"]
+    assert not rank_lead({**base, "source": "superjob", "work_mode": None,
+                          "location": "Екатеринбург"})["eligible"]
 
 
 def test_layout_requires_entry_level_signal_and_rejects_senior_experience():
