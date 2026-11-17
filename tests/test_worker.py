@@ -9,6 +9,7 @@ def test_collect_all_deduplicates_urls(monkeypatch):
     other = {"source": "remoteok", "title": "Frontend", "url": "https://example.com/2"}
 
     with patch.object(worker, "hh_search", return_value=[same]), \
+         patch.object(worker, "hh_hybrid_search", return_value=[]), \
          patch.object(worker, "remoteok", return_value=[same, other]), \
          patch.object(worker, "collect_freelance", return_value=[]), \
          patch.object(worker, "collect_peopleperhour", return_value=[]), \
@@ -44,6 +45,7 @@ def test_hh_block_without_session_stops_repeated_queries_but_other_sources_conti
     monkeypatch.setattr(worker, "JOB_COLLECTORS", ())
     lead = {"source": "remoteok", "title": "Junior React", "url": "https://example.com/job"}
     with patch.object(worker, "hh_search", side_effect=worker.HHAccessUnavailable("HH API HTTP 403; browser session missing")) as hh, \
+         patch.object(worker, "hh_hybrid_search", return_value=[]), \
          patch.object(worker, "remoteok", return_value=[lead]), \
          patch.object(worker, "collect_freelance", return_value=[]), \
          patch.object(worker, "collect_freelancehunt", return_value=[]), \
@@ -93,6 +95,19 @@ def test_prioritize_actionable_leads(monkeypatch):
         "Junior React", "Junior frontend", "Junior QA", "React project",
         "Email project", "Paid bid",
     ]
+
+
+def test_freelance_is_only_selected_when_no_employment_vacancy_exists():
+    job = {"source": "hh", "title": "Junior React Developer", "profit_score": 65}
+    freelance = {"source": "freelancer_com", "title": "React landing page", "profit_score": 99}
+
+    selected, jobs, freelance_leads = worker.select_primary_leads([freelance, job])
+    assert selected == jobs == [job]
+    assert freelance_leads == [freelance]
+
+    selected, jobs, freelance_leads = worker.select_primary_leads([freelance])
+    assert selected == freelance_leads == [freelance]
+    assert jobs == []
 
 
 def test_freelancehunt_api_priority_requires_token(monkeypatch):
