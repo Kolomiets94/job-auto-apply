@@ -170,9 +170,13 @@ def _application_priority(lead):
         ) else 1
     source = str(lead.get("source") or "").lower()
     if source == "hh":
-        # HH applicant-side API access is no longer supported; keep vacancies
-        # in the Telegram shortlist instead of prioritizing browser submissions.
-        return 1
+        # HH submissions use the authenticated Playwright browser flow, not
+        # the retired applicant API. Only mark them actionable when the browser
+        # flow and a saved HH session are both configured.
+        has_hh_session = bool(
+            os.getenv("HH_STORAGE_STATE_JSON") or os.getenv("HH_STORAGE_STATE")
+        )
+        return 0 if os.getenv("AUTO_BROWSER_APPLY") == "1" and has_hh_session else 1
     if source == "remote_job_ru":
         return 0 if os.getenv("AUTO_BROWSER_APPLY") == "1" and all(
             os.getenv(key) for key in ("REMOTE_JOB_NAME", "REMOTE_JOB_PHONE")
