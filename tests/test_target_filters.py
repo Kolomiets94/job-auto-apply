@@ -149,3 +149,11 @@ def test_mandatory_relocation_filter_handles_location_without_name_error():
     result = rank_lead(lead)
     assert not result["eligible"]
     assert result["rank_reason"] == "mandatory nonlocal relocation"
+
+
+
+def test_residence_requirement_accepts_russia_but_rejects_foreign_only():
+    base = {"source": "remotive", "title": "Junior React Developer",
+            "location": "Worldwide", "work_mode": "REMOTE"}
+    assert rank_lead({**base, "description": "React TypeScript. Applicants must reside in Russia."})["eligible"]
+    assert not rank_lead({**base, "description": "React TypeScript. Applicants must reside in the US."})["eligible"]
