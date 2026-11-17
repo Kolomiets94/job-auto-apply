@@ -39,7 +39,7 @@ class HHAccessUnavailable(RuntimeError):
 
 
 def salary_ok(v):
-    """Keep vacancies with explicit RUB salary in the configured 20k-80k band."""
+    """Reject explicit RUB salaries below the configured floor; do not cap high salaries."""
     if is_placement(v.get("name")):
         return placement_is_paid({**v, "title": v.get("name"), "description": " ".join(str(x or "") for x in (v.get("snippet") or {}).values())})
     salary = v.get("salary")
@@ -50,17 +50,13 @@ def salary_ok(v):
     if currency not in ("RUR", "RUB"):
         return True
 
-    minimum = int(os.getenv("HH_MIN_SALARY_RUB", "20000"))
-    maximum = int(os.getenv("HH_MAX_SALARY_RUB", "80000"))
+    minimum = int(os.getenv("HH_MIN_SALARY_RUB", "60000"))
     salary_from = salary.get("from")
     salary_to = salary.get("to")
-    if isinstance(salary_from, (int, float)) and salary_from < minimum:
-        return False
-    if isinstance(salary_to, (int, float)) and salary_to > maximum:
-        return False
-    amount = salary_from if isinstance(salary_from, (int, float)) else salary_to
-    if isinstance(amount, (int, float)):
-        return minimum <= amount <= maximum
+    if isinstance(salary_from, (int, float)):
+        return salary_from >= minimum
+    if isinstance(salary_to, (int, float)):
+        return salary_to >= minimum
     return True
 
 
@@ -77,25 +73,51 @@ def workplace_ok(v):
     area = str((v.get("area") or {}).get("name") or v.get("location") or "").lower()
     local = any(x in area for x in ("екатеринбург", "yekaterinburg", "ekaterinburg"))
     title = str(v.get("name") or v.get("title") or "").lower()
-    schedule = _format_text(v.get("schedule")).lower()
-    formats = " ".join(_format_text(v.get(key)) for key in ("work_mode", "work_format", "work_formats")).lower()
-    details = " ".join(str(x or "") for x in (v.get("snippet") or {}).values()).lower()
-    text = " ".join((title, schedule, formats, details))
-
     if re.search(r"\boffice\b|офис", title):
         return False
-    office = re.search(
-        r"\bon[\s-]?site\b|\bin[\s-]?office\b|\boffice[\s-]?(?:only|based)\b|"
+
+    remote = r"\bremote\b|удал[её]н|дистанцион"
+    hybrid = r"\bhybrid\b|гибрид"
+    office = (
+        r"\bon[\s_-]?site\b|\bin[\s_-]?office\b|\boffice[\s-]?(?:only|based)\b|"
         r"работа\s+в\s+офисе|только\s+в\s+офисе|офисн(?:ый|ая|ое)\s+формат|"
-        r"на\s+месте\s+работодателя",
-        text,
+        r"на\s+месте\s+работодателя"
     )
-    if office:
-        return False
-    if re.search(r"\bremote\b|удал[её]н|дистанцион", text):
-        return True
-    if re.search(r"\bhybrid\b|гибрид", text):
+
+    explicit_mode = _format_text(v.get("work_mode")).lower()
+    if explicit_mode:
+        if re.search(hybrid, explicit_mode):
+            return local
+        if re.search(office, explicit_mode) or re.search(
+            r"\b(?:on[_ -]?site|onsite|office)\b", explicit_mode
+        ):
+            return False
+        if re.search(remote, explicit_mode):
+            return True
+
+    formats = " ".join(
+        _format_text(v.get(key))
+        for key in ("work_format", "work_formats", "workplace_type", "workplace")
+    ).lower()
+    if formats:
+        if re.search(hybrid, formats):
+            return local
+        if re.search(office, formats) or re.search(
+            r"\b(?:on[_ -]?site|onsite|office)\b", formats
+        ):
+            return False
+        if re.search(remote, formats):
+            return True
+
+    schedule = _format_text(v.get("schedule")).lower()
+    details = " ".join(str(x or "") for x in (v.get("snippet") or {}).values()).lower()
+    text = " ".join((title, schedule, details))
+    if re.search(hybrid, text):
         return local
+    if re.search(office, text):
+        return False
+    if re.search(remote, text):
+        return True
     return False
 
 
