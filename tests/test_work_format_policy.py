@@ -60,7 +60,7 @@ def test_hybrid_and_office_modes_take_precedence_over_incidental_remote_text():
         "work_mode": "ON_SITE",
     })
     assert not main.workplace_ok({
-        "location": "Екатеринбург",
+        "location": "Москва",
         "schedule": {"name": "Удаленная работа"},
         "snippet": {"description": "Hybrid schedule; React TypeScript"},
     })
