@@ -110,11 +110,31 @@ def _location_rejected(lead: Dict[str, Any], text: str) -> bool:
     )
     if any(x in text for x in restricted):
         return True
-    if str(lead.get("source") or "").lower() in INTERNATIONAL_SOURCES and str(lead.get("source")) not in FREELANCE_SOURCES:
+    source = str(lead.get("source") or "").lower()
+    if source in INTERNATIONAL_SOURCES and source not in FREELANCE_SOURCES:
         location = str(lead.get("location") or "").lower().strip()
-        return not any(x in location for x in ("worldwide", "anywhere", "global", "russia", "росси"))
+        eligibility_text = f"{location} {text}".lower()
+        excluded_russia = re.search(
+            r"\b(?:not|no|excluding|except|outside)\b.{0,45}\brussia\b|"
+            r"\brussia\b.{0,45}\b(?:excluded|not available|not eligible|not supported)\b|"
+            r"не\s+(?:нанимаем|принимаем|рассматриваем).{0,45}росси[яию]|"
+            r"росси[яию].{0,45}не\s+(?:доступна|подходит|принимается)",
+            eligibility_text,
+        )
+        if excluded_russia:
+            return True
+        if re.search(r"\brussia\b|росси[яию]", location):
+            return False
+        explicit_russia = re.search(
+            r"\b(?:open to|accept(?:ing)?|hire(?:s|d|ing)?|work from|based in|residing in|"
+            r"candidates? in|applicants? in|eligible in|available in|remote in)\b.{0,45}\brussia\b|"
+            r"\brussia\b.{0,45}\b(?:eligible|allowed|accepted|available|remote|based|candidates|applicants|hire)\b|"
+            r"(?:можно|доступн[аоы]?|принимаем|нанимаем|кандидат[ыа]?|работать|удал[её]нно|проживать).{0,45}росси[яию]|"
+            r"росси[яию].{0,45}(?:можно|доступн[аоы]?|принимаем|нанимаем|кандидат[ыа]?|работать|удал[её]нно|проживать)",
+            eligibility_text,
+        )
+        return not bool(explicit_russia)
     return False
-
 
 def _role_category(lead: Dict[str, Any]) -> str:
     """Route jobs to the user's preferred role/resume order."""
