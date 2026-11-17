@@ -116,11 +116,17 @@ def _location_rejected(lead: Dict[str, Any], text: str) -> bool:
         if excluded_russia:
             return True
 
-        # A country-specific residence restriction is compatible with this
-        # candidate only when it explicitly names Russia.
+        if any(term in eligibility_text for term in (
+            "work authorization", "work authorisation",
+            "visa sponsorship is not available", "no visa sponsorship",
+        )):
+            return True
+
+        # A candidate-residence restriction is incompatible only when it
+        # names a country/region other than Russia.
         restricted_foreign = re.search(
-            r"\b(?:must reside in|must be located in|must live in|residents? of|"
-            r"based in|located in)\b.{0,45}\b(?:the\s+)?(?:us|u\.s\.|united states|"
+            r"\b(?:must reside in|must be located in|must live in|must be based in|"
+            r"residents? of|right to work in)\b.{0,45}\b(?:the\s+)?(?:us|u\.s\.|united states|"
             r"uk|united kingdom|eu|europe|canada|australia|new zealand|singapore)\b|"
             r"\b(?:us only|u\.s\. only|uk only|eu only|europe only|canada only|"
             r"australia only|new zealand only)\b",
