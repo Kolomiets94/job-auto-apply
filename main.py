@@ -21,6 +21,15 @@ QUERIES=[
     ("layout","младший верстальщик"),
     ("layout","junior HTML"),
 ]
+
+HYBRID_QUERIES=[
+    ("frontend","junior frontend"),
+    ("frontend","junior React"),
+    ("frontend","React TypeScript"),
+    ("frontend","junior JavaScript"),
+    ("layout","junior верстальщик"),
+    ("layout","junior HTML CSS"),
+]
 EXCLUDE=("full stack","fullstack","full-stack","vue","angular","react native","react-native","flutter","middle","senior","lead","head of","manager","director")
 UA={"User-Agent":"Mozilla/5.0 (compatible; JobFreelanceHunter/1.2; vacancy-feed)"}
 
@@ -55,13 +64,39 @@ def salary_ok(v):
     return True
 
 
+def _format_text(value):
+    if isinstance(value, dict):
+        return " ".join(str(value.get(key) or "") for key in ("id", "name", "title", "value"))
+    if isinstance(value, (list, tuple, set)):
+        return " ".join(_format_text(item) for item in value)
+    return str(value or "")
+
+
 def workplace_ok(v):
-    """HH RSS query is explicitly restricted to remote vacancies."""
+    """Allow remote everywhere; hybrid only in Yekaterinburg; never office."""
     area = str((v.get("area") or {}).get("name") or v.get("location") or "").lower()
-    schedule = str((v.get("schedule") or {}).get("name") or v.get("schedule") or "").lower()
     local = any(x in area for x in ("екатеринбург", "yekaterinburg", "ekaterinburg"))
-    remote = any(x in schedule for x in ("удален", "удалён", "дистанцион", "remote"))
-    return local or remote
+    title = str(v.get("name") or v.get("title") or "").lower()
+    schedule = _format_text(v.get("schedule")).lower()
+    formats = " ".join(_format_text(v.get(key)) for key in ("work_mode", "work_format", "work_formats")).lower()
+    details = " ".join(str(x or "") for x in (v.get("snippet") or {}).values()).lower()
+    text = " ".join((title, schedule, formats, details))
+
+    if re.search(r"\boffice\b|офис", title):
+        return False
+    office = re.search(
+        r"\bon[\s-]?site\b|\bin[\s-]?office\b|\boffice[\s-]?(?:only|based)\b|"
+        r"работа\s+в\s+офисе|только\s+в\s+офисе|офисн(?:ый|ая|ое)\s+формат|"
+        r"на\s+месте\s+работодателя",
+        text,
+    )
+    if office:
+        return False
+    if re.search(r"\bremote\b|удал[её]н|дистанцион", text):
+        return True
+    if re.search(r"\bhybrid\b|гибрид", text):
+        return local
+    return False
 
 
 def ok(v):
@@ -173,10 +208,94 @@ def hh_search(tag, q):
             "experience": None,
             "schedule": "Удаленная работа",
             "location": vacancy["location"],
+            "work_mode": "REMOTE",
         })
 
     # Avoid hammering HH while iterating over the configured keyword list.
     time.sleep(float(os.getenv("HH_RSS_REQUEST_DELAY", "1")))
+    return results
+
+
+def hh_yekaterinburg_area_id():
+    """Resolve the current HH area ID for Yekaterinburg; allow an explicit env override."""
+    global _HH_YEKATERINBURG_AREA_ID
+    configured = os.getenv("HH_YEKATERINBURG_AREA_ID", "").strip()
+    if configured:
+        return configured
+    if _HH_YEKATERINBURG_AREA_ID:
+        return _HH_YEKATERINBURG_AREA_ID
+    response = requests.get("https://api.hh.ru/areas/113", headers=UA, timeout=20)
+    response.raise_for_status()
+    stack = [response.json()]
+    while stack:
+        area = stack.pop()
+        if str(area.get("name") or "").strip().casefold() == "екатеринбург":
+            _HH_YEKATERINBURG_AREA_ID = str(area.get("id"))
+            return _HH_YEKATERINBURG_AREA_ID
+        stack.extend(area.get("areas") or [])
+    raise HHAccessUnavailable("Could not resolve Yekaterinburg area ID from HH directory")
+
+
+_HH_YEKATERINBURG_AREA_ID = None
+
+
+def hh_hybrid_search(tag, q):
+    """Use HH's vacancy API to search hybrid vacancies only in Yekaterinburg."""
+    import time
+
+    area_id = hh_yekaterinburg_area_id()
+    params = {
+        "text": q,
+        "area": area_id,
+        "work_format": "HYBRID",
+        "per_page": 50,
+        "page": 0,
+        "order_by": "publication_time",
+    }
+    for attempt in range(3):
+        try:
+            response = requests.get(
+                "https://api.hh.ru/vacancies", params=params, headers=UA, timeout=25,
+            )
+        except (requests.Timeout, requests.ConnectionError) as exc:
+            if attempt == 2:
+                raise HHAccessUnavailable("HH API network unavailable") from exc
+            time.sleep(2 ** attempt)
+            continue
+        if response.status_code in (401, 403):
+            raise HHAccessUnavailable(f"HH API HTTP {response.status_code}")
+        if response.status_code == 429 or 500 <= response.status_code < 600:
+            if attempt == 2:
+                raise HHAccessUnavailable(f"HH API HTTP {response.status_code} after retries")
+            retry_after = response.headers.get("Retry-After", "")
+            try:
+                delay = min(30, max(1, float(retry_after)))
+            except (TypeError, ValueError):
+                delay = 2 ** attempt
+            time.sleep(delay)
+            continue
+        response.raise_for_status()
+        break
+
+    results = []
+    for vacancy in response.json().get("items", []):
+        lead = {
+            "source": "hh",
+            "category": tag,
+            "title": vacancy.get("name"),
+            "company": (vacancy.get("employer") or {}).get("name"),
+            "url": vacancy.get("alternate_url"),
+            "published": vacancy.get("published_at"),
+            "salary": vacancy.get("salary"),
+            "description": " ".join(str(x or "") for x in (vacancy.get("snippet") or {}).values()),
+            "experience": (vacancy.get("experience") or {}).get("name"),
+            "location": (vacancy.get("area") or {}).get("name"),
+            "work_format": vacancy.get("work_format") or [],
+            "schedule": vacancy.get("schedule") or {},
+            "work_mode": "HYBRID",
+        }
+        if ok({**lead, "name": lead["title"], "snippet": {"description": lead["description"]}}):
+            results.append(lead)
     return results
 
 
@@ -195,6 +314,9 @@ def collect():
     jobs=[]
     for tag,q in QUERIES:
         try:jobs+=hh_search(tag,q)
+        except Exception:pass
+    for tag,q in HYBRID_QUERIES:
+        try:jobs+=hh_hybrid_search(tag,q)
         except Exception:pass
     jobs+=remoteok()
     try: jobs+=collect_freelance()

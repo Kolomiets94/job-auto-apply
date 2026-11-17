@@ -28,6 +28,8 @@ def test_worldwide_does_not_override_explicit_restriction():
             'description': 'worldwide company, US only'}
     assert not rank_lead(lead)['eligible']
     lead['description'] = 'React TypeScript remote'
+    assert not rank_lead(lead)['eligible']
+    lead['description'] = 'React TypeScript remote. We accept candidates based in Russia'
     assert rank_lead(lead)['eligible']
     lead['location'] = 'USA'
     assert not rank_lead(lead)['eligible']

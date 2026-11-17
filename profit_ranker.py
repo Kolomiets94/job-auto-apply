@@ -125,11 +125,36 @@ def _location_rejected(lead: Dict[str, Any], text: str) -> bool:
     )
     if any(x in text for x in restricted):
         return True
-    if str(lead.get("source") or "").lower() in INTERNATIONAL_SOURCES and str(lead.get("source")) not in FREELANCE_SOURCES:
+    source = str(lead.get("source") or "").lower()
+    if source in INTERNATIONAL_SOURCES and source not in FREELANCE_SOURCES:
         location = str(lead.get("location") or "").lower().strip()
-        return not any(x in location for x in ("worldwide", "anywhere", "global", "russia", "росси"))
+        eligibility_text = f"{location} {text}".lower()
+        excluded_russia = re.search(
+            r"\b(?:not|no|excluding|except|outside)\b.{0,45}\brussia\b|"
+            r"\brussia\b.{0,45}\b(?:excluded|not available|not eligible|not supported)\b|"
+            r"не\s+(?:нанимаем|принимаем|рассматриваем).{0,45}росси[яию]|"
+            r"росси[яию].{0,45}не\s+(?:доступна|подходит|принимается)",
+            eligibility_text,
+        )
+        if excluded_russia:
+            return True
+        if re.search(r"\brussia\b|росси[яию]", location):
+            return False
+        generic_location = any(
+            term in location for term in ("worldwide", "anywhere", "global", "remote", "all locations")
+        )
+        if location and not generic_location:
+            return True
+        explicit_russia = re.search(
+            r"\b(?:open to|accept(?:ing)?|hire(?:s|d|ing)?|work from|based in|residing in|"
+            r"candidates? in|applicants? in|eligible in|available in|remote in)\b.{0,45}\brussia\b|"
+            r"\brussia\b.{0,45}\b(?:eligible|allowed|accepted|available|remote|based|candidates|applicants|hire)\b|"
+            r"(?:можно|доступн[аоы]?|принимаем|нанимаем|кандидат[ыа]?|работать|удал[её]нно|проживать).{0,45}росси[яию]|"
+            r"росси[яию].{0,45}(?:можно|доступн[аоы]?|принимаем|нанимаем|кандидат[ыа]?|работать|удал[её]нно|проживать)",
+            eligibility_text,
+        )
+        return not bool(explicit_russia)
     return False
-
 
 def _role_category(lead: Dict[str, Any]) -> str:
     """Route jobs to the user's preferred role/resume order."""
@@ -144,6 +169,80 @@ def _role_category(lead: Dict[str, Any]) -> str:
 
 ROLE_PRIORITY = {"frontend": 0, "layout": 1}
 
+REMOTE_ONLY_SOURCES = {
+    "remoteok", "jobicy", "remotive", "weworkremotely", "arbeitnow",
+    "habr_career", "trudvsem", "getmatch", "zarplata", "remote_job_ru",
+}
+
+
+def _field_text(value: Any) -> str:
+    if isinstance(value, dict):
+        return " ".join(str(value.get(key) or "") for key in ("id", "name", "title", "value"))
+    if isinstance(value, (list, tuple, set)):
+        return " ".join(_field_text(item) for item in value)
+    return str(value or "")
+
+
+def _is_yekaterinburg(lead: Dict[str, Any]) -> bool:
+    place = " ".join(
+        str(lead.get(key) or "")
+        for key in ("location", "region", "city", "area", "address")
+    ).casefold()
+    return any(name in place for name in ("екатеринбург", "yekaterinburg", "ekaterinburg"))
+
+
+def _work_mode(lead: Dict[str, Any]) -> str:
+    structured = " ".join(
+        _field_text(lead.get(key))
+        for key in ("work_mode", "work_format", "work_formats", "workplace_type", "workplace")
+        if lead.get(key) not in (None, "", [], {})
+    ).casefold()
+    remote_pattern = r"\bremote\b|удал[её]н|дистанцион"
+    hybrid_pattern = r"\bhybrid\b|гибрид"
+    office_pattern = (
+        r"\bon[\s_-]?site\b|\bin[\s_-]?office\b|\boffice[\s-]?(?:only|based)\b|"
+        r"работа\s+в\s+офисе|только\s+в\s+офисе|офисн(?:ый|ая|ое)\s+формат|"
+        r"на\s+месте\s+работодателя"
+    )
+    if structured:
+        if re.search(remote_pattern, structured):
+            return "remote"
+        if re.search(hybrid_pattern, structured):
+            return "hybrid"
+        if re.search(office_pattern, structured):
+            return "office"
+
+    title = str(lead.get("title") or "").casefold()
+    if re.search(r"\boffice\b|офис", title):
+        return "office"
+    text = " ".join(
+        str(lead.get(key) or "")
+        for key in ("title", "description", "requirements", "schedule", "employment_format")
+    ).casefold()
+    if re.search(remote_pattern, text):
+        return "remote"
+    if re.search(hybrid_pattern, text):
+        return "hybrid"
+    if re.search(office_pattern, text):
+        return "office"
+
+    source = str(lead.get("source") or "").lower()
+    # HH RSS was remote-only before structured work-mode fields were added.
+    if source == "hh" or source in FREELANCE_SOURCES or source in REMOTE_ONLY_SOURCES:
+        return "remote"
+    return "unknown"
+
+
+def _work_format_rejection(lead: Dict[str, Any]) -> str | None:
+    mode = _work_mode(lead)
+    if mode == "remote":
+        return None
+    if mode == "hybrid":
+        return None if _is_yekaterinburg(lead) else "hybrid is allowed only in Yekaterinburg"
+    if mode == "office":
+        return "office/on-site roles are excluded"
+    return "remote work format is not confirmed"
+
 
 def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     text = _text(lead)
@@ -156,14 +255,13 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     # Exclude non-Junior roles by title, not incidental descriptions.
     if any(x in title for x in BLOCK) or re.search(r"(?<![a-z])vue(?![a-z])", title):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "excluded job title"}
-    # Local office/hybrid roles are acceptable in Yekaterinburg only.
+    # Remote everywhere; hybrid only in Yekaterinburg; office/on-site never.
+    work_format_rejection = _work_format_rejection(lead)
+    if work_format_rejection:
+        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": work_format_rejection}
     place = " ".join(str(lead.get(k) or "") for k in ("location", "region", "city")).lower()
     details = " ".join(str(lead.get(k) or "") for k in ("description", "requirements")).lower()
-    local = any(x in place for x in ("екатеринбург", "yekaterinburg", "ekaterinburg"))
-    office = any(x in title for x in ("офис", "onsite", "on-site", "on site", "гибрид", "hybrid"))
-    office = office or any(x in details for x in ("только в офисе", "строго в офисе", "office only", "on-site only", "onsite only"))
-    if office and not local:
-        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "nonlocal office/hybrid job"}
+    local = _is_yekaterinburg(lead)
     # Exclude explicit mandatory relocation to another city even if office is not in title.
     relocation = any(x in details for x in (
         "обязателен переезд", "переезд обязателен", "необходим переезд",
