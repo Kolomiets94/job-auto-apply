@@ -144,10 +144,6 @@ def _select_resume(page, category):
 def _known_question_answer(question, category):
     """Return only answers grounded in the candidate profile; never guess."""
     q = _norm(question)
-    if category == "qa" and any(x in q for x in ("геймдев", "gamedev", "game dev")) and any(
-        x in q for x in ("почему", "интерес", "хотите", "привлека")
-    ):
-        return "Хочу развиваться в ручном тестировании и применять опыт проверки своих веб-приложений. В геймдеве меня привлекает разнообразие пользовательских сценариев и возможность улучшать качество продукта для пользователей. Готов изучать особенности тестирования игр и начинать с задач уровня Junior."
     if any(x in q for x in ("английск", "english", "уровень языка")):
         return "B1 (Intermediate): читаю техническую документацию и могу базово общаться в команде."
     if any(x in q for x in ("город", "где вы жив", "где прожива", "локац")):
