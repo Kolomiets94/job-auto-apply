@@ -80,11 +80,18 @@ def test_entry_level_layout_without_junior_title():
     assert not rank_lead({**base, "requirements": "SQL required"})["eligible"]
 
 
-def test_office_location_policy():
+def test_office_roles_are_excluded_even_in_yekaterinburg():
     base = {"source": "hh", "title": "Junior React Developer офис", "description": "React TypeScript"}
-    assert rank_lead({**base, "location": "Екатеринбург"})["eligible"]
+    assert not rank_lead({**base, "location": "Екатеринбург"})["eligible"]
     assert not rank_lead({**base, "location": "Санкт-Петербург"})["eligible"]
-    assert not rank_lead({"source": "hh", "title": "Junior QA Engineer", "location": "Санкт-Петербург", "description": "Работа только в офисе. Manual QA"})["eligible"]
+    assert not rank_lead({"source": "hh", "title": "Junior QA Engineer", "location": "Екатеринбург", "description": "Работа только в офисе. Manual QA"})["eligible"]
+
+
+def test_hybrid_roles_are_allowed_only_in_yekaterinburg():
+    base = {"source": "hh", "title": "Junior React Developer", "description": "React TypeScript",
+            "work_mode": "HYBRID"}
+    assert rank_lead({**base, "location": "Екатеринбург"})["eligible"]
+    assert not rank_lead({**base, "location": "Москва"})["eligible"]
 
 
 def test_layout_requires_entry_level_signal_and_rejects_senior_experience():
