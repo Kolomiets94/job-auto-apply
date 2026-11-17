@@ -174,6 +174,18 @@ def run_scheduled():
     print("[scheduled] claimed", slot, flush=True)
     return jsonify({"status": "started", "hour_utc": slot}), 202
 
+
+@app.get("/health/hh-session")
+def hh_session_health():
+    """Read-only, token-protected HH session diagnostic; no application is submitted."""
+    if not _authorized():
+        return jsonify({"error": "unauthorized"}), 401
+    from browser_apply import diagnose_hh_session
+    result = diagnose_hh_session()
+    response = jsonify(result)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
 @app.get("/health/db")
 def database_health():
     if not _authorized():
