@@ -193,7 +193,11 @@ def _work_mode(lead: Dict[str, Any]) -> str:
     if re.search(office_pattern, text):
         return "office"
 
-    if str(lead.get("source") or "").lower() in REMOTE_ONLY_SOURCES:
+    source = str(lead.get("source") or "").lower()
+    # Legacy HH queue entries were collected with schedule=remote before the
+    # work_mode field was added. Current hybrid/office HH results carry an
+    # explicit structured format and are handled above.
+    if source == "hh" or source in FREELANCE_SOURCES or source in REMOTE_ONLY_SOURCES:
         return "remote"
     return "unknown"
 
