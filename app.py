@@ -186,6 +186,25 @@ def hh_session_health():
     response.headers["Cache-Control"] = "no-store"
     return response
 
+
+def _run_startup_hh_diagnostic():
+    """Run a read-only HH session check after Gunicorn imports the app."""
+    try:
+        from browser_apply import diagnose_hh_session
+        result = diagnose_hh_session()
+        # Only safe boolean/status fields are emitted; never log session material.
+        app.logger.info(
+            "HH session diagnostic: configured=%s valid_json=%s authenticated=%s status=%s",
+            result.get("configured"), result.get("valid_json"),
+            result.get("authenticated"), result.get("status"),
+        )
+    except Exception as exc:
+        app.logger.warning("HH session diagnostic failed: %s", type(exc).__name__)
+
+
+# Run independently so a slow HH response does not block service startup.
+threading.Thread(target=_run_startup_hh_diagnostic, name="hh-session-diagnostic", daemon=True).start()
+
 @app.get("/health/db")
 def database_health():
     if not _authorized():
