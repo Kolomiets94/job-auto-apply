@@ -69,26 +69,23 @@ def test_remote_job_requires_phone_before_browser_launch(monkeypatch):
     assert result == {"status": "NEEDS_HUMAN", "reason": "remote_job_identity_missing"}
 
 
-def test_hh_university_enrollment_question_answer():
-    question = "Вы сейчас проходите обучение в вузе? Если да, какая форма обучения (очная/заочная; дневная/вечерняя)?"
-    assert browser_apply._known_question_answer(question, "qa") == "Нет, сейчас не учусь в вузе."
+def test_hh_education_question_is_not_guessed():
+    question = "Вы сейчас проходите обучение в вузе? Если да, какая форма обучения?"
+    assert browser_apply._known_question_answer(question, "frontend") is None
 
 
 def test_hh_unrelated_employer_question_remains_unanswered():
     assert browser_apply._known_question_answer("Какой у вас любимый цвет?", "qa") is None
 
 
-def test_hh_full_time_employment_question_answer():
+def test_hh_employment_preference_question_is_not_guessed():
     question = "Вы ищете работу с полной или частичной занятостью?"
-    assert browser_apply._known_question_answer(question, "qa") == "Ищу работу с полной занятостью."
+    assert browser_apply._known_question_answer(question, "frontend") is None
 
 
-def test_hh_gamedev_motivation_authorized_by_candidate():
+def test_hh_role_motivation_question_is_not_guessed():
     question = "Почему вы хотите работать в геймдеве? писать тут"
-    answer = browser_apply._known_question_answer(question, "qa")
-    assert answer and "своих веб-приложений" in answer
-    assert browser_apply._known_question_answer("Какой у вас коммерческий опыт в геймдеве?", "qa").startswith("Коммерческого опыта пока нет.")
-    assert browser_apply._known_question_answer("Почему вы хотите работать в геймдеве?", "frontend") is None
+    assert browser_apply._known_question_answer(question, "qa") is None
 
 
 def test_choice_question_reads_outer_container_when_nearest_is_empty():
