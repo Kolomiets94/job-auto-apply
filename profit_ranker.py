@@ -143,7 +143,7 @@ def _location_rejected(lead: Dict[str, Any], text: str) -> bool:
             "europe", "emea", "asia", "north america", "latin america", "americas",
         ))
         if location and not broad_location and not re.search(
-            r"\\brussia\\b|росси[яию]", location
+            r"\brussia\b|росси[яию]", location
         ):
             return True
 
