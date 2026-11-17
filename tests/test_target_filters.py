@@ -22,7 +22,7 @@ def test_internship_requires_confirmed_payment():
 
 
 def test_required_sql_rejected_and_explicit_optional_sql_allowed():
-    base = {"source": "hh", "title": "Junior React Developer", "description": "React TypeScript"}
+    base = {"source": "hh", "title": "Junior React Developer", "description": "React TypeScript", "work_mode": "REMOTE"}
     assert not rank_lead({**base, "requirements": "SQL required"})["eligible"]
     assert not rank_lead({**base, "requirements": "Знание SQL"})["eligible"]
     assert rank_lead({**base, "requirements": "SQL будет плюсом"})["eligible"]
@@ -50,7 +50,7 @@ def test_junior_web_developer_in_moscow_is_frontend():
 
 
 def test_junior_title_does_not_override_experience_range():
-    base = {"source": "hh", "title": "Junior React Developer", "description": "React TypeScript"}
+    base = {"source": "hh", "title": "Junior React Developer", "description": "React TypeScript", "work_mode": "REMOTE"}
     for experience in ("3–6 лет", "3-6 лет", "2 года", "от 3 лет", "3 years"):
         result = rank_lead({**base, "experience": experience})
         assert (result["eligible"] if experience in ("2 года",) else not result["eligible"]), experience
@@ -81,7 +81,7 @@ def test_entry_level_layout_without_junior_title():
 
 
 def test_work_format_policy_is_remote_everywhere_and_hybrid_only_in_yekaterinburg():
-    base = {"source": "hh", "title": "Junior React Developer", "description": "React TypeScript"}
+    base = {"source": "hh", "title": "Junior React Developer", "description": "React TypeScript", "work_mode": "REMOTE"}
     assert rank_lead({**base, "work_mode": "REMOTE", "location": "Москва"})["eligible"]
     assert rank_lead({**base, "work_format": [{"id": "HYBRID", "name": "Гибридный формат"}],
                       "location": "Екатеринбург"})["eligible"]
