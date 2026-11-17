@@ -25,7 +25,7 @@ def _send_email(lead, proposal):
     if not email:
         return None
 
-    if not re.fullmatch(r"[^\\s@,;<>]+@[^\\s@,;<>]+\\.[^\\s@,;<>]+", str(email)):
+    if not re.fullmatch(r"[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+", str(email)):
         return {"status": "NEEDS_CONFIRMATION", "reason": "invalid_application_email"}
 
     if os.getenv("AUTO_SEND_EMAIL", "0") != "1":
@@ -42,7 +42,7 @@ def _send_email(lead, proposal):
     msg["To"] = email
     prefix = "Application" if lead.get("language") == "en" else "Отклик"
     msg["Subject"] = f"{prefix}: {lead.get('title', 'проект')}"
-    msg.set_content(proposal + "\\n\\nGitHub: https://github.com/Kolomiets94\\n"
+    msg.set_content(proposal + "\n\nGitHub: https://github.com/Kolomiets94\n"
                     + str(lead.get("url") or ""))
 
     with smtplib.SMTP_SSL(
