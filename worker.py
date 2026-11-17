@@ -20,7 +20,7 @@ from notification_rules import format_notification, should_notify
 from telegram_notifier import send_message, send_notification
 from publication_filter import is_new_publication
 
-DEFAULT_RESUME_TEXT = """Junior Frontend Developer. React, TypeScript, JavaScript ES6+, Redux Toolkit, React Router, REST API, HTML5, CSS3, SCSS, Git, Figma, Vite, Webpack, responsive and cross-browser layout. Projects include authentication, protected routes, CRUD, API integration, debounce search, validation and error handling. Manual testing of own web applications. English B1. Remote work."""
+DEFAULT_RESUME_TEXT = """Junior Frontend Developer. React, TypeScript, JavaScript ES6+, Redux Toolkit, React Router, REST API, HTML5, CSS3, SCSS, Git, Figma, Vite, Webpack, responsive and cross-browser layout. Personal project work since August 2024 includes authentication, protected routes, CRUD, API integration, debounce search, validation and error handling. English B1. Remote work."""
 
 
 def load_resume_text():
@@ -587,7 +587,7 @@ def run():
     for lead in freelance_review:
         message = format_notification(lead)
         if not message or lead.get("url") not in message:
-            message = f"Фриланс-заказ: {str(lead.get('title') or 'Заказ')[:100]}\\n{lead['url']}\\nОтклик не отправлен."
+            message = f"Фриланс-заказ: {str(lead.get('title') or 'Заказ')[:100]}\n{lead['url']}\nОтклик не отправлен."
         try:
             delivery = send_message(message)
             freelance_review_delivery.append({"title": lead.get("title"), **delivery})
@@ -780,13 +780,13 @@ def run():
         "Приоритет: вакансии. Фриланс — только если подходящих вакансий нет."
     )
     if ranked_jobs:
-        summary_message += "\\n\\nПодходящие вакансии:"
+        summary_message += "\n\nПодходящие вакансии:"
         for lead in ranked_jobs[:5]:
-            summary_message += f"\\n- {str(lead.get('title') or 'Вакансия')[:90]} [{lead.get('source') or '?'}]\\n{lead.get('url') or ''}"
+            summary_message += f"\n- {str(lead.get('title') or 'Вакансия')[:90]} [{lead.get('source') or '?'}]\n{lead.get('url') or ''}"
     elif freelance_review:
-        summary_message += "\\n\\nФриланс — резервный вариант:"
+        summary_message += "\n\nФриланс — резервный вариант:"
         for lead in freelance_review[:5]:
-            summary_message += f"\\n- {str(lead.get('title') or 'Заказ')[:90]} [{lead.get('source') or '?'}]\\n{lead.get('url') or ''}"
+            summary_message += f"\n- {str(lead.get('title') or 'Заказ')[:90]} [{lead.get('source') or '?'}]\n{lead.get('url') or ''}"
     try:
         summary_delivery = send_message(summary_message)
     except Exception as exc:
