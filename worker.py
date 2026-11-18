@@ -20,6 +20,7 @@ from queue_store import enqueue, enqueue_many, set_state, submitted_today, submi
 from notification_rules import format_notification, should_notify
 from telegram_notifier import send_message, send_notification
 from publication_filter import is_new_publication
+from direct_outreach import build_outreach_drafts
 
 DEFAULT_RESUME_TEXT = """Junior Frontend Developer. React, TypeScript, JavaScript ES6+, Redux Toolkit, React Router, REST API, HTML5, CSS3, SCSS, Git, Figma, Vite, Webpack, responsive and cross-browser layout. Personal project work since August 2024 includes authentication, protected routes, CRUD, API integration, debounce search, validation and error handling. English B1. Remote work."""
 
@@ -597,6 +598,8 @@ def run():
     )[:10]
     stats['job_ranked'] = len(ranked_jobs)
     stats['job_actionable'] = sum(_application_priority(lead) == 0 for lead in ranked_jobs)
+    outreach_drafts = build_outreach_drafts(job_review, limit=5)
+    stats["outreach_drafts_prepared"] = len(outreach_drafts)
     if job_review:
         lines = ['Вакансии Junior Frontend / вёрстка / QA — Россия и мир:',
                  'Ссылки на вакансии; отправка откликов здесь не подтверждается.']
@@ -821,6 +824,16 @@ def run():
         summary_message += "\n\nПодходящие вакансии:"
         for lead in ranked_jobs[:5]:
             summary_message += f"\n- {str(lead.get('title') or 'Вакансия')[:90]} [{lead.get('source') or '?'}] — ATS {lead.get('ats_score', 'н/д')}/100 ({lead.get('ats_verdict', 'н/д')})\n{lead.get('url') or ''}"
+        if outreach_drafts:
+            summary_message += "\n\nПрямой контакт с компаниями — ЧЕРНОВИКИ, НЕ ОТПРАВЛЕНЫ:"
+            for draft in outreach_drafts:
+                summary_message += (
+                    f"\n\n{draft['company']} — {draft['title']}"
+                    f"\nКонтакт руководителя: {draft['people_search_url']}"
+                    f"\nСайт/контакты компании: {draft['company_search_url']}"
+                    f"\nВакансия: {draft['vacancy_url']}"
+                    f"\nТекст сообщения: {draft['message_draft']}"
+                )
     elif freelance_review:
         summary_message += "\n\nФриланс — резервный вариант:"
         for lead in freelance_review[:5]:
