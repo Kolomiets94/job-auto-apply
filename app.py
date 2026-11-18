@@ -19,9 +19,35 @@ def _authorized():
 
 
 def _scheduler_authorized():
-    expected = os.getenv("SCHEDULER_TOKEN", "").strip()
+    """Authenticate scheduled calls with GitHub Actions OIDC, not a shared secret."""
     provided = request.headers.get("Authorization", "")
-    return bool(expected) and hmac.compare_digest(provided, "Bearer " + expected)
+    if not provided.startswith("Bearer "):
+        return False
+    token = provided[7:].strip()
+    if not token:
+        return False
+    try:
+        import jwt
+        from jwt import PyJWKClient
+        jwks = PyJWKClient("https://token.actions.githubusercontent.com/.well-known/jwks")
+        signing_key = jwks.get_signing_key_from_jwt(token).key
+        claims = jwt.decode(
+            token,
+            signing_key,
+            algorithms=["RS256"],
+            audience="https://job-freelance-hunter.onrender.com/run/scheduled",
+            issuer="https://token.actions.githubusercontent.com",
+        )
+        return (
+            claims.get("repository") == "Kolomiets94/job-auto-apply"
+            and claims.get("ref") == "refs/heads/main"
+            and claims.get("workflow_ref") ==
+                "Kolomiets94/job-auto-apply/.github/workflows/hourly-job-hunter.yml@refs/heads/main"
+            and claims.get("event_name") in ("schedule", "workflow_dispatch")
+        )
+    except Exception:
+        app.logger.warning("Scheduled request rejected: invalid GitHub OIDC token")
+        return False
 
 
 @app.get("/")
