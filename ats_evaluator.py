@@ -254,7 +254,7 @@ def build_filter_report(leads):
     items = list(leads or [])
     if not items:
         return (
-            "ФИЛЬТРЫ JOB AUTO APPLY\\n"
+            "ФИЛЬТРЫ JOB AUTO APPLY\n"
             "Нет вакансий для анализа фильтров в этой выборке."
         )
 
@@ -318,4 +318,4 @@ def build_filter_report(leads):
         "не приписывать коммерческий опыт или отсутствующие технологии.",
         "- Внутренний ранкер показывает первую причину отказа, а не окончательный вердикт работодателя.",
     ])
-    return "\\n".join(lines)
+    return "\n".join(lines)
