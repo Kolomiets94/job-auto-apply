@@ -20,7 +20,7 @@ jobs:
       - name: Trigger draft-only report
         env:
           SCHEDULER_TOKEN: ${{ secrets.SCHEDULER_TOKEN }}
-          SERVICE_URL: https://job-auto-apply-5wmf.onrender.com
+          SERVICE_URL: https://job-freelance-hunter.onrender.com
         run: |
           set -euo pipefail
           if [ -z "${SCHEDULER_TOKEN}" ]; then
