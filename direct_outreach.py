@@ -1,4 +1,4 @@
-""""Public-source, draft-only direct outreach research helpers.
+"""Public-source, draft-only direct outreach research helpers.
 
 The module never guesses a person's identity/email and never sends messages.
 It generates targeted public search links and a short draft with explicit
@@ -56,7 +56,7 @@ def build_outreach_draft(lead):
         f"Увидел ваш материал о {evidence}. "
         if evidence else
         f"Увидел вакансию «{title}» в {company}. "
-        "Изучаю вашу команду и хочу обратиться по делу. "
+        "изучаю вашу команду и хочу обратиться по делу. "
     )
     proof = f"Мои релевантные навыки: {skills_text}. " if skills_text else ""
     portfolio_line = f"Мой проект/портфолио: {portfolio}. " if portfolio else (
