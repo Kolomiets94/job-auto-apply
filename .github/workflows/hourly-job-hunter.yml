@@ -1,15 +1,15 @@
-name: Daily evening job hunter
+name: Job hunter — every 3 hours
 
 on:
   schedule:
-    - cron: "0 16 * * *"
+    - # Every 3 hours; GitHub cron uses UTC (Yekaterinburg is UTC+5).\n    - cron: "0 */3 * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: daily-evening-job-hunter
+  group: job-hunter-every-3-hours
   cancel-in-progress: false
 
 jobs:
@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Trigger the daily evening draft-only run
+      - name: Trigger the scheduled draft-only run and ATS market report
         env:
           SCHEDULER_TOKEN: ${{ secrets.SCHEDULER_TOKEN }}
         run: |
