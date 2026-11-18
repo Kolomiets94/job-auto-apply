@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: job-hunter-scheduled-report
@@ -19,12 +20,15 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Trigger the scheduled draft-only run and ATS market report
-        env:
-          SCHEDULER_TOKEN: ${{ secrets.SCHEDULER_TOKEN }}
         run: |
-          test -n "$SCHEDULER_TOKEN" || { echo "Missing SCHEDULER_TOKEN repository secret"; exit 1; }
+          TOKEN_RESPONSE=$(curl --fail --silent --show-error \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https%3A%2F%2Fjob-freelance-hunter.onrender.com%2Frun%2Fscheduled")
+          OIDC_TOKEN=$(printf '%s' "$TOKEN_RESPONSE" | python -c 'import json,sys; print(json.load(sys.stdin)["value"])')
+          test -n "$OIDC_TOKEN" || { echo "Could not obtain GitHub OIDC token"; exit 1; }
+          echo "::add-mask::$OIDC_TOKEN"
           curl --fail-with-body --silent --show-error \
             --retry 2 --retry-delay 10 \
             -X POST \
-            -H "Authorization: Bearer $SCHEDULER_TOKEN" \
+            -H "Authorization: Bearer $OIDC_TOKEN" \
             "https://job-freelance-hunter.onrender.com/run/scheduled"
