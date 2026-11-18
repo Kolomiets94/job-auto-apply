@@ -53,3 +53,41 @@ def test_market_report_aggregates_reasons_and_actions():
 
 def test_market_report_handles_empty_batch():
     assert "нет вакансий" in build_market_report([])
+
+
+
+def test_filter_report_keeps_internal_reasons_separate():
+    from ats_evaluator import build_filter_report
+
+    leads = [
+        {
+            "title": "Junior React Frontend Developer",
+            "source": "hh",
+            "experience": "Без опыта",
+            "salary": {"from": 70000, "currency": "RUR"},
+            "description": "Удалённая работа. React, TypeScript.",
+        },
+        {
+            "title": "Junior React Frontend Developer",
+            "source": "hh",
+            "experience": "Без опыта",
+            "salary": {"from": 70000, "currency": "RUR"},
+            "work_mode": "office",
+            "description": "Работа в офисе. React, TypeScript.",
+        },
+        {
+            "title": "Junior React Frontend Developer",
+            "source": "hh",
+            "experience": "Без опыта",
+            "salary": {"from": 50000, "currency": "RUR"},
+            "description": "Удалённая работа. React, TypeScript.",
+        },
+    ]
+
+    report = build_filter_report(leads)
+
+    assert "Вакансий проверено внутренним ранкером: 3" in report
+    assert "Прошли внутренние фильтры: 1; исключены: 2." in report
+    assert "Офисный формат" in report
+    assert "Зарплата ниже внутреннего порога" in report
+    assert "первая сработавшая причина" in report
