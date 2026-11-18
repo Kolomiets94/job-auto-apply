@@ -18,14 +18,14 @@ def _authorized():
     return bool(expected) and hmac.compare_digest(provided, "Bearer " + expected)
 
 
-def _scheduler_authorized():
-    """Authenticate scheduled calls with GitHub Actions OIDC, not a shared secret."""
+def _scheduler_claims():
+    """Return verified GitHub Actions OIDC claims for this repository/workflow."""
     provided = request.headers.get("Authorization", "")
     if not provided.startswith("Bearer "):
-        return False
+        return None
     token = provided[7:].strip()
     if not token:
-        return False
+        return None
     try:
         import jwt
         from jwt import PyJWKClient
@@ -38,16 +38,17 @@ def _scheduler_authorized():
             audience="https://job-freelance-hunter.onrender.com/run/scheduled",
             issuer="https://token.actions.githubusercontent.com",
         )
-        return (
+        valid = (
             claims.get("repository") == "Kolomiets94/job-auto-apply"
             and claims.get("ref") == "refs/heads/main"
             and claims.get("workflow_ref") ==
                 "Kolomiets94/job-auto-apply/.github/workflows/hourly-job-hunter.yml@refs/heads/main"
             and claims.get("event_name") in ("schedule", "workflow_dispatch")
         )
+        return claims if valid else None
     except Exception:
         app.logger.warning("Scheduled request rejected: invalid GitHub OIDC token")
-        return False
+        return None
 
 
 @app.get("/")
@@ -99,14 +100,24 @@ def run_scheduled():
     The endpoint is intentionally draft-only until live sending, persistent
     storage, and the application channels have been reviewed together.
     """
-    if not _scheduler_authorized():
+    claims = _scheduler_claims()
+    if not claims:
         return jsonify({"error": "unauthorized"}), 401
     if os.getenv("DRY_RUN", "").strip().lower() not in ("1", "true", "yes"):
         return jsonify({"error": "draft_mode_required"}), 409
     if not os.getenv("DATABASE_URL", "").strip():
         return jsonify({"error": "persistent_database_required"}), 503
 
-    slot = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H")
+    hour_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H")
+    if claims.get("event_name") == "workflow_dispatch":
+        run_id = str(claims.get("run_id") or "").strip()
+        run_attempt = str(claims.get("run_attempt") or "").strip()
+        if not run_id.isdigit() or not run_attempt.isdigit():
+            return jsonify({"error": "manual_run_identity_missing"}), 401
+        slot = f"manual:{run_id}:{run_attempt}"
+    else:
+        slot = hour_utc
+        run_id = ""
     try:
         from queue_store import _db
         with _db() as connection:
@@ -152,7 +163,10 @@ def run_scheduled():
 
     threading.Thread(target=work, name="hunter-scheduled", daemon=True).start()
     print("[scheduled] claimed", slot, flush=True)
-    return jsonify({"status": "started", "hour_utc": slot}), 202
+    response = {"status": "started", "hour_utc": hour_utc}
+    if run_id:
+        response["run_id"] = run_id
+    return jsonify(response), 202
 
 @app.get("/health/db")
 def database_health():
