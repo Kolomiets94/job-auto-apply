@@ -12,7 +12,7 @@ from freelance_sources import (
 )
 from freelancehunt_adapter import collect_freelancehunt
 from job_matcher import JobMatcher
-from ats_evaluator import review_lead, build_market_report
+from ats_evaluator import review_lead, build_market_report, build_filter_report
 from profit_ranker import rank_leads, FREELANCE_SOURCES, ROLE_PRIORITY, _role_category
 from proposal_writer import make_proposal
 from application_dispatcher import dispatch
