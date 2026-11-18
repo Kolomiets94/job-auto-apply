@@ -1,15 +1,16 @@
-name: Daily evening job hunter
+name: Job hunter — every 3 hours (08:00–20:00 Yekaterinburg)
 
 on:
   schedule:
-    - cron: "0 16 * * *"
+    # Yekaterinburg is UTC+5: 03, 06, 09, 12, 15 UTC = 08, 11, 14, 17, 20 local.
+    - cron: "0 3,6,9,12,15 * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: daily-evening-job-hunter
+  group: job-hunter-every-3-hours
   cancel-in-progress: false
 
 jobs:
@@ -17,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Trigger the daily evening draft-only run
+      - name: Trigger the scheduled draft-only run and ATS market report
         env:
           SCHEDULER_TOKEN: ${{ secrets.SCHEDULER_TOKEN }}
         run: |
