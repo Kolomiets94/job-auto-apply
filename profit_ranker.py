@@ -418,6 +418,6 @@ def rank_leads(leads):
     # Within the same role, keep the strongest fit/profit score first.
     return sorted(
         eligible,
-        key=lambda x: (x.get("role_priority", 99), -x.get("profit_score", 0)),
+        key=lambda x: (x.get("role_priority", 99), -x.get("ats_score", 0), -x.get("profit_score", 0)),
     )
 
