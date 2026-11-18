@@ -36,7 +36,7 @@ def build_market_report(leads):
     total = len(items)
     if not total:
         return (
-            "ATS-АНАЛИЗ РЫНКА\\n"
+            "ATS-АНАЛИЗ РЫНКА\n"
             "В этой выборке нет вакансий с рассчитанным ATS-анализом. "
             "Проверь наличие текста резюме и описаний вакансий."
         )
@@ -124,7 +124,7 @@ def build_market_report(leads):
         f"Распределение: сильное совпадение — {strong}, проверить вручную — {review}, слабое совпадение — {weak}.",
         "Важно: это анализ текста вакансий и резюме, а не доступ к закрытым ATS работодателей и не гарантия отказа.",
     ])
-    return "\\n".join(lines)
+    return "\n".join(lines)
 
 
 ROLE_TERMS = ("frontend", "front-end", "front end", "react", "фронтенд", "фронтэнд", "веб-разработчик")
