@@ -244,3 +244,78 @@ def review_lead(lead, resume_text):
         "ats_commercial_gap": any("коммерческий опыт" in flag.lower() for flag in hard_gaps),
         "ats_method": "transparent_heuristic_v1",
     }
+
+
+def build_filter_report(leads):
+    """Report Job Auto Apply's own primary exclusion reasons separately from ATS."""
+    from collections import Counter
+    from profit_ranker import rank_lead
+
+    items = list(leads or [])
+    if not items:
+        return (
+            "ФИЛЬТРЫ JOB AUTO APPLY\\n"
+            "Нет вакансий для анализа фильтров в этой выборке."
+        )
+
+    reasons = Counter()
+    passed = 0
+    for lead in items:
+        decision = rank_lead(lead)
+        if decision.get("eligible"):
+            passed += 1
+        else:
+            reasons[str(decision.get("rank_reason") or "unknown")] += 1
+
+    labels = {
+        "internship/trainee excluded": "Стажировка/trainee исключена текущими правилами",
+        "non-target QA role": "QA не входит в основной целевой профиль",
+        "excluded job title": "Исключённый уровень или тип должности",
+        "office/on-site roles are excluded": "Офисный формат",
+        "hybrid is allowed only in Yekaterinburg": "Гибрид не в Екатеринбурге",
+        "remote work format is not confirmed": "Удалённый формат не подтверждён",
+        "mandatory nonlocal relocation": "Обязательный переезд в другой город",
+        "mandatory unsupported stack": "Обязательный неподдерживаемый стек",
+        "SQL outside confirmed stack": "SQL вне подтверждённого стека",
+        "known stale vacancy (2023)": "Устаревшая вакансия",
+        "salary below configured floor": "Зарплата ниже внутреннего порога",
+        "explicit location/work-authorization restriction": "География или право на работу не подходят",
+        "non-target job title": "Нецелевая должность",
+        "job title outside target roles": "Название вне целевых Frontend/React ролей",
+        "experience from 3 years": "Требуется от 3 лет опыта",
+        "experience range above 3 years": "Вилка опыта выше 3 лет",
+        "three years required": "Требуется 3 года опыта",
+        "experience above 3 years": "Требуется более 3 лет опыта",
+        "layout entry level not confirmed": "Для вёрстки не подтверждён начальный уровень",
+        "not Junior or 0-3 years": "Не подтверждён Junior / диапазон 0–3 года",
+        "freelance title outside demonstrated stack": "Фриланс-задача вне подтверждённого стека",
+        "freelance title requires unsupported technology": "Фриланс требует неподдерживаемую технологию",
+        "freelance project too complex/out of scope": "Фриланс-задача слишком сложная или вне профиля",
+    }
+    lines = [
+        "ФИЛЬТРЫ JOB AUTO APPLY — ОТДЕЛЬНЫЙ АНАЛИЗ",
+        f"Вакансий проверено внутренним ранкером: {len(items)}",
+        f"Прошли внутренние фильтры: {passed}; исключены: {len(items) - passed}.",
+        "Ниже указана первая сработавшая причина по порядку правил rank_lead; "
+        "это не полный список всех возможных проблем одной вакансии.",
+        "Причины этого раздела не смешиваются с ATS-пробелами; одна вакансия может "
+        "одновременно пройти внутренние фильтры и иметь ATS-пробелы, или наоборот.",
+        "",
+        "ОСНОВНЫЕ ПРИЧИНЫ ИСКЛЮЧЕНИЯ:",
+    ]
+    if not reasons:
+        lines.append("В этой выборке внутренние фильтры не исключили ни одной вакансии.")
+    else:
+        for number, (reason, count) in enumerate(reasons.most_common(8), 1):
+            label = labels.get(reason, reason)
+            lines.append(f"{number}. {label} — {count} вакансий ({count * 100.0 / len(items):.1f}%).")
+    lines.extend([
+        "",
+        "Как трактовать результат:",
+        "- Зарплата ниже порога — можно пересмотреть только если пользователь изменит нижнюю границу.",
+        "- Офис/неподходящий гибрид/география — не исправляется формулировкой резюме.",
+        "- Недостаточный Junior-сигнал или неподдерживаемый обязательный стек — проверять описание вручную; "
+        "не приписывать коммерческий опыт или отсутствующие технологии.",
+        "- Внутренний ранкер показывает первую причину отказа, а не окончательный вердикт работодателя.",
+    ])
+    return "\\n".join(lines)
