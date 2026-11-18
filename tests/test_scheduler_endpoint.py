@@ -8,7 +8,7 @@ import queue_store
 
 def test_scheduled_trigger_is_authenticated_draft_only_and_idempotent(monkeypatch, tmp_path):
     path = tmp_path / "scheduled.db"
-    monkeypatch.setenv("SCHEDULER_TOKEN", "test-secret")
+    monkeypatch.setattr(service, "_scheduler_authorized", lambda: service.request.headers.get("Authorization") == "Bearer test-secret")
     monkeypatch.setenv("DATABASE_URL", "configured-for-test")
     monkeypatch.setenv("DRY_RUN", "1")
     monkeypatch.setattr(queue_store, "_db", lambda: sqlite3.connect(path))
@@ -37,7 +37,7 @@ def test_scheduled_trigger_is_authenticated_draft_only_and_idempotent(monkeypatc
 
 
 def test_scheduled_trigger_requires_persistent_storage(monkeypatch):
-    monkeypatch.setenv("SCHEDULER_TOKEN", "test-secret")
+    monkeypatch.setattr(service, "_scheduler_authorized", lambda: service.request.headers.get("Authorization") == "Bearer test-secret")
     monkeypatch.setenv("DRY_RUN", "1")
     monkeypatch.delenv("DATABASE_URL", raising=False)
     response = service.app.test_client().post(
