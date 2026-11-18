@@ -12,7 +12,7 @@ from freelance_sources import (
 )
 from freelancehunt_adapter import collect_freelancehunt
 from job_matcher import JobMatcher
-from ats_evaluator import review_lead
+from ats_evaluator import review_lead, build_market_report
 from profit_ranker import rank_leads, FREELANCE_SOURCES, ROLE_PRIORITY, _role_category
 from proposal_writer import make_proposal
 from application_dispatcher import dispatch
@@ -815,6 +815,7 @@ def run():
         f"Ошибок: {stats['failed']}\n"
         "Вакансии — приоритет. Фриланс используется только если подходящих вакансий нет."
     )
+    summary_message += "\n\n" + build_market_report(job_leads)
     if ranked_jobs:
         summary_message += "\n\nПодходящие вакансии:"
         for lead in ranked_jobs[:5]:
