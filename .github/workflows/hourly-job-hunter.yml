@@ -1,16 +1,16 @@
-name: Job hunter — every 3 hours (08:00–20:00 Yekaterinburg)
+name: Job hunter — reports at 08:00, 10:00, 12:00, 14:00, 16:00 Yekaterinburg
 
 on:
   schedule:
-    # Yekaterinburg is UTC+5: 03, 06, 09, 12, 15 UTC = 08, 11, 14, 17, 20 local.
-    - cron: "0 3,6,9,12,15 * * *"
+    # Yekaterinburg is UTC+5: 03, 05, 07, 09, 11 UTC = 08, 10, 12, 14, 16 local.
+    - cron: "0 3,5,7,9,11 * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: job-hunter-every-3-hours
+  group: job-hunter-scheduled-report
   cancel-in-progress: false
 
 jobs:
@@ -27,4 +27,4 @@ jobs:
             --retry 2 --retry-delay 10 \
             -X POST \
             -H "Authorization: Bearer $SCHEDULER_TOKEN" \
-            "https://job-auto-apply-5wmf.onrender.com/run/scheduled"
+            "https://job-freelance-hunter.onrender.com/run/scheduled"
