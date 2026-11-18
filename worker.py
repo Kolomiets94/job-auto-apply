@@ -816,6 +816,7 @@ def run():
         "Вакансии — приоритет. Фриланс используется только если подходящих вакансий нет."
     )
     summary_message += "\n\n" + build_market_report(job_leads)
+    summary_message += "\n\n" + build_filter_report(job_leads)
     if ranked_jobs:
         summary_message += "\n\nПодходящие вакансии:"
         for lead in ranked_jobs[:5]:
