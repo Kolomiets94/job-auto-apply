@@ -1,4 +1,4 @@
-"""Public-source, draft-only direct outreach research helpers.
+""""Public-source, draft-only direct outreach research helpers.
 
 The module never guesses a person's identity/email and never sends messages.
 It generates targeted public search links and a short draft with explicit
@@ -52,8 +52,6 @@ def build_outreach_draft(lead):
         f"https://hunter.io/search/{quote_plus(domain)}" if domain else ""
     )
 
-    # Never claim to have studied a product/project unless the lead contains
-    # a concrete, verified context string supplied by an upstream source.
     opening = (
         f"Увидел ваш материал о {evidence}. "
         if evidence else
@@ -77,6 +75,8 @@ def build_outreach_draft(lead):
         "vacancy_url": vacancy_url,
         "contact_priority": [item["priority"] for item in people_links],
         "people_search_links": people_links,
+        # Backwards-compatible alias for earlier consumers/tests.
+        "people_search_url": people_links[0]["url"],
         "github_people_search_url": github_url,
         "company_team_search_url": f"https://www.google.com/search?q={company_q}",
         "public_email_lookup_url": domain_search,
