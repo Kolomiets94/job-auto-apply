@@ -1,9 +1,9 @@
-name: Job hunter — every 3 hours
+name: Job hunter — every 3 hours (08:00–20:00 Yekaterinburg)
 
 on:
   schedule:
-    # GitHub Actions cron is UTC; this still runs at 3-hour intervals in Yekaterinburg.
-    - cron: "0 */3 * * *"
+    # Yekaterinburg is UTC+5: 03, 06, 09, 12, 15 UTC = 08, 11, 14, 17, 20 local.
+    - cron: "0 3,6,9,12,15 * * *"
   workflow_dispatch:
 
 permissions:
