@@ -224,7 +224,7 @@ def review_lead(lead, resume_text):
         "ats_role_match": role_match,
         "ats_junior_match": junior_match,
         "ats_project_evidence": project_evidence,
-        "ats_experience_gap": any("опыте вакансии указано" in flag or "указан опыт от" in flag for flag in hard_gaps),
-        "ats_commercial_gap": any("коммерческий опыт" in flag for flag in hard_gaps),
+        "ats_experience_gap": any("опыте вакансии указано" in flag.lower() or "указан опыт от" in flag.lower() for flag in hard_gaps),
+        "ats_commercial_gap": any("коммерческий опыт" in flag.lower() for flag in hard_gaps),
         "ats_method": "transparent_heuristic_v1",
     }
