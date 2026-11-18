@@ -26,3 +26,31 @@ def test_skips_unknown_company_and_deduplicates_companies():
     drafts = build_outreach_drafts(leads)
     assert [item["company"] for item in drafts] == ["Acme", "Beta"]
     assert all(item["sent"] is False for item in drafts)
+
+
+
+def test_decision_maker_hierarchy_and_public_research_links():
+    draft = build_outreach_draft({
+        "company": "Acme",
+        "company_domain": "acme.example",
+        "title": "Junior Backend Developer",
+        "personalization_evidence": "their public API launch",
+        "portfolio_url": "https://github.com/example/project",
+    })
+    assert draft["contact_priority"][0] == "Engineering Manager / Team Lead"
+    assert "CTO / Founder (small companies)" in draft["contact_priority"]
+    assert "github.com/search" in draft["github_people_search_url"]
+    assert "hunter.io/search" in draft["public_email_lookup_url"]
+    assert "public API launch" in draft["message_draft"]
+    assert "https://github.com/example/project" in draft["message_draft"]
+    assert draft["email_verified"] is False
+    assert draft["sent"] is False
+
+
+def test_does_not_invent_candidate_stack_or_fake_personalization():
+    draft = build_outreach_draft({"company": "Acme", "title": "Junior Developer"})
+    assert "React" not in draft["message_draft"]
+    assert "изучаю вашу команду" in draft["message_draft"]
+    assert "[найти конкретный продукт, PR или пост]" in draft["personalization_evidence"]
+    assert draft["follow_up_after_days"] == 7
+    assert draft["follow_up_limit"] == 1
