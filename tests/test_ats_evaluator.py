@@ -45,6 +45,10 @@ def test_market_report_aggregates_reasons_and_actions():
     assert "Работодатель просит коммерческий опыт" in report
     assert "Что сделать:" in report
     assert "не гарантия отказа" in report
+    assert "ПЛАН ДЕЙСТВИЙ:" in report
+    assert "Можно исправить сразу:" in report
+    assert "Нужно подтвердить проектом:" in report
+    assert "Нужно освоить дополнительно:" in report
 
 
 def test_market_report_handles_empty_batch():
