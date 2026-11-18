@@ -23,6 +23,7 @@ def test_review_lead_exposes_structured_gap_flags():
     assert reviewed["ats_experience_gap"] is True
     assert reviewed["ats_commercial_gap"] is True
     assert reviewed["ats_project_evidence"] is True
+    assert reviewed["ats_role_match"] is True
 
 
 def test_market_report_aggregates_reasons_and_actions():
