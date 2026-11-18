@@ -2,7 +2,8 @@ name: Job hunter — every 3 hours
 
 on:
   schedule:
-    - # Every 3 hours; GitHub cron uses UTC (Yekaterinburg is UTC+5).\n    - cron: "0 */3 * * *"
+    # GitHub Actions cron is UTC; this still runs at 3-hour intervals in Yekaterinburg.
+    - cron: "0 */3 * * *"
   workflow_dispatch:
 
 permissions:
