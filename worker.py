@@ -12,6 +12,7 @@ from freelance_sources import (
 )
 from freelancehunt_adapter import collect_freelancehunt
 from job_matcher import JobMatcher
+from ats_evaluator import review_lead
 from profit_ranker import rank_leads, FREELANCE_SOURCES, ROLE_PRIORITY, _role_category
 from proposal_writer import make_proposal
 from application_dispatcher import dispatch
@@ -151,7 +152,7 @@ def apply_resume_matching(leads, resume_text=None):
     if not resume_text:
         return leads
     matcher = JobMatcher()
-    return [matcher.score_lead(lead, resume_text) for lead in leads]
+    return [review_lead(matcher.score_lead(lead, resume_text), resume_text) for lead in leads]
 
 
 def is_freelance(lead):
@@ -817,7 +818,7 @@ def run():
     if ranked_jobs:
         summary_message += "\n\nПодходящие вакансии:"
         for lead in ranked_jobs[:5]:
-            summary_message += f"\n- {str(lead.get('title') or 'Вакансия')[:90]} [{lead.get('source') or '?'}]\n{lead.get('url') or ''}"
+            summary_message += f"\n- {str(lead.get('title') or 'Вакансия')[:90]} [{lead.get('source') or '?'}] — ATS {lead.get('ats_score', 'н/д')}/100 ({lead.get('ats_verdict', 'н/д')})\n{lead.get('url') or ''}"
     elif freelance_review:
         summary_message += "\n\nФриланс — резервный вариант:"
         for lead in freelance_review[:5]:
