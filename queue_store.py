@@ -55,6 +55,10 @@ def _db():
           id TEXT PRIMARY KEY, url TEXT, source TEXT, title TEXT, state TEXT,
           score INTEGER DEFAULT 0, payload TEXT, updated_at TEXT, submitted_at TEXT)""")
         conn.execute("ALTER TABLE leads ADD COLUMN IF NOT EXISTS submitted_at TEXT")
+        conn.execute("""CREATE TABLE IF NOT EXISTS outreach(
+          id TEXT PRIMARY KEY, company TEXT, opportunity_type TEXT, vacancy_url TEXT,
+          status TEXT, payload TEXT, created_at TEXT, updated_at TEXT,
+          contacted_at TEXT, replied_at TEXT, follow_up_at TEXT)""")
         conn.execute("""UPDATE leads SET submitted_at=updated_at
                         WHERE submitted_at IS NULL AND state IN ('SUBMITTED','REPLIED','WON')""")
         conn.commit()
@@ -63,6 +67,10 @@ def _db():
     c.execute("""CREATE TABLE IF NOT EXISTS leads(
       id TEXT PRIMARY KEY, url TEXT, source TEXT, title TEXT, state TEXT,
       score INTEGER DEFAULT 0, payload TEXT, updated_at TEXT, submitted_at TEXT)""")
+    c.execute("""CREATE TABLE IF NOT EXISTS outreach(
+      id TEXT PRIMARY KEY, company TEXT, opportunity_type TEXT, vacancy_url TEXT,
+      status TEXT, payload TEXT, created_at TEXT, updated_at TEXT,
+      contacted_at TEXT, replied_at TEXT, follow_up_at TEXT)""")
     try:
         c.execute("ALTER TABLE leads ADD COLUMN submitted_at TEXT")
     except Exception:
@@ -234,3 +242,74 @@ def list_queue(limit=100):
         ).fetchall()
     return [dict(x) for x in rows]
 
+
+
+OUTREACH_STATES = ("DRAFT", "CONTACTED", "REPLIED", "INTERVIEW", "REJECTED", "OFFER", "NO_RESPONSE", "SUPPRESSED")
+
+
+def _outreach_id(draft):
+    raw = "|".join(str(draft.get(k) or "").strip().casefold()
+                   for k in ("company", "opportunity_type", "vacancy_url"))
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def save_outreach_drafts(drafts):
+    """Persist deduplicated company outreach drafts without sending them."""
+    now = datetime.now(timezone.utc).isoformat()
+    ids = []
+    with _db() as c:
+        for draft in drafts:
+            oid = _outreach_id(draft)
+            ids.append(oid)
+            payload = json.dumps(draft, ensure_ascii=False)
+            c.execute("""INSERT OR IGNORE INTO outreach
+              (id,company,opportunity_type,vacancy_url,status,payload,created_at,updated_at)
+              VALUES(?,?,?,?,?,?,?,?)""",
+              (oid, draft.get("company"), draft.get("opportunity_type"),
+               draft.get("vacancy_url"), "DRAFT", payload, now, now))
+            # Refresh content only while it is still a draft; never reset a sent/replied record.
+            c.execute("""UPDATE outreach SET payload=?,updated_at=?
+                         WHERE id=? AND status='DRAFT'""", (payload, now, oid))
+    return ids
+
+
+def update_outreach_status(outreach_id, status, follow_up_days=7):
+    """Record a confirmed human/platform event; this function never sends messages."""
+    if status not in OUTREACH_STATES:
+        raise ValueError("invalid outreach status")
+    now = datetime.now(timezone.utc).isoformat()
+    follow_up = None
+    if status == "CONTACTED":
+        follow_up = (datetime.now(timezone.utc) + timedelta(days=max(1, min(int(follow_up_days), 30)))).isoformat()
+    with _db() as c:
+        c.execute("""UPDATE outreach SET status=?,updated_at=?,
+          contacted_at=CASE WHEN ?='CONTACTED' AND contacted_at IS NULL THEN ? ELSE contacted_at END,
+          replied_at=CASE WHEN ? IN ('REPLIED','INTERVIEW','REJECTED','OFFER') THEN ? ELSE replied_at END,
+          follow_up_at=CASE WHEN ?='CONTACTED' THEN ? ELSE follow_up_at END
+          WHERE id=?""", (status, now, status, now, status, now, status, follow_up, outreach_id))
+
+
+def list_outreach(limit=100, status=None):
+    """Return persisted outreach records, optionally filtered by lifecycle status."""
+    with _db() as c:
+        c.row_factory = sqlite3.Row
+        if status:
+            if status not in OUTREACH_STATES:
+                raise ValueError("invalid outreach status")
+            rows = c.execute("SELECT * FROM outreach WHERE status=? ORDER BY updated_at DESC LIMIT ?",
+                             (status, limit)).fetchall()
+        else:
+            rows = c.execute("SELECT * FROM outreach ORDER BY updated_at DESC LIMIT ?",
+                             (limit,)).fetchall()
+    return [dict(row) for row in rows]
+
+
+def due_outreach_followups(limit=100):
+    """List contacted companies whose one follow-up window has elapsed without a reply."""
+    now = datetime.now(timezone.utc).isoformat()
+    with _db() as c:
+        c.row_factory = sqlite3.Row
+        rows = c.execute("""SELECT * FROM outreach
+          WHERE status='CONTACTED' AND follow_up_at IS NOT NULL AND follow_up_at<=?
+          ORDER BY follow_up_at ASC LIMIT ?""", (now, limit)).fetchall()
+    return [dict(row) for row in rows]
