@@ -303,7 +303,7 @@ def update_outreach_status(outreach_id, status, follow_up_days=7, feedback_reaso
     if status == "CONTACTED":
         follow_up = (datetime.now(timezone.utc) + timedelta(days=max(1, min(int(follow_up_days), 30)))).isoformat()
     with _db() as c:
-        c.execute("""UPDATE outreach SET status=?,updated_at=?,
+        result = c.execute("""UPDATE outreach SET status=?,updated_at=?,
           contacted_at=CASE WHEN ?='CONTACTED' AND contacted_at IS NULL THEN ? ELSE contacted_at END,
           replied_at=CASE WHEN ? IN ('REPLIED','INTERVIEW','REJECTED','OFFER') THEN ? ELSE replied_at END,
           follow_up_at=CASE WHEN ?='CONTACTED' THEN ? ELSE follow_up_at END,
@@ -313,6 +313,7 @@ def update_outreach_status(outreach_id, status, follow_up_days=7, feedback_reaso
             status, now, status, now, status, now, status, follow_up,
             status, feedback_reason, status, feedback_reason, now, outreach_id,
         ))
+    return result.rowcount == 1
 
 
 def build_outcome_feedback_report(records=None):
