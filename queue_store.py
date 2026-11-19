@@ -331,7 +331,10 @@ def resolve_outreach_id(prefix):
         return None
     if len(rows) > 1:
         raise ValueError("ambiguous outreach id prefix")
-    return rows[0]["id"]
+    try:
+        return rows[0]["id"]
+    except (TypeError, KeyError, IndexError):
+        return rows[0][0]
 
 
 
