@@ -1,7 +1,10 @@
 import unittest
+import tempfile
+import os
 
 from direct_outreach import build_outreach_draft, build_outreach_drafts
-from profit_ranker import rank_lead\nfrom main import ok as hh_listing_is_eligible
+from profit_ranker import rank_lead
+from main import ok as hh_listing_is_eligible
 
 
 class PaidPlacementPolicyTests(unittest.TestCase):
@@ -17,7 +20,6 @@ class PaidPlacementPolicyTests(unittest.TestCase):
         })
         self.assertTrue(lead["eligible"], lead.get("rank_reason"))
         self.assertEqual(lead["opportunity_type"], "paid_placement")
-
 
     def test_hh_collection_keeps_paid_placement_and_rejects_unpaid(self):
         paid = {
@@ -36,7 +38,8 @@ class PaidPlacementPolicyTests(unittest.TestCase):
         self.assertTrue(hh_listing_is_eligible(paid))
         self.assertFalse(hh_listing_is_eligible(unpaid))
         self.assertTrue(hh_listing_is_eligible(junior))
-\n    def test_unpaid_or_unconfirmed_placement_is_rejected(self):
+
+    def test_unpaid_or_unconfirmed_placement_is_rejected(self):
         for description in ("Неоплачиваемая стажировка", "Стажировка, условия оплаты не указаны"):
             lead = rank_lead({
                 "title": "Frontend Developer Intern",
@@ -109,6 +112,31 @@ class PaidPlacementPolicyTests(unittest.TestCase):
             {"title": "Junior Frontend Developer", "company": "Example Labs"},
         ])
         self.assertEqual(len(drafts), 2)
+
+    def test_outreach_ledger_lifecycle_and_followup(self):
+        from queue_store import save_outreach_drafts, update_outreach_status, list_outreach, OUTREACH_STATES
+        with tempfile.TemporaryDirectory() as tmp:
+            old = os.environ.get("HUNTER_DB")
+            os.environ["HUNTER_DB"] = os.path.join(tmp, "test.db")
+            try:
+                draft = build_outreach_draft({
+                    "title": "Junior Frontend Developer",
+                    "company": "Example Labs",
+                    "url": "https://example.com/jobs/1",
+                })
+                oid = save_outreach_drafts([draft])[0]
+                self.assertEqual(list_outreach()[0]["status"], "DRAFT")
+                update_outreach_status(oid, "CONTACTED", follow_up_days=7)
+                self.assertEqual(list_outreach()[0]["status"], "CONTACTED")
+                update_outreach_status(oid, "REPLIED")
+                self.assertEqual(list_outreach()[0]["status"], "REPLIED")
+                with self.assertRaises(ValueError):
+                    update_outreach_status(oid, "INVALID")
+            finally:
+                if old is None:
+                    os.environ.pop("HUNTER_DB", None)
+                else:
+                    os.environ["HUNTER_DB"] = old
 
 
 if __name__ == "__main__":
