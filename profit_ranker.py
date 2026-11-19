@@ -102,6 +102,19 @@ def _explicit_salary_rejected(lead: Dict[str, Any]) -> bool:
 
 def _location_rejected(lead: Dict[str, Any], text: str) -> bool:
     source = str(lead.get("source") or "").lower()
+    # Explicit residence/right-to-work restrictions apply regardless of source.
+    # A Russian job board can still carry a vacancy limited to US/UK/EU residents.
+    all_location_text = f"{lead.get('location') or ''} {text}".lower()
+    restricted_foreign = re.search(
+        r"\\b(?:must reside in|must be located in|must live in|must be based in|"
+        r"residents? of|right to work in)\\b.{0,45}\\b(?:the\\s+)?(?:us|u\\.s\\.|united states|"
+        r"uk|united kingdom|eu|europe|canada|australia|new zealand|singapore)\\b|"
+        r"\\b(?:us only|u\\.s\\. only|uk only|eu only|europe only|canada only|"
+        r"australia only|new zealand only)\\b",
+        all_location_text,
+    )
+    if restricted_foreign:
+        return True
     if source in INTERNATIONAL_SOURCES and source not in FREELANCE_SOURCES:
         location = str(lead.get("location") or "").lower().strip()
         eligibility_text = f"{location} {text}".lower()
