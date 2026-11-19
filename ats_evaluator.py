@@ -188,7 +188,13 @@ def review_lead(lead, resume_text):
     )
     required_lines = [line.strip() for line in re.split(r"[\n.;]", description)
                      if required_pattern.search(line)]
+    required_missing = [
+        skill for skill in missing
+        if any(_contains(line.lower(), SKILL_ALIASES.get(skill, (skill,))) for line in required_lines)
+    ]
     hard_gaps = []
+    if required_missing:
+        hard_gaps.append("Не совпали явно обязательные навыки: " + ", ".join(required_missing) + ".")
     exp_text = _text(lead.get("experience")).lower()
     if re.search(r"(?:от|from|at least|minimum|min\.?)\s*[2-9]\s*(?:год|года|лет|years?)", exp_text):
         hard_gaps.append("В опыте вакансии указано от 2 лет; проектный опыт не равен коммерческому.")
@@ -235,10 +241,7 @@ def review_lead(lead, resume_text):
         "ats_matched_keywords": matched[:20],
         "ats_missing_keywords": missing[:20],
         "ats_required_lines": required_lines[:8],
-        "ats_required_missing_keywords": [
-            skill for skill in missing
-            if any(_contains(line.lower(), SKILL_ALIASES.get(skill, (skill,))) for line in required_lines)
-        ][:20],
+        "ats_required_missing_keywords": required_missing[:20],
         "ats_risk_flags": hard_gaps[:8],
         "ats_recruiter_note": recruiter_note,
         "ats_role_match": role_match,
