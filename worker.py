@@ -5,7 +5,7 @@ import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from job_sources import JOB_COLLECTORS
 
-from main import QUERIES, HYBRID_QUERIES, HHAccessUnavailable, hh_search, hh_search_hybrid, remoteok
+from main import QUERIES, HHAccessUnavailable, hh_search, remoteok
 from freelance_sources import (
     collect_freelance, collect_peopleperhour, collect_prolinker,
     collect_weblancer, collect_freelancer_com,
@@ -115,17 +115,7 @@ def collect_all():
                 # Avoid repeating a blocked API request for each search term.
                 break
 
-    # Hybrid roles are collected only from the dynamically resolved
-    # Yekaterinburg area; remote roles above remain nationwide.
-    for tag, query in HYBRID_QUERIES:
-        try:
-            matches = hh_search_hybrid(tag, query)
-            print(f"[collector] hh hybrid {tag} / {query}: {len(matches)} leads", flush=True)
-            leads += matches
-        except Exception as exc:
-            record_collection_error(f"hh_hybrid:{tag}:{query}", exc)
-            if isinstance(exc, HHAccessUnavailable):
-                break
+    # Fully remote only: do not spend HH requests on hybrid vacancies.
 
     try:
         leads += remoteok()
