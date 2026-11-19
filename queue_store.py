@@ -59,7 +59,10 @@ def _db():
         conn.execute("""CREATE TABLE IF NOT EXISTS outreach(
           id TEXT PRIMARY KEY, company TEXT, opportunity_type TEXT, vacancy_url TEXT,
           status TEXT, payload TEXT, created_at TEXT, updated_at TEXT,
-          contacted_at TEXT, replied_at TEXT, follow_up_at TEXT)""")
+          contacted_at TEXT, replied_at TEXT, follow_up_at TEXT,
+          feedback_reason TEXT, feedback_recorded_at TEXT)""")
+        conn.execute("ALTER TABLE outreach ADD COLUMN IF NOT EXISTS feedback_reason TEXT")
+        conn.execute("ALTER TABLE outreach ADD COLUMN IF NOT EXISTS feedback_recorded_at TEXT")
         conn.execute("""UPDATE leads SET submitted_at=updated_at
                         WHERE submitted_at IS NULL AND state IN ('SUBMITTED','REPLIED','WON')""")
         conn.commit()
@@ -71,7 +74,13 @@ def _db():
     c.execute("""CREATE TABLE IF NOT EXISTS outreach(
       id TEXT PRIMARY KEY, company TEXT, opportunity_type TEXT, vacancy_url TEXT,
       status TEXT, payload TEXT, created_at TEXT, updated_at TEXT,
-      contacted_at TEXT, replied_at TEXT, follow_up_at TEXT)""")
+      contacted_at TEXT, replied_at TEXT, follow_up_at TEXT,
+      feedback_reason TEXT, feedback_recorded_at TEXT)""")
+    for column, sql_type in (("feedback_reason", "TEXT"), ("feedback_recorded_at", "TEXT")):
+        try:
+            c.execute(f"ALTER TABLE outreach ADD COLUMN {column} {sql_type}")
+        except sqlite3.OperationalError:
+            pass
     try:
         c.execute("ALTER TABLE leads ADD COLUMN submitted_at TEXT")
     except Exception:
@@ -274,10 +283,21 @@ def save_outreach_drafts(drafts):
     return ids
 
 
-def update_outreach_status(outreach_id, status, follow_up_days=7):
-    """Record a confirmed human/platform event; this function never sends messages."""
+FEEDBACK_REASONS = (
+    "skills_gap", "experience_gap", "location_restriction", "work_authorization",
+    "language", "salary", "role_mismatch", "position_filled", "other",
+)
+
+
+def update_outreach_status(outreach_id, status, follow_up_days=7, feedback_reason=None):
+    """Record a confirmed human/platform event; never sends messages or stores raw replies."""
     if status not in OUTREACH_STATES:
         raise ValueError("invalid outreach status")
+    if feedback_reason is not None:
+        if status != "REJECTED":
+            raise ValueError("feedback_reason is only valid for REJECTED status")
+        if feedback_reason not in FEEDBACK_REASONS:
+            raise ValueError("invalid feedback_reason")
     now = datetime.now(timezone.utc).isoformat()
     follow_up = None
     if status == "CONTACTED":
@@ -286,8 +306,47 @@ def update_outreach_status(outreach_id, status, follow_up_days=7):
         c.execute("""UPDATE outreach SET status=?,updated_at=?,
           contacted_at=CASE WHEN ?='CONTACTED' AND contacted_at IS NULL THEN ? ELSE contacted_at END,
           replied_at=CASE WHEN ? IN ('REPLIED','INTERVIEW','REJECTED','OFFER') THEN ? ELSE replied_at END,
-          follow_up_at=CASE WHEN ?='CONTACTED' THEN ? ELSE follow_up_at END
-          WHERE id=?""", (status, now, status, now, status, now, status, follow_up, outreach_id))
+          follow_up_at=CASE WHEN ?='CONTACTED' THEN ? ELSE follow_up_at END,
+          feedback_reason=CASE WHEN ?='REJECTED' THEN ? ELSE feedback_reason END,
+          feedback_recorded_at=CASE WHEN ?='REJECTED' AND ? IS NOT NULL THEN ? ELSE feedback_recorded_at END
+          WHERE id=?""", (
+            status, now, status, now, status, now, status, follow_up,
+            status, feedback_reason, status, feedback_reason, now, outreach_id,
+        ))
+
+
+def build_outcome_feedback_report(records=None):
+    """Summarize categorized employer outcomes; never auto-tunes matching weights."""
+    from collections import Counter
+    items = list_outreach(limit=1000) if records is None else list(records)
+    rejected = [item for item in items if item.get("status") == "REJECTED"]
+    reasons = Counter(item.get("feedback_reason") for item in rejected if item.get("feedback_reason"))
+    responses = sum(item.get("status") in ("REPLIED", "INTERVIEW", "REJECTED", "OFFER") for item in items)
+    interviews = sum(item.get("status") == "INTERVIEW" for item in items)
+    offers = sum(item.get("status") == "OFFER" for item in items)
+    labels = {
+        "skills_gap": "Не совпали навыки",
+        "experience_gap": "Недостаточно опыта",
+        "location_restriction": "Ограничение по локации",
+        "work_authorization": "Нет права/возможности найма в стране",
+        "language": "Язык",
+        "salary": "Зарплатные ожидания",
+        "role_mismatch": "Несовпадение роли",
+        "position_filled": "Позиция уже закрыта",
+        "other": "Другая причина",
+    }
+    lines = [
+        "ОБРАТНАЯ СВЯЗЬ ПО ОТКЛИКАМ",
+        f"Записей в журнале: {len(items)}; ответы работодателей: {responses}; интервью: {interviews}; предложения: {offers}.",
+        f"Отказы с указанной категорией причины: {sum(reasons.values())}.",
+    ]
+    if reasons:
+        lines.append("Причины отказов:")
+        lines.extend(f"- {labels.get(reason, reason)}: {count}" for reason, count in reasons.most_common())
+    else:
+        lines.append("Пока недостаточно размеченных отказов для анализа причин.")
+    lines.append("Эти данные показывают наблюдаемые причины; веса ATS автоматически не меняются.")
+    return "\\n".join(lines)
 
 
 def list_outreach(limit=100, status=None):
