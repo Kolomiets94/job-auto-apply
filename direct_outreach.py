@@ -64,7 +64,7 @@ def build_outreach_draft(lead):
     opening = (
         f"Изучил информацию о вашем продукте/команде: {evidence}. "
         if evidence else
-        f"Увидел вакансию «{title}» в {company}. "
+        "f"Сейчас изучаю вашу команду; увидел вакансию «{title}» в {company}. "
     )
     proof = f"Подтверждённые релевантные навыки: {skills_text}. " if skills_text else ""
     portfolio_line = f"Примеры моих работ: {portfolio}. " if portfolio else (
