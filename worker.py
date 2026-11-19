@@ -22,7 +22,7 @@ from telegram_notifier import send_message, send_notification
 from publication_filter import is_new_publication
 from direct_outreach import build_outreach_drafts
 
-DEFAULT_RESUME_TEXT = """Junior Frontend Developer. React, TypeScript, JavaScript ES6+, Redux Toolkit, React Router, REST API, HTML5, CSS3, SCSS, Git, Figma, Vite, Webpack, responsive and cross-browser layout. Personal project work since August 2024 includes authentication, protected routes, CRUD, API integration, debounce search, validation and error handling. English B1. Remote work."""
+DEFAULT_RESUME_TEXT = ""  # Never invent skills or project history when no verified resume is configured.
 
 
 def load_resume_text():
@@ -191,8 +191,10 @@ def prioritize_actionable_leads(ranked):
         title = str(lead.get("title") or "").lower()
         react_first = 0 if role == "frontend" and "react" in title else 1
         channel = _application_priority(lead)
+        placement_first = 0 if lead.get("opportunity_type") == "paid_placement" else 1
         return (
             1 if is_freelance(lead) else 0,
+            placement_first,
             ROLE_PRIORITY.get(role, 99),
             react_first,
             channel,
@@ -515,6 +517,21 @@ def run():
                             "proposal": proposal})
             continue
 
+        # Live applications require an explicitly configured, truthful candidate profile.
+        # Without it, keep the lead visible but never submit a fabricated default CV.
+        if not load_resume_text():
+            set_state(lid, "NEEDS_HUMAN")
+            stats["needs_human"] += 1
+            results.append({
+                "id": lid,
+                "title": lead.get("title"),
+                "source": lead.get("source"),
+                "url": lead.get("url"),
+                "status": "NEEDS_HUMAN",
+                "reason": "verified_resume_missing",
+            })
+            continue
+
         try:
             set_state(lid, "SHORTLISTED")
             proposal = make_proposal(lead)
@@ -598,7 +615,7 @@ def run():
     )[:10]
     stats['job_ranked'] = len(ranked_jobs)
     stats['job_actionable'] = sum(_application_priority(lead) == 0 for lead in ranked_jobs)
-    outreach_drafts = build_outreach_drafts(job_review, limit=5)
+    outreach_drafts = build_outreach_drafts(job_review, limit=10)
     stats["outreach_drafts_prepared"] = len(outreach_drafts)
     if job_review:
         lines = ['Вакансии Junior Frontend / вёрстка / QA — Россия и мир:',
