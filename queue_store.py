@@ -25,7 +25,8 @@ class _PgConnection:
     def execute(self, sql, params=()):
         from psycopg.rows import dict_row
         sql = sql.replace("INSERT OR IGNORE INTO leads", "INSERT INTO leads")
-        if sql.lstrip().startswith("INSERT INTO leads"):
+        sql = sql.replace("INSERT OR IGNORE INTO outreach", "INSERT INTO outreach")
+        if sql.lstrip().startswith(("INSERT INTO leads", "INSERT INTO outreach")):
             sql += " ON CONFLICT (id) DO NOTHING"
         sql = sql.replace("?", "%s")
         cur = self.conn.cursor(row_factory=dict_row if self.row_factory else None)
