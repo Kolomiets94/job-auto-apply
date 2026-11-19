@@ -271,7 +271,7 @@ def _work_format_rejection(lead: Dict[str, Any]) -> str | None:
     if mode == "remote":
         return None
     if mode == "hybrid":
-        return None if _is_yekaterinburg(lead) else "hybrid is allowed only in Yekaterinburg"
+        return "hybrid work is excluded; fully remote only"
     if mode == "office":
         return "office/on-site roles are excluded"
     return "remote work format is not confirmed"
@@ -280,8 +280,12 @@ def _work_format_rejection(lead: Dict[str, Any]) -> str | None:
 def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     text = _text(lead)
     title = str(lead.get("title") or "").lower()
-    if is_placement(title):
-        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "internship/trainee excluded"}
+    employer = " ".join(str(lead.get(key) or "") for key in ("company", "employer", "company_name")).casefold()
+    excluded_employers = ("aston", "preax", "edmagit")
+    if any(re.search(rf"(?<![a-zа-я0-9]){re.escape(name)}(?![a-zа-я0-9])", employer) for name in excluded_employers):
+        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "excluded employer"}
+    if is_placement(title) and not placement_is_paid(lead):
+        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "placement compensation not confirmed"}
     if re.search(r"\bqa\b|tester|тестиров|quality assurance|автотест", title, re.I):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "non-target QA role"}
     # Exclude non-Junior roles by title, not incidental descriptions.
@@ -398,9 +402,13 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     score = round(min(100, (fit * .45 + budget_score * .25 + quick + comp_score + resume_score * .25) * 100))
     if is_russian_market:
         score = min(100, score + 15)
+    placement = is_placement(title)
+    if placement:
+        score = min(100, score + 20)
     category = _role_category(lead)
     return {
         **lead,
+        "opportunity_type": "paid_placement" if placement else "junior_vacancy",
         "category": category,
         "role_priority": ROLE_PRIORITY.get(category, 99),
         "profit_score": score,
