@@ -32,3 +32,12 @@ def test_generic_remote_does_not_prove_russia_eligibility():
     assert result["ats_remote_status"] == "confirmed"
     assert result["ats_russia_eligibility"] == "unknown"
     assert result["ats_paid_status"] == "not_applicable"
+
+
+def test_hybrid_exclusion_wins_over_generic_remote_mention():
+    result = assess_job_conditions({
+        "title": "Remote Junior Frontend Developer",
+        "description": "Remote-first team, but hybrid office attendance is required.",
+        "work_mode": "hybrid",
+    })
+    assert result["ats_remote_status"] == "blocked"
