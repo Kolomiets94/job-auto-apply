@@ -124,7 +124,10 @@ def update_outreach(outreach_id):
 @app.post("/telegram/register-webhook")
 def register_telegram_webhook():
     """Register this service's fixed Telegram webhook without exposing bot credentials."""
-    if not _authorized():
+    setup_key = os.getenv("TELEGRAM_WEBHOOK_SETUP_KEY", "").strip()
+    setup_provided = request.headers.get("X-Telegram-Setup-Key", "")
+    setup_authorized = bool(setup_key) and hmac.compare_digest(setup_provided, setup_key)
+    if not (_authorized() or setup_authorized):
         return jsonify({"error": "unauthorized"}), 401
     token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip() or os.getenv("BOT_TOKEN", "").strip()
     secret = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
