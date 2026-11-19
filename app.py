@@ -121,6 +121,39 @@ def update_outreach(outreach_id):
     return jsonify({"status": "updated", "outreach_id": outreach_id})
 
 
+@app.post("/telegram/register-webhook")
+def register_telegram_webhook():
+    """Register this service's fixed Telegram webhook without exposing bot credentials."""
+    if not _authorized():
+        return jsonify({"error": "unauthorized"}), 401
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip() or os.getenv("BOT_TOKEN", "").strip()
+    secret = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
+    if not token or not secret:
+        return jsonify({"error": "telegram_configuration_missing"}), 503
+    if len(secret) < 32:
+        return jsonify({"error": "webhook_secret_too_short"}), 503
+    try:
+        import requests
+        response = requests.post(
+            f"https://api.telegram.org/bot{token}/setWebhook",
+            json={
+                "url": "https://job-freelance-hunter.onrender.com/telegram/webhook",
+                "secret_token": secret,
+                "allowed_updates": ["message"],
+            },
+            timeout=15,
+        )
+        response.raise_for_status()
+        result = response.json()
+        if not isinstance(result, dict) or not result.get("ok"):
+            app.logger.warning("Telegram webhook registration was rejected by Telegram")
+            return jsonify({"error": "telegram_registration_failed"}), 502
+    except Exception:
+        app.logger.exception("Telegram webhook registration request failed")
+        return jsonify({"error": "telegram_registration_failed"}), 502
+    return jsonify({"status": "registered", "webhook": "/telegram/webhook"})
+
+
 @app.post("/telegram/webhook")
 def telegram_webhook():
     """Receive authenticated Telegram bot commands; never sends employer messages."""
