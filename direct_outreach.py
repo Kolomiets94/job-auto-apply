@@ -5,6 +5,9 @@ It generates targeted public search links and a short draft with explicit
 personalization placeholders when no verified evidence is available.
 """
 from urllib.parse import quote_plus
+import re
+
+from entry_level import is_placement
 
 
 ROLE_TARGETS = (
@@ -28,8 +31,14 @@ def build_outreach_draft(lead):
     company = _first_text(lead, "company", "employer", "company_name")
     if not company:
         return None
+    if any(re.search(rf"(?<![a-zа-я0-9]){name}(?![a-zа-я0-9])", company.casefold())
+           for name in ("aston", "preax", "edmagit")):
+        return None
 
     title = _first_text(lead, "title") or "Junior Developer"
+    placement = is_placement(title)
+    opportunity_type = "paid_placement" if placement else "junior_vacancy"
+    target_role = "оплачиваемую стажировку или практику" if placement else "позицию Junior Frontend Developer"
     domain = _first_text(lead, "company_domain", "domain", "employer_domain")
     vacancy_url = _first_text(lead, "url", "apply_url")
     evidence = _first_text(
@@ -53,25 +62,26 @@ def build_outreach_draft(lead):
     )
 
     opening = (
-        f"Увидел ваш материал о {evidence}. "
+        f"Изучил информацию о вашем продукте/команде: {evidence}. "
         if evidence else
-        f"Увидел вакансию «{title}» в {company}. "
-        "изучаю вашу команду и хочу обратиться по делу. "
+        f"Сейчас изучаю вашу команду; увидел вакансию «{title}» в {company}. "
     )
-    proof = f"Мои релевантные навыки: {skills_text}. " if skills_text else ""
-    portfolio_line = f"Мой проект/портфолио: {portfolio}. " if portfolio else (
-        "Портфолио: [добавьте ссылку на самый релевантный работающий проект]. "
+    proof = f"Подтверждённые релевантные навыки: {skills_text}. " if skills_text else ""
+    portfolio_line = f"Примеры моих работ: {portfolio}. " if portfolio else (
+        "Портфолио/ссылку на учебный проект добавлю перед отправкой. "
     )
     note = (
-        f"Здравствуйте! {opening}{proof}{portfolio_line}"
-        "Могу быть полезен в задачах команды, связанных с этой вакансией. "
-        "Подскажите, пожалуйста, актуален ли поиск и будет ли уместно "
-        "обсудить это в коротком 15-минутном разговоре?"
+        f"Здравствуйте! {opening}"
+        f"Прошу рассмотреть мою кандидатуру на {target_role}. "
+        f"{proof}{portfolio_line}"
+        "Подскажите, пожалуйста, рассматриваете ли вы начинающих специалистов "
+        "и кому лучше направить резюме?"
     )
 
     return {
         "company": company,
         "title": title[:100],
+        "opportunity_type": opportunity_type,
         "vacancy_url": vacancy_url,
         "contact_priority": [item["priority"] for item in people_links],
         "people_search_links": people_links,
@@ -79,6 +89,7 @@ def build_outreach_draft(lead):
         "people_search_url": people_links[0]["url"],
         "github_people_search_url": github_url,
         "company_team_search_url": f"https://www.google.com/search?q={company_q}",
+        "company_search_url": f"https://www.google.com/search?q={company_q}",
         "public_email_lookup_url": domain_search,
         "personalization_evidence": evidence or "[найти конкретный продукт, PR или пост]",
         "portfolio_url": portfolio,
@@ -98,7 +109,7 @@ def build_outreach_drafts(leads, limit=5):
         draft = build_outreach_draft(lead)
         if not draft:
             continue
-        key = draft["company"].casefold()
+        key = (draft["company"].casefold(), draft["opportunity_type"])
         if key in seen:
             continue
         seen.add(key)

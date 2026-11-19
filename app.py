@@ -5,7 +5,7 @@ import threading
 from datetime import datetime, timezone
 from main import collect
 from profit_ranker import rank_leads, FREELANCE_SOURCES
-from queue_store import enqueue, list_queue
+from queue_store import enqueue, list_queue, list_outreach, update_outreach_status, build_outcome_feedback_report
 from proposal_writer import make_proposal
 from worker import run as run_worker
 
@@ -84,6 +84,61 @@ def queue():
     if not _authorized():
         return jsonify({"error": "unauthorized"}), 401
     return jsonify({"items":list_queue()})
+
+@app.get("/outreach")
+def outreach():
+    if not _authorized():
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        limit = max(1, min(int(request.args.get("limit", "100")), 500))
+    except ValueError:
+        return jsonify({"error": "invalid_limit"}), 400
+    return jsonify({
+        "items": list_outreach(limit=limit),
+        "feedback_report": build_outcome_feedback_report(),
+    })
+
+
+@app.post("/outreach/<outreach_id>/status")
+def update_outreach(outreach_id):
+    if not _authorized():
+        return jsonify({"error": "unauthorized"}), 401
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"error": "json_object_required"}), 400
+    status = payload.get("status")
+    reason = payload.get("feedback_reason")
+    try:
+        updated = update_outreach_status(
+            outreach_id,
+            status,
+            feedback_reason=reason,
+        )
+    except (TypeError, ValueError) as exc:
+        return jsonify({"error": str(exc)}), 400
+    if not updated:
+        return jsonify({"error": "outreach_not_found"}), 404
+    return jsonify({"status": "updated", "outreach_id": outreach_id})
+
+
+@app.post("/telegram/webhook")
+def telegram_webhook():
+    """Receive authenticated Telegram bot commands; never sends employer messages."""
+    expected = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
+    supplied = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+    if not expected or not hmac.compare_digest(supplied, expected):
+        return jsonify({"error": "unauthorized"}), 401
+    update = request.get_json(silent=True)
+    if not isinstance(update, dict):
+        return jsonify({"error": "invalid_update"}), 400
+    try:
+        from telegram_control import handle_update
+        handle_update(update)
+    except Exception:
+        app.logger.exception("Telegram control update failed")
+        return jsonify({"error": "update_failed"}), 500
+    return jsonify({"ok": True})
+
 
 @app.post("/run")
 def run_hunter():

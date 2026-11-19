@@ -25,7 +25,8 @@ class _PgConnection:
     def execute(self, sql, params=()):
         from psycopg.rows import dict_row
         sql = sql.replace("INSERT OR IGNORE INTO leads", "INSERT INTO leads")
-        if sql.lstrip().startswith("INSERT INTO leads"):
+        sql = sql.replace("INSERT OR IGNORE INTO outreach", "INSERT INTO outreach")
+        if sql.lstrip().startswith(("INSERT INTO leads", "INSERT INTO outreach")):
             sql += " ON CONFLICT (id) DO NOTHING"
         sql = sql.replace("?", "%s")
         cur = self.conn.cursor(row_factory=dict_row if self.row_factory else None)
@@ -55,6 +56,13 @@ def _db():
           id TEXT PRIMARY KEY, url TEXT, source TEXT, title TEXT, state TEXT,
           score INTEGER DEFAULT 0, payload TEXT, updated_at TEXT, submitted_at TEXT)""")
         conn.execute("ALTER TABLE leads ADD COLUMN IF NOT EXISTS submitted_at TEXT")
+        conn.execute("""CREATE TABLE IF NOT EXISTS outreach(
+          id TEXT PRIMARY KEY, company TEXT, opportunity_type TEXT, vacancy_url TEXT,
+          status TEXT, payload TEXT, created_at TEXT, updated_at TEXT,
+          contacted_at TEXT, replied_at TEXT, follow_up_at TEXT,
+          feedback_reason TEXT, feedback_recorded_at TEXT)""")
+        conn.execute("ALTER TABLE outreach ADD COLUMN IF NOT EXISTS feedback_reason TEXT")
+        conn.execute("ALTER TABLE outreach ADD COLUMN IF NOT EXISTS feedback_recorded_at TEXT")
         conn.execute("""UPDATE leads SET submitted_at=updated_at
                         WHERE submitted_at IS NULL AND state IN ('SUBMITTED','REPLIED','WON')""")
         conn.commit()
@@ -63,6 +71,16 @@ def _db():
     c.execute("""CREATE TABLE IF NOT EXISTS leads(
       id TEXT PRIMARY KEY, url TEXT, source TEXT, title TEXT, state TEXT,
       score INTEGER DEFAULT 0, payload TEXT, updated_at TEXT, submitted_at TEXT)""")
+    c.execute("""CREATE TABLE IF NOT EXISTS outreach(
+      id TEXT PRIMARY KEY, company TEXT, opportunity_type TEXT, vacancy_url TEXT,
+      status TEXT, payload TEXT, created_at TEXT, updated_at TEXT,
+      contacted_at TEXT, replied_at TEXT, follow_up_at TEXT,
+      feedback_reason TEXT, feedback_recorded_at TEXT)""")
+    for column, sql_type in (("feedback_reason", "TEXT"), ("feedback_recorded_at", "TEXT")):
+        try:
+            c.execute(f"ALTER TABLE outreach ADD COLUMN {column} {sql_type}")
+        except sqlite3.OperationalError:
+            pass
     try:
         c.execute("ALTER TABLE leads ADD COLUMN submitted_at TEXT")
     except Exception:
@@ -234,3 +252,147 @@ def list_queue(limit=100):
         ).fetchall()
     return [dict(x) for x in rows]
 
+
+
+OUTREACH_STATES = ("DRAFT", "CONTACTED", "REPLIED", "INTERVIEW", "REJECTED", "OFFER", "NO_RESPONSE", "SUPPRESSED")
+
+
+def _outreach_id(draft):
+    raw = "|".join(str(draft.get(k) or "").strip().casefold()
+                   for k in ("company", "opportunity_type", "vacancy_url"))
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def save_outreach_drafts(drafts):
+    """Persist deduplicated company outreach drafts without sending them."""
+    now = datetime.now(timezone.utc).isoformat()
+    ids = []
+    with _db() as c:
+        for draft in drafts:
+            oid = _outreach_id(draft)
+            ids.append(oid)
+            payload = json.dumps(draft, ensure_ascii=False)
+            c.execute("""INSERT OR IGNORE INTO outreach
+              (id,company,opportunity_type,vacancy_url,status,payload,created_at,updated_at)
+              VALUES(?,?,?,?,?,?,?,?)""",
+              (oid, draft.get("company"), draft.get("opportunity_type"),
+               draft.get("vacancy_url"), "DRAFT", payload, now, now))
+            # Refresh content only while it is still a draft; never reset a sent/replied record.
+            c.execute("""UPDATE outreach SET payload=?,updated_at=?
+                         WHERE id=? AND status='DRAFT'""", (payload, now, oid))
+    return ids
+
+
+FEEDBACK_REASONS = (
+    "skills_gap", "experience_gap", "location_restriction", "work_authorization",
+    "language", "salary", "role_mismatch", "position_filled", "other",
+)
+
+
+def update_outreach_status(outreach_id, status, follow_up_days=7, feedback_reason=None):
+    """Record a confirmed human/platform event; never sends messages or stores raw replies."""
+    if status not in OUTREACH_STATES:
+        raise ValueError("invalid outreach status")
+    if feedback_reason is not None:
+        if status != "REJECTED":
+            raise ValueError("feedback_reason is only valid for REJECTED status")
+        if feedback_reason not in FEEDBACK_REASONS:
+            raise ValueError("invalid feedback_reason")
+    now = datetime.now(timezone.utc).isoformat()
+    follow_up = None
+    if status == "CONTACTED":
+        follow_up = (datetime.now(timezone.utc) + timedelta(days=max(1, min(int(follow_up_days), 30)))).isoformat()
+    with _db() as c:
+        result = c.execute("""UPDATE outreach SET status=?,updated_at=?,
+          contacted_at=CASE WHEN ?='CONTACTED' AND contacted_at IS NULL THEN ? ELSE contacted_at END,
+          replied_at=CASE WHEN ? IN ('REPLIED','INTERVIEW','REJECTED','OFFER') THEN ? ELSE replied_at END,
+          follow_up_at=CASE WHEN ?='CONTACTED' THEN ? ELSE follow_up_at END,
+          feedback_reason=CASE WHEN ?='REJECTED' THEN ? ELSE feedback_reason END,
+          feedback_recorded_at=CASE WHEN ?='REJECTED' AND ? IS NOT NULL THEN ? ELSE feedback_recorded_at END
+          WHERE id=?""", (
+            status, now, status, now, status, now, status, follow_up,
+            status, feedback_reason, status, feedback_reason, now, outreach_id,
+        ))
+    return result.rowcount == 1
+
+
+
+def resolve_outreach_id(prefix):
+    """Resolve a unique outreach ID by its short hexadecimal prefix."""
+    value = str(prefix or "").strip().lower()
+    if len(value) < 8 or len(value) > 64 or not re.fullmatch(r"[0-9a-f]+", value):
+        raise ValueError("invalid outreach id prefix")
+    with _db() as c:
+        rows = c.execute(
+            "SELECT id FROM outreach WHERE id LIKE ? LIMIT 2",
+            (value + "%",),
+        ).fetchall()
+    if not rows:
+        return None
+    if len(rows) > 1:
+        raise ValueError("ambiguous outreach id prefix")
+    try:
+        return rows[0]["id"]
+    except (TypeError, KeyError, IndexError):
+        return rows[0][0]
+
+
+
+def build_outcome_feedback_report(records=None):
+    """Summarize categorized employer outcomes; never auto-tunes matching weights."""
+    from collections import Counter
+    items = list_outreach(limit=1000) if records is None else list(records)
+    rejected = [item for item in items if item.get("status") == "REJECTED"]
+    reasons = Counter(item.get("feedback_reason") for item in rejected if item.get("feedback_reason"))
+    responses = sum(item.get("status") in ("REPLIED", "INTERVIEW", "REJECTED", "OFFER") for item in items)
+    interviews = sum(item.get("status") == "INTERVIEW" for item in items)
+    offers = sum(item.get("status") == "OFFER" for item in items)
+    labels = {
+        "skills_gap": "Не совпали навыки",
+        "experience_gap": "Недостаточно опыта",
+        "location_restriction": "Ограничение по локации",
+        "work_authorization": "Нет права/возможности найма в стране",
+        "language": "Язык",
+        "salary": "Зарплатные ожидания",
+        "role_mismatch": "Несовпадение роли",
+        "position_filled": "Позиция уже закрыта",
+        "other": "Другая причина",
+    }
+    lines = [
+        "ОБРАТНАЯ СВЯЗЬ ПО ОТКЛИКАМ",
+        f"Записей в журнале: {len(items)}; ответы работодателей: {responses}; интервью: {interviews}; предложения: {offers}.",
+        f"Отказы с указанной категорией причины: {sum(reasons.values())}.",
+    ]
+    if reasons:
+        lines.append("Причины отказов:")
+        lines.extend(f"- {labels.get(reason, reason)}: {count}" for reason, count in reasons.most_common())
+    else:
+        lines.append("Пока недостаточно размеченных отказов для анализа причин.")
+    lines.append("Эти данные показывают наблюдаемые причины; веса ATS автоматически не меняются.")
+    return "\n".join(lines)
+
+
+def list_outreach(limit=100, status=None):
+    """Return persisted outreach records, optionally filtered by lifecycle status."""
+    with _db() as c:
+        c.row_factory = sqlite3.Row
+        if status:
+            if status not in OUTREACH_STATES:
+                raise ValueError("invalid outreach status")
+            rows = c.execute("SELECT * FROM outreach WHERE status=? ORDER BY updated_at DESC LIMIT ?",
+                             (status, limit)).fetchall()
+        else:
+            rows = c.execute("SELECT * FROM outreach ORDER BY updated_at DESC LIMIT ?",
+                             (limit,)).fetchall()
+    return [dict(row) for row in rows]
+
+
+def due_outreach_followups(limit=100):
+    """List contacted companies whose one follow-up window has elapsed without a reply."""
+    now = datetime.now(timezone.utc).isoformat()
+    with _db() as c:
+        c.row_factory = sqlite3.Row
+        rows = c.execute("""SELECT * FROM outreach
+          WHERE status='CONTACTED' AND follow_up_at IS NOT NULL AND follow_up_at<=?
+          ORDER BY follow_up_at ASC LIMIT ?""", (now, limit)).fetchall()
+    return [dict(row) for row in rows]

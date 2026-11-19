@@ -102,6 +102,19 @@ def _explicit_salary_rejected(lead: Dict[str, Any]) -> bool:
 
 def _location_rejected(lead: Dict[str, Any], text: str) -> bool:
     source = str(lead.get("source") or "").lower()
+    # Explicit residence/right-to-work restrictions apply regardless of source.
+    # A Russian job board can still carry a vacancy limited to US/UK/EU residents.
+    all_location_text = f"{lead.get('location') or ''} {text}".lower()
+    restricted_foreign = re.search(
+        r"\b(?:must reside in|must be located in|must live in|must be based in|"
+        r"residents? of|right to work in)\b.{0,45}\b(?:the\s+)?(?:us|u\.s\.|united states|"
+        r"uk|united kingdom|eu|europe|canada|australia|new zealand|singapore)\b|"
+        r"\b(?:us only|u\.s\. only|uk only|eu only|europe only|canada only|"
+        r"australia only|new zealand only)\b",
+        all_location_text,
+    )
+    if restricted_foreign:
+        return True
     if source in INTERNATIONAL_SOURCES and source not in FREELANCE_SOURCES:
         location = str(lead.get("location") or "").lower().strip()
         eligibility_text = f"{location} {text}".lower()
@@ -271,7 +284,7 @@ def _work_format_rejection(lead: Dict[str, Any]) -> str | None:
     if mode == "remote":
         return None
     if mode == "hybrid":
-        return None if _is_yekaterinburg(lead) else "hybrid is allowed only in Yekaterinburg"
+        return "hybrid work is excluded; fully remote only"
     if mode == "office":
         return "office/on-site roles are excluded"
     return "remote work format is not confirmed"
@@ -280,12 +293,16 @@ def _work_format_rejection(lead: Dict[str, Any]) -> str | None:
 def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     text = _text(lead)
     title = str(lead.get("title") or "").lower()
-    if is_placement(title):
-        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "internship/trainee excluded"}
+    employer = " ".join(str(lead.get(key) or "") for key in ("company", "employer", "company_name")).casefold()
+    excluded_employers = ("aston", "preax", "edmagit")
+    if any(re.search(rf"(?<![a-zа-я0-9]){re.escape(name)}(?![a-zа-я0-9])", employer) for name in excluded_employers):
+        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "excluded employer"}
+    if is_placement(title) and not placement_is_paid(lead):
+        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "placement compensation not confirmed"}
     if re.search(r"\bqa\b|tester|тестиров|quality assurance|автотест", title, re.I):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "non-target QA role"}
     # Exclude non-Junior roles by title, not incidental descriptions.
-    if any(x in title for x in BLOCK) or re.search(r"(?<![a-z])vue(?![a-z])", title):
+    if re.search(r"\bjunior\s*\+", title) or any(x in title for x in BLOCK) or re.search(r"(?<![a-z])vue(?![a-z])", title):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "excluded job title"}
     # Remote is allowed across Russia and internationally only when the
     # location policy below confirms that a candidate based in Russia may work.
@@ -398,9 +415,13 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     score = round(min(100, (fit * .45 + budget_score * .25 + quick + comp_score + resume_score * .25) * 100))
     if is_russian_market:
         score = min(100, score + 15)
+    placement = is_placement(title)
+    if placement:
+        score = min(100, score + 20)
     category = _role_category(lead)
     return {
         **lead,
+        "opportunity_type": "paid_placement" if placement else "junior_vacancy",
         "category": category,
         "role_priority": ROLE_PRIORITY.get(category, 99),
         "profit_score": score,

@@ -91,3 +91,17 @@ def test_filter_report_keeps_internal_reasons_separate():
     assert "Офисный формат" in report
     assert "Зарплата ниже внутреннего порога" in report
     assert "первая сработавшая причина" in report
+
+
+def test_required_missing_skills_are_separated_from_general_gaps():
+    reviewed = review_lead(
+        {
+            "title": "Junior React Frontend Developer",
+            "description": "Must have Node.js and Jest. React is a plus.",
+            "experience": "Без опыта",
+            "key_skills": ["Node.js", "Jest", "React"],
+        },
+        "Junior Frontend Developer. React, JavaScript, HTML, CSS. Учебные проекты.",
+    )
+    assert "node.js" in reviewed["ats_required_missing_keywords"]
+    assert "react" not in reviewed["ats_required_missing_keywords"]

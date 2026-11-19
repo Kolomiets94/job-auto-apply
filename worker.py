@@ -5,7 +5,7 @@ import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from job_sources import JOB_COLLECTORS
 
-from main import QUERIES, HYBRID_QUERIES, HHAccessUnavailable, hh_search, hh_search_hybrid, remoteok
+from main import QUERIES, HHAccessUnavailable, hh_search, hh_search_hybrid, remoteok
 from freelance_sources import (
     collect_freelance, collect_peopleperhour, collect_prolinker,
     collect_weblancer, collect_freelancer_com,
@@ -13,16 +13,18 @@ from freelance_sources import (
 from freelancehunt_adapter import collect_freelancehunt
 from job_matcher import JobMatcher
 from ats_evaluator import review_lead, build_market_report, build_filter_report
+from ats_conditions import assess_job_conditions
 from profit_ranker import rank_leads, FREELANCE_SOURCES, ROLE_PRIORITY, _role_category
 from proposal_writer import make_proposal
 from application_dispatcher import dispatch
-from queue_store import enqueue, enqueue_many, set_state, submitted_today, submitted_this_week, was_submitted, queued_leads
+from queue_store import enqueue, enqueue_many, set_state, submitted_today, submitted_this_week, was_submitted, queued_leads, save_outreach_drafts, list_outreach, build_outcome_feedback_report
 from notification_rules import format_notification, should_notify
 from telegram_notifier import send_message, send_notification
 from publication_filter import is_new_publication
 from direct_outreach import build_outreach_drafts
+from resume_parser import extract_resume_text, ResumeParseError
 
-DEFAULT_RESUME_TEXT = """Junior Frontend Developer. React, TypeScript, JavaScript ES6+, Redux Toolkit, React Router, REST API, HTML5, CSS3, SCSS, Git, Figma, Vite, Webpack, responsive and cross-browser layout. Personal project work since August 2024 includes authentication, protected routes, CRUD, API integration, debounce search, validation and error handling. English B1. Remote work."""
+DEFAULT_RESUME_TEXT = ""  # Never invent skills or project history when no verified resume is configured.
 
 
 def load_resume_text():
@@ -31,9 +33,11 @@ def load_resume_text():
         return text
     path = os.getenv("RESUME_FILE", "resume/profile.txt")
     try:
-        with open(path, "r", encoding="utf-8") as fh:
-            return fh.read().strip()
-    except OSError:
+        return extract_resume_text(path)
+    except FileNotFoundError:
+        return DEFAULT_RESUME_TEXT
+    except ResumeParseError as exc:
+        print(f"[resume] parsing failed; live applications remain blocked: {exc}", flush=True)
         return DEFAULT_RESUME_TEXT
 
 
@@ -115,17 +119,7 @@ def collect_all():
                 # Avoid repeating a blocked API request for each search term.
                 break
 
-    # Hybrid roles are collected only from the dynamically resolved
-    # Yekaterinburg area; remote roles above remain nationwide.
-    for tag, query in HYBRID_QUERIES:
-        try:
-            matches = hh_search_hybrid(tag, query)
-            print(f"[collector] hh hybrid {tag} / {query}: {len(matches)} leads", flush=True)
-            leads += matches
-        except Exception as exc:
-            record_collection_error(f"hh_hybrid:{tag}:{query}", exc)
-            if isinstance(exc, HHAccessUnavailable):
-                break
+    # Fully remote only: do not spend HH requests on hybrid vacancies.
 
     try:
         leads += remoteok()
@@ -150,10 +144,11 @@ def collect_all():
 
 def apply_resume_matching(leads, resume_text=None):
     resume_text = load_resume_text() if resume_text is None else resume_text
+    conditioned = [{**lead, **assess_job_conditions(lead)} for lead in leads]
     if not resume_text:
-        return leads
+        return conditioned
     matcher = JobMatcher()
-    return [review_lead(matcher.score_lead(lead, resume_text), resume_text) for lead in leads]
+    return [review_lead(matcher.score_lead(lead, resume_text), resume_text) for lead in conditioned]
 
 
 def is_freelance(lead):
@@ -191,8 +186,10 @@ def prioritize_actionable_leads(ranked):
         title = str(lead.get("title") or "").lower()
         react_first = 0 if role == "frontend" and "react" in title else 1
         channel = _application_priority(lead)
+        placement_first = 0 if lead.get("opportunity_type") == "paid_placement" else 1
         return (
             1 if is_freelance(lead) else 0,
+            placement_first,
             ROLE_PRIORITY.get(role, 99),
             react_first,
             channel,
@@ -515,6 +512,21 @@ def run():
                             "proposal": proposal})
             continue
 
+        # Live applications require an explicitly configured, truthful candidate profile.
+        # Without it, keep the lead visible but never submit a fabricated default CV.
+        if not load_resume_text():
+            set_state(lid, "NEEDS_HUMAN")
+            stats["needs_human"] += 1
+            results.append({
+                "id": lid,
+                "title": lead.get("title"),
+                "source": lead.get("source"),
+                "url": lead.get("url"),
+                "status": "NEEDS_HUMAN",
+                "reason": "verified_resume_missing",
+            })
+            continue
+
         try:
             set_state(lid, "SHORTLISTED")
             proposal = make_proposal(lead)
@@ -593,13 +605,21 @@ def run():
     # Show matching employment vacancies independently of freelance projects.
     job_review = sorted(
         (lead for lead in ranked_jobs if lead.get('url')),
-        key=lambda lead: (ROLE_PRIORITY.get(_role_category(lead), 99),
-                          _application_priority(lead), -lead.get('profit_score', 0)),
+        key=lambda lead: (
+            0 if lead.get("opportunity_type") == "paid_placement" else 1,
+            ROLE_PRIORITY.get(_role_category(lead), 99),
+            _application_priority(lead),
+            -lead.get("profit_score", 0),
+        ),
     )[:10]
     stats['job_ranked'] = len(ranked_jobs)
     stats['job_actionable'] = sum(_application_priority(lead) == 0 for lead in ranked_jobs)
-    outreach_drafts = build_outreach_drafts(job_review, limit=5)
+    outreach_drafts = build_outreach_drafts(job_review, limit=10)
+    outreach_ids = save_outreach_drafts(outreach_drafts)
     stats["outreach_drafts_prepared"] = len(outreach_drafts)
+    stats["outreach_drafts_saved"] = len(outreach_ids)
+    stats["outreach_sent"] = sum(bool(item.get("contacted_at")) for item in list_outreach(limit=500))
+    stats["outreach_replied"] = sum(item["status"] in ("REPLIED", "INTERVIEW", "REJECTED", "OFFER") for item in list_outreach(limit=500))
     if job_review:
         lines = ['Вакансии Junior Frontend / вёрстка / QA — Россия и мир:',
                  'Ссылки на вакансии; отправка откликов здесь не подтверждается.']
@@ -820,6 +840,7 @@ def run():
     )
     summary_message += "\n\n" + build_market_report(job_leads)
     summary_message += "\n\n" + build_filter_report(job_leads)
+    summary_message += "\n\n" + build_outcome_feedback_report()
     if ranked_jobs:
         summary_message += "\n\nПодходящие вакансии:"
         for lead in ranked_jobs[:5]:

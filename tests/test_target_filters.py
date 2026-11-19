@@ -18,7 +18,7 @@ def test_accepts_explicit_one_year_frontend_and_rejects_higher_experience():
 def test_internship_requires_confirmed_payment():
     lead = {"source": "hh", "title": "Junior React internship", "description": "React"}
     assert not rank_lead(lead)["eligible"]
-    assert not rank_lead({**lead, "description": "Paid internship. React"})["eligible"]
+    assert rank_lead({**lead, "description": "Paid internship. React"})["eligible"]
 
 
 def test_required_sql_rejected_and_explicit_optional_sql_allowed():
@@ -83,12 +83,12 @@ def test_entry_level_layout_without_junior_title():
     assert not rank_lead({**base, "requirements": "SQL required"})["eligible"]
 
 
-def test_work_format_policy_is_remote_everywhere_and_hybrid_only_in_yekaterinburg():
+def test_work_format_policy_is_remote_only_everywhere():
     base = {"source": "hh", "title": "Junior React Developer", "description": "React TypeScript", "work_mode": "REMOTE"}
     assert rank_lead({**base, "work_mode": "REMOTE", "location": "Москва"})["eligible"]
-    assert rank_lead({**base, "work_mode": "HYBRID",
-                      "work_format": [{"id": "HYBRID", "name": "Гибридный формат"}],
-                      "location": "Екатеринбург"})["eligible"]
+    assert not rank_lead({**base, "work_mode": "HYBRID",
+                          "work_format": [{"id": "HYBRID", "name": "Гибридный формат"}],
+                          "location": "Екатеринбург"})["eligible"]
     assert not rank_lead({**base, "work_mode": "HYBRID",
                           "work_format": [{"id": "HYBRID", "name": "Гибридный формат"}],
                           "location": "Санкт-Петербург"})["eligible"]

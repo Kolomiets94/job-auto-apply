@@ -75,10 +75,9 @@ def test_run_keeps_no_email_lead_for_confirmation():
          patch.object(worker, "set_state") as set_state:
         result = worker.run()
 
-    assert result["results"][0]["status"] == "NEEDS_CONFIRMATION"
-    assert result["results"][0]["reason"] == "no_free_direct_channel"
-    set_state.assert_any_call("lead-1", "SHORTLISTED")
-    set_state.assert_any_call("lead-1", "NEEDS_CONFIRMATION")
+    assert result["results"][0]["status"] == "NEEDS_HUMAN"
+    assert result["results"][0]["reason"] == "verified_resume_missing"
+    set_state.assert_called_once_with("lead-1", "NEEDS_HUMAN")
 
 
 def test_prioritize_actionable_leads(monkeypatch):
@@ -135,6 +134,7 @@ def test_role_priority_is_preserved_over_channel_priority():
 
 
 def test_two_challenges_pause_browser_but_allow_email(monkeypatch):
+    monkeypatch.setenv("RESUME_TEXT", "JavaScript HTML CSS учебные проекты")
     leads = [
         {"source": "remote_job_ru", "category": "frontend", "title": f"Junior React {i}",
          "url": f"https://remote-job.ru/vacancy/show/{i}/react"} for i in (1, 2, 3)
@@ -205,6 +205,7 @@ def test_draft_run_prepares_letter_without_dispatch_or_state_change(monkeypatch)
 
 
 def test_total_hourly_cap_counts_across_job_and_freelance(monkeypatch):
+    monkeypatch.setenv("RESUME_TEXT", "JavaScript HTML CSS учебные проекты")
     leads = [
         {"source": "jobicy", "category": "frontend", "title": "Junior React",
          "url": "https://example.com/job", "apply_email": "jobs@example.com"},

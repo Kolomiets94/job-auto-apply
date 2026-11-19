@@ -77,7 +77,7 @@ def ok(v):
     if any(x in title for x in level_terms): return False
     if any(x in text for x in EXCLUDE if x not in level_terms): return False
     if not salary_ok(v): return False
-    if re.search(r"\b(?:intern|internship|trainee)\b|стаж[её]р|стажиров|практикант", title): return False
+    # Paid placements are intentionally retained for ranking; salary_ok rejects unpaid or unclear ones.
     return True
 
 

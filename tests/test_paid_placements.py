@@ -4,17 +4,13 @@ from profit_ranker import rank_lead
 
 
 class PaidPlacementTests(unittest.TestCase):
-    def test_paid_titles_route_to_correct_resume(self):
-        for title, category in (("Frontend Intern", "frontend"), ("Стажёр React", "frontend"),
-                                ("Практикант HTML CSS", "layout"), ("Стажировка верстальщик", "layout"),
-                                ("QA Intern", "qa"), ("Практика тестировщик", "qa"),
-                                ("Trainee Manual Tester", "qa")):
+    def test_paid_frontend_titles_are_eligible_and_routed(self):
+        for title in ("Frontend Intern", "Стажёр React", "Практикант HTML CSS", "Стажировка верстальщик"):
             with self.subTest(title=title):
-                lead = rank_lead({"source": "hh", "title": title,
+                lead = rank_lead({"source": "hh", "title": title, "location": "Россия",
                                   "salary": {"from": 15000, "currency": "RUB"}})
-                self.assertFalse(lead["eligible"])
-                self.assertEqual(lead["rank_reason"], "internship/trainee excluded")
-
+                self.assertTrue(lead["eligible"], lead.get("rank_reason"))
+                self.assertEqual(lead["opportunity_type"], "paid_placement")
     def test_unknown_unpaid_and_zero_compensation_are_rejected(self):
         for description, salary in (("React", None), ("Unpaid React internship", {"from": 15000}),
                                     ("Неоплачиваемая практика React", None),
@@ -30,7 +26,7 @@ class PaidPlacementTests(unittest.TestCase):
                                     "salary": {"from": 15000, "currency": "RUB"}})["eligible"])
 
     def test_other_requirements_still_apply(self):
-        base = {"source": "hh", "title": "Paid Frontend Intern", "description": "React"}
+        base = {"source": "hh", "title": "Paid Frontend Intern", "description": "React", "location": "Россия", "salary": {"from": 15000, "currency": "RUB"}}
         for overrides in ({"title": "Paid Senior Frontend Intern"}, {"title": "Paid Junior+ React Intern"},
                           {"requirements": "SQL required"}, {"requirements": "Angular required"},
                           {"description": "Must reside in the US. React"}, {"title": "Paid HR Intern"}):
