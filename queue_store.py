@@ -346,7 +346,7 @@ def build_outcome_feedback_report(records=None):
     else:
         lines.append("Пока недостаточно размеченных отказов для анализа причин.")
     lines.append("Эти данные показывают наблюдаемые причины; веса ATS автоматически не меняются.")
-    return "\\n".join(lines)
+    return "\n".join(lines)
 
 
 def list_outreach(limit=100, status=None):
