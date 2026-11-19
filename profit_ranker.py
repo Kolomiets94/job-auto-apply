@@ -289,7 +289,7 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     if re.search(r"\bqa\b|tester|тестиров|quality assurance|автотест", title, re.I):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "non-target QA role"}
     # Exclude non-Junior roles by title, not incidental descriptions.
-    if re.search(r"\\bjunior\\s*\\+", title) or any(x in title for x in BLOCK) or re.search(r"(?<![a-z])vue(?![a-z])", title):
+    if re.search(r"\bjunior\s*\+", title) or any(x in title for x in BLOCK) or re.search(r"(?<![a-z])vue(?![a-z])", title):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "excluded job title"}
     # Remote is allowed across Russia and internationally only when the
     # location policy below confirms that a candidate based in Russia may work.
