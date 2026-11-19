@@ -89,6 +89,7 @@ def build_outreach_draft(lead):
         "people_search_url": people_links[0]["url"],
         "github_people_search_url": github_url,
         "company_team_search_url": f"https://www.google.com/search?q={company_q}",
+        "company_search_url": f"https://www.google.com/search?q={company_q}",
         "public_email_lookup_url": domain_search,
         "personalization_evidence": evidence or "[найти конкретный продукт, PR или пост]",
         "portfolio_url": portfolio,
