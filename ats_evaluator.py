@@ -186,7 +186,7 @@ def review_lead(lead, resume_text):
         r"обязательн[аоы]?)",
         re.I,
     )
-    required_lines = [line.strip() for line in re.split(r"[\n.;]", description)
+    required_lines = [line.strip() for line in re.split(r"[\n;]|(?<=[.!?])\s+", description)
                      if required_pattern.search(line)]
     required_missing = [
         skill for skill in missing
