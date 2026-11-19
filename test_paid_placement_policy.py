@@ -114,10 +114,11 @@ class PaidPlacementPolicyTests(unittest.TestCase):
         self.assertEqual(len(drafts), 2)
 
     def test_outreach_ledger_lifecycle_and_followup(self):
-        from queue_store import save_outreach_drafts, update_outreach_status, list_outreach, OUTREACH_STATES
+        import queue_store
+        from queue_store import save_outreach_drafts, update_outreach_status, list_outreach
         with tempfile.TemporaryDirectory() as tmp:
-            old = os.environ.get("HUNTER_DB")
-            os.environ["HUNTER_DB"] = os.path.join(tmp, "test.db")
+            old = queue_store.DB_PATH
+            queue_store.DB_PATH = os.path.join(tmp, "test.db")
             try:
                 draft = build_outreach_draft({
                     "title": "Junior Frontend Developer",
@@ -133,10 +134,7 @@ class PaidPlacementPolicyTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     update_outreach_status(oid, "INVALID")
             finally:
-                if old is None:
-                    os.environ.pop("HUNTER_DB", None)
-                else:
-                    os.environ["HUNTER_DB"] = old
+                queue_store.DB_PATH = old
 
 
 if __name__ == "__main__":
