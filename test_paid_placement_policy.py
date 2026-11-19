@@ -1,7 +1,7 @@
 import unittest
 
 from direct_outreach import build_outreach_draft, build_outreach_drafts
-from profit_ranker import rank_lead
+from profit_ranker import rank_lead\nfrom main import ok as hh_listing_is_eligible
 
 
 class PaidPlacementPolicyTests(unittest.TestCase):
@@ -18,7 +18,25 @@ class PaidPlacementPolicyTests(unittest.TestCase):
         self.assertTrue(lead["eligible"], lead.get("rank_reason"))
         self.assertEqual(lead["opportunity_type"], "paid_placement")
 
-    def test_unpaid_or_unconfirmed_placement_is_rejected(self):
+
+    def test_hh_collection_keeps_paid_placement_and_rejects_unpaid(self):
+        paid = {
+            "name": "Frontend Developer Intern",
+            "salary": {"from": 30000, "currency": "RUR"},
+            "snippet": {"requirement": "JavaScript, HTML, CSS"},
+        }
+        unpaid = {
+            "name": "Frontend Developer Intern",
+            "snippet": {"requirement": "JavaScript, HTML, CSS. Неоплачиваемая стажировка"},
+        }
+        junior = {
+            "name": "Junior Frontend Developer",
+            "snippet": {"requirement": "JavaScript, HTML, CSS"},
+        }
+        self.assertTrue(hh_listing_is_eligible(paid))
+        self.assertFalse(hh_listing_is_eligible(unpaid))
+        self.assertTrue(hh_listing_is_eligible(junior))
+\n    def test_unpaid_or_unconfirmed_placement_is_rejected(self):
         for description in ("Неоплачиваемая стажировка", "Стажировка, условия оплаты не указаны"):
             lead = rank_lead({
                 "title": "Frontend Developer Intern",
