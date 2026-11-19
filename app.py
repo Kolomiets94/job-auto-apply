@@ -12,6 +12,48 @@ from worker import run as run_worker
 app=Flask(__name__)
 
 
+_telegram_setup_lock = threading.Lock()
+_telegram_setup_done = False
+
+
+@app.before_request
+def _complete_one_time_telegram_setup():
+    """Use the temporary Render setup flag to register the fixed webhook on a health check."""
+    global _telegram_setup_done
+    if request.path != "/" or _telegram_setup_done:
+        return None
+    if not os.getenv("TELEGRAM_WEBHOOK_SETUP_KEY", "").strip():
+        return None
+    with _telegram_setup_lock:
+        if _telegram_setup_done:
+            return None
+        token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip() or os.getenv("BOT_TOKEN", "").strip()
+        secret = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
+        if not token or len(secret) < 32:
+            app.logger.warning("Telegram one-time setup skipped: required configuration missing")
+            return None
+        try:
+            import requests
+            response = requests.post(
+                f"https://api.telegram.org/bot{token}/setWebhook",
+                json={
+                    "url": "https://job-freelance-hunter.onrender.com/telegram/webhook",
+                    "secret_token": secret,
+                    "allowed_updates": ["message"],
+                },
+                timeout=15,
+            )
+            response.raise_for_status()
+            if response.json().get("ok"):
+                _telegram_setup_done = True
+                app.logger.info("Telegram webhook registered by one-time setup")
+            else:
+                app.logger.warning("Telegram one-time webhook setup was rejected")
+        except Exception:
+            app.logger.exception("Telegram one-time webhook setup request failed")
+    return None
+
+
 def _authorized():
     expected = os.getenv("HUNTER_RUN_TOKEN", "").strip()
     provided = request.headers.get("Authorization", "")
