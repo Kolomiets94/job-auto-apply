@@ -45,12 +45,12 @@ def assess_job_conditions(lead):
     text = _joined(lead)
     mode = str(lead.get("work_mode") or "").lower()
 
-    if "remote" in mode or "удален" in mode or REMOTE_RE.search(text):
-        remote = "confirmed"
-    elif "hybrid" in mode or "гибрид" in mode or HYBRID_RE.search(text):
+    if "hybrid" in mode or "гибрид" in mode or HYBRID_RE.search(text):
         remote = "blocked"
     elif "office" in mode or "onsite" in mode or "офис" in mode or OFFICE_RE.search(text):
         remote = "blocked"
+    elif "remote" in mode or "удален" in mode or REMOTE_RE.search(text):
+        remote = "confirmed"
     else:
         remote = "unknown"
 
