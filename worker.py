@@ -144,13 +144,11 @@ def collect_all():
 
 def apply_resume_matching(leads, resume_text=None):
     resume_text = load_resume_text() if resume_text is None else resume_text
+    conditioned = [{**lead, **assess_job_conditions(lead)} for lead in leads]
     if not resume_text:
-        return leads
+        return conditioned
     matcher = JobMatcher()
-    return [
-        {**review_lead(matcher.score_lead(lead, resume_text), resume_text), **assess_job_conditions(lead)}
-        for lead in leads
-    ]
+    return [review_lead(matcher.score_lead(lead, resume_text), resume_text) for lead in conditioned]
 
 
 def is_freelance(lead):
