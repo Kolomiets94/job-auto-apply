@@ -13,6 +13,7 @@ from freelance_sources import (
 from freelancehunt_adapter import collect_freelancehunt
 from job_matcher import JobMatcher
 from ats_evaluator import review_lead, build_market_report, build_filter_report
+from ats_conditions import assess_job_conditions
 from profit_ranker import rank_leads, FREELANCE_SOURCES, ROLE_PRIORITY, _role_category
 from proposal_writer import make_proposal
 from application_dispatcher import dispatch
@@ -146,7 +147,10 @@ def apply_resume_matching(leads, resume_text=None):
     if not resume_text:
         return leads
     matcher = JobMatcher()
-    return [review_lead(matcher.score_lead(lead, resume_text), resume_text) for lead in leads]
+    return [
+        {**review_lead(matcher.score_lead(lead, resume_text), resume_text), **assess_job_conditions(lead)}
+        for lead in leads
+    ]
 
 
 def is_freelance(lead):
