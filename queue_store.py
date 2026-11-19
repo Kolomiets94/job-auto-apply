@@ -316,6 +316,25 @@ def update_outreach_status(outreach_id, status, follow_up_days=7, feedback_reaso
     return result.rowcount == 1
 
 
+
+def resolve_outreach_id(prefix):
+    """Resolve a unique outreach ID by its short hexadecimal prefix."""
+    value = str(prefix or "").strip().lower()
+    if len(value) < 8 or len(value) > 64 or not re.fullmatch(r"[0-9a-f]+", value):
+        raise ValueError("invalid outreach id prefix")
+    with _db() as c:
+        rows = c.execute(
+            "SELECT id FROM outreach WHERE id LIKE ? LIMIT 2",
+            (value + "%",),
+        ).fetchall()
+    if not rows:
+        return None
+    if len(rows) > 1:
+        raise ValueError("ambiguous outreach id prefix")
+    return rows[0][0]
+
+
+
 def build_outcome_feedback_report(records=None):
     """Summarize categorized employer outcomes; never auto-tunes matching weights."""
     from collections import Counter
