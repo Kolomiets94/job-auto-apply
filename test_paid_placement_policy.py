@@ -1,0 +1,97 @@
+import unittest
+
+from direct_outreach import build_outreach_draft, build_outreach_drafts
+from profit_ranker import rank_lead
+
+
+class PaidPlacementPolicyTests(unittest.TestCase):
+    def test_paid_remote_frontend_internship_is_eligible_and_prioritized(self):
+        lead = rank_lead({
+            "title": "Frontend Developer Intern",
+            "company": "Example Labs",
+            "source": "hh",
+            "location": "Россия",
+            "salary": "Стажировка оплачиваемая, 40 000 ₽ в месяц",
+            "description": "Оплачиваемая стажировка. JavaScript, HTML, CSS.",
+            "experience": "Без опыта",
+        })
+        self.assertTrue(lead["eligible"], lead.get("rank_reason"))
+        self.assertEqual(lead["opportunity_type"], "paid_placement")
+
+    def test_unpaid_or_unconfirmed_placement_is_rejected(self):
+        for description in ("Неоплачиваемая стажировка", "Стажировка, условия оплаты не указаны"):
+            lead = rank_lead({
+                "title": "Frontend Developer Intern",
+                "company": "Example Labs",
+                "source": "hh",
+                "location": "Россия",
+                "description": description + ". JavaScript, HTML, CSS.",
+            })
+            self.assertFalse(lead["eligible"])
+            self.assertEqual(lead["rank_reason"], "placement compensation not confirmed")
+
+    def test_ordinary_junior_vacancy_remains_eligible(self):
+        lead = rank_lead({
+            "title": "Junior Frontend Developer",
+            "company": "Example Labs",
+            "source": "hh",
+            "location": "Россия",
+            "experience": "Без опыта",
+            "description": "JavaScript, HTML, CSS. Опыт не требуется.",
+        })
+        self.assertTrue(lead["eligible"], lead.get("rank_reason"))
+        self.assertEqual(lead["opportunity_type"], "junior_vacancy")
+
+    def test_hybrid_is_rejected_even_in_yekaterinburg(self):
+        lead = rank_lead({
+            "title": "Junior Frontend Developer",
+            "company": "Example Labs",
+            "source": "hh",
+            "location": "Екатеринбург",
+            "work_mode": "hybrid",
+            "experience": "Без опыта",
+            "description": "JavaScript, HTML, CSS.",
+        })
+        self.assertFalse(lead["eligible"])
+        self.assertEqual(lead["rank_reason"], "hybrid work is excluded; fully remote only")
+
+    def test_excluded_employers_are_rejected(self):
+        for company in ("ASTON", "PREAX", "Edmagit"):
+            lead = rank_lead({
+                "title": "Junior Frontend Developer",
+                "company": company,
+                "source": "hh",
+                "location": "Россия",
+                "experience": "Без опыта",
+                "description": "JavaScript, HTML, CSS.",
+            })
+            self.assertFalse(lead["eligible"])
+            self.assertEqual(lead["rank_reason"], "excluded employer")
+
+    def test_outreach_drafts_cover_both_opportunity_types_and_skip_excluded(self):
+        internship = build_outreach_draft({
+            "title": "Frontend Developer Intern",
+            "company": "Example Labs",
+        })
+        junior = build_outreach_draft({
+            "title": "Junior Frontend Developer",
+            "company": "Example Labs",
+        })
+        excluded = build_outreach_draft({
+            "title": "Junior Frontend Developer",
+            "company": "Edmagit",
+        })
+        self.assertEqual(internship["opportunity_type"], "paid_placement")
+        self.assertIn("оплачиваемую стажировку", internship["message_draft"])
+        self.assertEqual(junior["opportunity_type"], "junior_vacancy")
+        self.assertIn("Junior Frontend Developer", junior["message_draft"])
+        self.assertIsNone(excluded)
+        drafts = build_outreach_drafts([
+            {"title": "Frontend Developer Intern", "company": "Example Labs"},
+            {"title": "Junior Frontend Developer", "company": "Example Labs"},
+        ])
+        self.assertEqual(len(drafts), 2)
+
+
+if __name__ == "__main__":
+    unittest.main()
