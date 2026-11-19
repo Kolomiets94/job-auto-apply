@@ -613,7 +613,7 @@ def run():
     outreach_ids = save_outreach_drafts(outreach_drafts)
     stats["outreach_drafts_prepared"] = len(outreach_drafts)
     stats["outreach_drafts_saved"] = len(outreach_ids)
-    stats["outreach_sent"] = sum(item["status"] == "CONTACTED" for item in list_outreach(limit=500))
+    stats["outreach_sent"] = sum(bool(item.get("contacted_at")) for item in list_outreach(limit=500))
     stats["outreach_replied"] = sum(item["status"] in ("REPLIED", "INTERVIEW", "REJECTED", "OFFER") for item in list_outreach(limit=500))
     if job_review:
         lines = ['Вакансии Junior Frontend / вёрстка / QA — Россия и мир:',
