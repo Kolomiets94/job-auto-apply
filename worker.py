@@ -16,7 +16,7 @@ from ats_evaluator import review_lead, build_market_report, build_filter_report
 from profit_ranker import rank_leads, FREELANCE_SOURCES, ROLE_PRIORITY, _role_category
 from proposal_writer import make_proposal
 from application_dispatcher import dispatch
-from queue_store import enqueue, enqueue_many, set_state, submitted_today, submitted_this_week, was_submitted, queued_leads
+from queue_store import enqueue, enqueue_many, set_state, submitted_today, submitted_this_week, was_submitted, queued_leads, save_outreach_drafts, list_outreach
 from notification_rules import format_notification, should_notify
 from telegram_notifier import send_message, send_notification
 from publication_filter import is_new_publication
@@ -610,7 +610,11 @@ def run():
     stats['job_ranked'] = len(ranked_jobs)
     stats['job_actionable'] = sum(_application_priority(lead) == 0 for lead in ranked_jobs)
     outreach_drafts = build_outreach_drafts(job_review, limit=10)
+    outreach_ids = save_outreach_drafts(outreach_drafts)
     stats["outreach_drafts_prepared"] = len(outreach_drafts)
+    stats["outreach_drafts_saved"] = len(outreach_ids)
+    stats["outreach_sent"] = sum(item["status"] == "CONTACTED" for item in list_outreach(limit=500))
+    stats["outreach_replied"] = sum(item["status"] in ("REPLIED", "INTERVIEW", "REJECTED", "OFFER") for item in list_outreach(limit=500))
     if job_review:
         lines = ['Вакансии Junior Frontend / вёрстка / QA — Россия и мир:',
                  'Ссылки на вакансии; отправка откликов здесь не подтверждается.']
