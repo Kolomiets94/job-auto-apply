@@ -610,8 +610,12 @@ def run():
     # Show matching employment vacancies independently of freelance projects.
     job_review = sorted(
         (lead for lead in ranked_jobs if lead.get('url')),
-        key=lambda lead: (ROLE_PRIORITY.get(_role_category(lead), 99),
-                          _application_priority(lead), -lead.get('profit_score', 0)),
+        key=lambda lead: (
+            0 if lead.get("opportunity_type") == "paid_placement" else 1,
+            ROLE_PRIORITY.get(_role_category(lead), 99),
+            _application_priority(lead),
+            -lead.get("profit_score", 0),
+        ),
     )[:10]
     stats['job_ranked'] = len(ranked_jobs)
     stats['job_actionable'] = sum(_application_priority(lead) == 0 for lead in ranked_jobs)
