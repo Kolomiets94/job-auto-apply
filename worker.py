@@ -21,6 +21,7 @@ from notification_rules import format_notification, should_notify
 from telegram_notifier import send_message, send_notification
 from publication_filter import is_new_publication
 from direct_outreach import build_outreach_drafts
+from resume_parser import extract_resume_text, ResumeParseError
 
 DEFAULT_RESUME_TEXT = ""  # Never invent skills or project history when no verified resume is configured.
 
@@ -31,9 +32,11 @@ def load_resume_text():
         return text
     path = os.getenv("RESUME_FILE", "resume/profile.txt")
     try:
-        with open(path, "r", encoding="utf-8") as fh:
-            return fh.read().strip()
-    except OSError:
+        return extract_resume_text(path)
+    except FileNotFoundError:
+        return DEFAULT_RESUME_TEXT
+    except ResumeParseError as exc:
+        print(f"[resume] parsing failed; live applications remain blocked: {exc}", flush=True)
         return DEFAULT_RESUME_TEXT
 
 
