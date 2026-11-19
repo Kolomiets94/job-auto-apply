@@ -121,6 +121,25 @@ def update_outreach(outreach_id):
     return jsonify({"status": "updated", "outreach_id": outreach_id})
 
 
+@app.post("/telegram/webhook")
+def telegram_webhook():
+    """Receive authenticated Telegram bot commands; never sends employer messages."""
+    expected = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
+    supplied = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+    if not expected or not hmac.compare_digest(supplied, expected):
+        return jsonify({"error": "unauthorized"}), 401
+    update = request.get_json(silent=True)
+    if not isinstance(update, dict):
+        return jsonify({"error": "invalid_update"}), 400
+    try:
+        from telegram_control import handle_update
+        handle_update(update)
+    except Exception:
+        app.logger.exception("Telegram control update failed")
+        return jsonify({"error": "update_failed"}), 500
+    return jsonify({"ok": True})
+
+
 @app.post("/run")
 def run_hunter():
     # Never allow anonymous internet requests to submit real job applications.
