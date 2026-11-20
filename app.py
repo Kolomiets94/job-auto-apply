@@ -226,7 +226,7 @@ def telegram_webhook():
                 outcome.get("status") if isinstance(outcome, dict) else "unknown",
                 outcome.get("reason", "") if isinstance(outcome, dict) else "",
                 outcome.get("command", "") if isinstance(outcome, dict) else "",
-                chat_id if outcome.get("reason") == "chat_not_configured" and isinstance(outcome, dict) else "",
+                chat_id if isinstance(outcome, dict) and outcome.get("reason") in ("chat_not_configured", "chat_mismatch") else "",
             ),
             flush=True,
         )
