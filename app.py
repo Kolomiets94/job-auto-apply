@@ -18,11 +18,9 @@ _telegram_setup_done = False
 
 @app.before_request
 def _complete_one_time_telegram_setup():
-    """Use the temporary Render setup flag to register the fixed webhook on a health check."""
+    """Register the fixed Telegram webhook once when Render checks the service health."""
     global _telegram_setup_done
     if request.path != "/" or _telegram_setup_done:
-        return None
-    if not os.getenv("TELEGRAM_WEBHOOK_SETUP_KEY", "").strip():
         return None
     with _telegram_setup_lock:
         if _telegram_setup_done:
