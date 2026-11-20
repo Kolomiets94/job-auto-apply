@@ -280,14 +280,9 @@ def _work_mode(lead: Dict[str, Any]) -> str:
 
 
 def _work_format_rejection(lead: Dict[str, Any]) -> str | None:
-    mode = _work_mode(lead)
-    if mode == "remote":
-        return None
-    if mode == "hybrid":
-        return "hybrid work is excluded; fully remote only"
-    if mode == "office":
-        return "office/on-site roles are excluded"
-    return "remote work format is not confirmed"
+    # The candidate is searching the Russian market and accepts remote,
+    # hybrid and office roles. Keep the detected format as metadata for display.
+    return None
 
 
 def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
