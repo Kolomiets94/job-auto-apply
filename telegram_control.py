@@ -51,60 +51,63 @@ def _outreach_text():
         return "Журнал обращений пока пуст."
     lines = ["Последние обращения (ID · статус · компания):"]
     for item in items:
-        company = re.sub(r"[\r\n]+", " ", str(item.get("company") or "Без названия"))
+        company = re.sub(r"[\\r\\n]+", " ", str(item.get("company") or "Без названия"))
         company = company[:90]
         lines.append(
             f"{str(item.get('id') or '')[:12]} · "
             f"{item.get('status') or 'UNKNOWN'} · {company}"
         )
     lines.append("Изменить: /set ID STATUS [REASON]")
-    return "\n".join(lines)
+    return "\\n".join(lines)
 
 
 def handle_update(update):
     """Process a Telegram webhook update from the configured chat only."""
     configured_chat = os.getenv("TELEGRAM_CHAT_ID", "").strip() or os.getenv("CHAT_ID", "").strip()
     message = update.get("message") if isinstance(update, dict) else None
-    if not configured_chat or not isinstance(message, dict):
-        return {"status": "ignored"}
+    if not configured_chat:
+        return {"status": "ignored", "reason": "chat_not_configured"}
+    if not isinstance(message, dict):
+        return {"status": "ignored", "reason": "no_message"}
     chat = message.get("chat") or {}
     if str(chat.get("id", "")) != configured_chat:
-        return {"status": "ignored"}
+        return {"status": "ignored", "reason": "chat_mismatch"}
     text = str(message.get("text") or "").strip()
     if not text.startswith("/"):
-        return {"status": "ignored"}
+        return {"status": "ignored", "reason": "not_a_command"}
 
     parts = text.split()
     command = parts[0].split("@", 1)[0].lower()
     if command in ("/start", "/help"):
         _reply(_help_text())
-        return {"status": "replied"}
+        return {"status": "replied", "command": "start_or_help"}
     if command == "/outreach":
         _reply(_outreach_text())
-        return {"status": "replied"}
+        return {"status": "replied", "command": "outreach"}
     if command != "/set":
         _reply("Неизвестная команда. Используйте /help.")
-        return {"status": "replied"}
+        return {"status": "replied", "command": "unknown"}
     if len(parts) not in (3, 4):
         _reply("Формат: /set ID STATUS [REASON]. Подробности: /help.")
-        return {"status": "replied"}
+        return {"status": "replied", "command": "set_invalid"}
 
     prefix, status = parts[1], parts[2].upper()
     reason = parts[3].lower() if len(parts) == 4 else None
     if status not in OUTREACH_STATES:
         _reply("Неизвестный статус. Допустимые: " + ", ".join(OUTREACH_STATES))
-        return {"status": "replied"}
+        return {"status": "replied", "command": "set_invalid_status"}
     if reason is not None and (status != "REJECTED" or reason not in FEEDBACK_REASONS):
         _reply("Для REJECTED укажите одну из категорий: " + ", ".join(FEEDBACK_REASONS))
-        return {"status": "replied"}
+        return {"status": "replied", "command": "set_invalid_reason"}
     try:
         outreach_id = resolve_outreach_id(prefix)
         if outreach_id is None:
             _reply("Обращение с таким ID не найдено. Обновите список командой /outreach.")
-            return {"status": "replied"}
+            return {"status": "replied", "command": "set_not_found"}
         update_outreach_status(outreach_id, status, feedback_reason=reason)
     except ValueError as exc:
         _reply(str(exc))
-        return {"status": "replied"}
+        return {"status": "replied", "command": "set_invalid"}
     _reply(f"Записано: {status}" + (f" · {_REASON_LABELS[reason]}" if reason else "") + ".")
-    return {"status": "updated"}
+    return {"status": "updated", "command": "set"}
+}
