@@ -110,4 +110,3 @@ def handle_update(update):
         return {"status": "replied", "command": "set_invalid"}
     _reply(f"Записано: {status}" + (f" · {_REASON_LABELS[reason]}" if reason else "") + ".")
     return {"status": "updated", "command": "set"}
-}
