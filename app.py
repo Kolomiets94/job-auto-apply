@@ -215,12 +215,18 @@ def telegram_webhook():
     try:
         from telegram_control import handle_update
         outcome = handle_update(update)
+        # If chat routing is not configured, expose only the private-chat ID
+        # needed to finish setup; never log message text or bot credentials.
+        message = update.get("message") if isinstance(update, dict) else None
+        chat = message.get("chat") if isinstance(message, dict) else None
+        chat_id = chat.get("id") if isinstance(chat, dict) and chat.get("type") == "private" else ""
         print(
-            "Telegram update processed: status=%s reason=%s command=%s"
+            "Telegram update processed: status=%s reason=%s command=%s private_chat_id=%s"
             % (
                 outcome.get("status") if isinstance(outcome, dict) else "unknown",
                 outcome.get("reason", "") if isinstance(outcome, dict) else "",
                 outcome.get("command", "") if isinstance(outcome, dict) else "",
+                chat_id if outcome.get("reason") == "chat_not_configured" and isinstance(outcome, dict) else "",
             ),
             flush=True,
         )
