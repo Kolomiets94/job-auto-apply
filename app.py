@@ -25,13 +25,14 @@ def _complete_one_time_telegram_setup():
     with _telegram_setup_lock:
         if _telegram_setup_done:
             return None
-        app.logger.info("Telegram one-time webhook setup: checking server-side configuration")
+        print("Telegram one-time webhook setup: checking server-side configuration", flush=True)
         token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip() or os.getenv("BOT_TOKEN", "").strip()
         secret = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
         if not token or len(secret) < 32:
-            app.logger.warning(
-                "Telegram one-time setup skipped: bot_token_present=%s webhook_secret_valid=%s",
-                bool(token), len(secret) >= 32,
+            print(
+                "Telegram one-time setup skipped: bot_token_present=%s webhook_secret_valid=%s"
+                % (bool(token), len(secret) >= 32),
+                flush=True,
             )
             return None
         try:
@@ -48,9 +49,9 @@ def _complete_one_time_telegram_setup():
             response.raise_for_status()
             if response.json().get("ok"):
                 _telegram_setup_done = True
-                app.logger.info("Telegram webhook registered by one-time setup")
+                print("Telegram webhook registered by one-time setup", flush=True)
             else:
-                app.logger.warning("Telegram one-time webhook setup was rejected")
+                print("Telegram one-time webhook setup was rejected", flush=True)
         except Exception:
             app.logger.exception("Telegram one-time webhook setup request failed")
     return None
