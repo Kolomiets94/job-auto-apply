@@ -16,6 +16,18 @@ QUERIES=[
     ("frontend","junior фронтенд"),
     ("frontend","junior JavaScript"),
     ("frontend","младший frontend"),
+    ("frontend","стажер React"),
+    ("frontend","стажёр React"),
+    ("frontend","React intern"),
+    ("frontend","Next.js junior"),
+    ("frontend","React Next.js"),
+    ("frontend","React AI"),
+    ("frontend","React LLM"),
+    ("frontend","React AI agents"),
+    ("frontend","React MCP"),
+    ("frontend","Next.js AI"),
+    ("frontend","frontend AI интеграции"),
+    ("frontend","React интеграция нейросетей"),
     ("layout","junior верстальщик"),
     ("layout","junior HTML CSS"),
     ("layout","младший верстальщик"),
@@ -113,8 +125,10 @@ def _hh_search(tag, q, work_format, area=None, max_pages=6):
     for page in range(max_pages):
         params = {
             "text": q, "per_page": 50, "page": page,
-            "order_by": "publication_time", "work_format": work_format,
+            "order_by": "publication_time",
         }
+        if work_format:
+            params["work_format"] = work_format
         if area:
             params["area"] = str(area)
         for attempt in range(3):
@@ -157,13 +171,13 @@ def _hh_search(tag, q, work_format, area=None, max_pages=6):
         "location": (v.get("area") or {}).get("name"),
         "work_format": v.get("work_format") or [],
         "schedule": v.get("schedule") or {},
-        "work_mode": work_format,
+        "work_mode": work_format or "",
     } for v in items if ok(v)]
 
 
 def hh_search(tag, q):
-    """Search remote HH vacancies across Russia."""
-    return _hh_search(tag, q, work_format="REMOTE")
+    """Search HH vacancies across Russia in remote, hybrid and office formats."""
+    return _hh_search(tag, q, work_format=None)
 
 
 def hh_search_hybrid(tag, q):
