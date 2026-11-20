@@ -20,15 +20,19 @@ _telegram_setup_done = False
 def _complete_one_time_telegram_setup():
     """Register the fixed Telegram webhook once when Render checks the service health."""
     global _telegram_setup_done
-    if request.path != "/" or _telegram_setup_done:
+    if request.path != "/" or request.method != "GET" or _telegram_setup_done:
         return None
     with _telegram_setup_lock:
         if _telegram_setup_done:
             return None
+        app.logger.info("Telegram one-time webhook setup: checking server-side configuration")
         token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip() or os.getenv("BOT_TOKEN", "").strip()
         secret = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
         if not token or len(secret) < 32:
-            app.logger.warning("Telegram one-time setup skipped: required configuration missing")
+            app.logger.warning(
+                "Telegram one-time setup skipped: bot_token_present=%s webhook_secret_valid=%s",
+                bool(token), len(secret) >= 32,
+            )
             return None
         try:
             import requests
