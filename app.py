@@ -214,7 +214,13 @@ def telegram_webhook():
         return jsonify({"error": "invalid_update"}), 400
     try:
         from telegram_control import handle_update
-        handle_update(update)
+        outcome = handle_update(update)
+        app.logger.info(
+            "Telegram update processed: status=%s reason=%s command=%s",
+            outcome.get("status") if isinstance(outcome, dict) else "unknown",
+            outcome.get("reason", "") if isinstance(outcome, dict) else "",
+            outcome.get("command", "") if isinstance(outcome, dict) else "",
+        )
     except Exception:
         app.logger.exception("Telegram control update failed")
         return jsonify({"error": "update_failed"}), 500
