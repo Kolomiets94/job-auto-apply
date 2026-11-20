@@ -20,16 +20,19 @@ os.makedirs(USER_DATA_FOLDER, exist_ok=True)
 
 # Default filters
 DEFAULT_FILTERS = {
-    'keywords': ['frontend', 'react', 'javascript', 'typescript', 'html', 'css', 'scss'],
+    'keywords': [
+        'frontend', 'react', 'javascript', 'typescript', 'next.js',
+        'html', 'css', 'scss', 'llm', 'ai agents', 'mcp', 'openai api',
+    ],
     'exclude_keywords': ['senior', 'lead', 'manager', 'director'],
     'min_salary': 60000,
-    # Remote across Russia; hybrid is the only local exception in Yekaterinburg.
-    'remote_only': True,
-    'hybrid_cities': ['Екатеринбург'],
-    'office_allowed': False,
+    # Search the Russian market: remote, hybrid and office roles are eligible.
+    'remote_only': False,
+    'hybrid_cities': [],
+    'office_allowed': True,
     'freelance_fallback_only': True,
     'experience_level': 'junior',
-    'cities': ['Екатеринбург', 'Удаленная работа по России']
+    'cities': ['Россия', 'Удаленная работа по России']
 }
 
 # hh.ru API
