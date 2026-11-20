@@ -215,11 +215,14 @@ def telegram_webhook():
     try:
         from telegram_control import handle_update
         outcome = handle_update(update)
-        app.logger.info(
-            "Telegram update processed: status=%s reason=%s command=%s",
-            outcome.get("status") if isinstance(outcome, dict) else "unknown",
-            outcome.get("reason", "") if isinstance(outcome, dict) else "",
-            outcome.get("command", "") if isinstance(outcome, dict) else "",
+        print(
+            "Telegram update processed: status=%s reason=%s command=%s"
+            % (
+                outcome.get("status") if isinstance(outcome, dict) else "unknown",
+                outcome.get("reason", "") if isinstance(outcome, dict) else "",
+                outcome.get("command", "") if isinstance(outcome, dict) else "",
+            ),
+            flush=True,
         )
     except Exception:
         app.logger.exception("Telegram control update failed")
