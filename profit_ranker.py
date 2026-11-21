@@ -100,6 +100,28 @@ def _explicit_salary_rejected(lead: Dict[str, Any]) -> bool:
     return False
 
 
+def _explicit_salary_above_ceiling(lead: Dict[str, Any]) -> bool:
+    """Reject a known RUB salary ceiling above the candidate's 70k monthly cap.
+
+    Unknown salaries remain eligible for review. For a range, either endpoint
+    above the cap is enough to show that the advertised maximum exceeds it.
+    """
+    if str(lead.get("source") or "").lower() in FREELANCE_SOURCES:
+        return False
+    salary = lead.get("salary")
+    if not isinstance(salary, dict):
+        return False
+    currency = str(salary.get("currency") or "").upper()
+    if currency not in ("RUR", "RUB"):
+        return False
+    cap = 70000
+    values = [
+        value for value in (salary.get("from"), salary.get("to"), salary.get("amount"))
+        if isinstance(value, (int, float)) and not isinstance(value, bool)
+    ]
+    return bool(values) and max(values) > cap
+
+
 def _location_rejected(lead: Dict[str, Any], text: str) -> bool:
     source = str(lead.get("source") or "").lower()
     # Explicit residence/right-to-work restrictions apply regardless of source.
@@ -297,7 +319,7 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     if re.search(r"\bqa\b|tester|тестиров|quality assurance|автотест", title, re.I):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "non-target QA role"}
     # Exclude non-Junior roles by title, not incidental descriptions.
-    if re.search(r"\bjunior\s*\+", title) or any(x in title for x in BLOCK) or re.search(r"(?<![a-z])vue(?![a-z])", title):
+    if any(x in title for x in BLOCK) or re.search(r"(?<![a-z])vue(?![a-z])", title):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "excluded job title"}
     # Remote is allowed across Russia and internationally only when the
     # location policy below confirms that a candidate based in Russia may work.
@@ -337,6 +359,8 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "known stale vacancy (2023)"}
     if _explicit_salary_rejected(lead):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "salary below configured floor"}
+    if _explicit_salary_above_ceiling(lead):
+        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "salary above configured ceiling"}
     if _location_rejected(lead, text):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "explicit location/work-authorization restriction"}
 
