@@ -119,7 +119,16 @@ def collect_all():
                 # Avoid repeating a blocked API request for each search term.
                 break
 
-    # Fully remote only: do not spend HH requests on hybrid vacancies.
+    # Also collect HH hybrid vacancies in Yekaterinburg; the ranker rejects hybrid roles elsewhere.
+    for tag, query in QUERIES:
+        try:
+            matches = hh_search_hybrid(tag, query)
+            print(f"[collector] hh hybrid {tag} / {query}: {len(matches)} leads", flush=True)
+            leads += matches
+        except Exception as exc:
+            record_collection_error(f"hh-hybrid:{tag}:{query}", exc)
+            if isinstance(exc, HHAccessUnavailable):
+                break
 
     try:
         leads += remoteok()
