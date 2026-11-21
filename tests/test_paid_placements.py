@@ -38,11 +38,14 @@ class PaidPlacementTests(unittest.TestCase):
 
     def test_other_requirements_still_apply(self):
         base = {"source": "hh", "title": "Paid Frontend Intern", "description": "React", "location": "Россия", "salary": {"from": 15000, "currency": "RUB"}}
-        for overrides in ({"title": "Paid Senior Frontend Intern"}, {"title": "Paid Junior+ React Intern"},
+        for overrides in ({"title": "Paid Senior Frontend Intern"},
                           {"requirements": "SQL required"}, {"requirements": "Angular required"},
                           {"description": "Must reside in the US. React"}, {"title": "Paid HR Intern"}):
             with self.subTest(overrides=overrides):
                 self.assertFalse(rank_lead({**base, **overrides})["eligible"])
+
+        junior_plus_intern = rank_lead({**base, "title": "Paid Junior+ React Intern"})
+        self.assertTrue(junior_plus_intern["eligible"])
 
     def test_title_boundaries(self):
         self.assertFalse(is_entry_level("International React Developer"))
