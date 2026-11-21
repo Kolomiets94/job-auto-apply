@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from job_sources import JOB_COLLECTORS
 
 from main import QUERIES, HHAccessUnavailable, hh_search, hh_search_hybrid, remoteok
+from hh_web_search import hh_web_session_available, search_hh_web
 from freelance_sources import (
     collect_freelance, collect_peopleperhour, collect_prolinker,
     collect_weblancer, collect_freelancer_com,
@@ -121,7 +122,29 @@ def collect_all():
                 hh_available = False
                 break
 
-    # Also collect HH hybrid vacancies in Yekaterinburg; the ranker rejects hybrid roles elsewhere.
+    # If HH API is unavailable, use the authenticated public search page as a
+    # bounded fallback. It is deliberately remote-only: the browser collector
+    # must never admit office/hybrid roles from other cities.
+    if not hh_available:
+        if hh_web_session_available():
+            fallback_queries = QUERIES[:16] + QUERIES[-2:]
+            for tag, query in fallback_queries:
+                try:
+                    matches = search_hh_web(tag, query)
+                    print(f"[collector] hh web remote {tag} / {query}: {len(matches)} leads", flush=True)
+                    leads += matches
+                except Exception as exc:
+                    record_collection_error(f"hh-web:{tag}:{query}", exc)
+                    # A security challenge or expired session is not something
+                    # to retry or work around. Stop this source for the run.
+                    break
+        else:
+            record_collection_error(
+                "hh-web",
+                RuntimeError("saved HH browser session unavailable; remote fallback skipped"),
+            )
+
+    # Hybrid vacancies are collected only through the API's explicit Yekaterinburg area filter.
     for tag, query in (QUERIES if hh_available else []):
         try:
             matches = hh_search_hybrid(tag, query)
