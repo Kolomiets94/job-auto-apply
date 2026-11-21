@@ -49,9 +49,12 @@ class PaidPlacementPolicyTests(unittest.TestCase):
                 "description": description + ". JavaScript, HTML, CSS.",
             })
             self.assertFalse(lead["eligible"])
-            self.assertEqual(lead["rank_reason"], "placement compensation not confirmed")
+            if "неоплачиваемая" in description.lower():
+                self.assertEqual(lead["rank_reason"], "salary outside configured range or unpaid placement")
+            else:
+                self.assertEqual(lead["rank_reason"], "salary requires manual review")
 
-    def test_ordinary_junior_vacancy_remains_eligible(self):
+    def test_ordinary_junior_without_salary_is_held_for_manual_review(self):
         lead = rank_lead({
             "title": "Junior Frontend Developer",
             "company": "Example Labs",
@@ -60,8 +63,33 @@ class PaidPlacementPolicyTests(unittest.TestCase):
             "experience": "Без опыта",
             "description": "JavaScript, HTML, CSS. Опыт не требуется.",
         })
+        self.assertFalse(lead["eligible"])
+        self.assertEqual(lead["rank_reason"], "salary requires manual review")
+
+    def test_regular_salary_bounds_are_50k_to_70k_monthly(self):
+        for amount in (50000, 60000, 70000):
+            lead = rank_lead({"title":"Junior Frontend Developer","source":"hh","location":"Россия","experience":"Без опыта","salary":{"from":amount,"currency":"RUR"},"description":"JavaScript, HTML, CSS."})
+            self.assertTrue(lead["eligible"], lead.get("rank_reason"))
+        for amount in (49000, 71000):
+            lead = rank_lead({"title":"Junior Frontend Developer","source":"hh","location":"Россия","experience":"Без опыта","salary":{"from":amount,"currency":"RUR"},"description":"JavaScript, HTML, CSS."})
+            self.assertFalse(lead["eligible"])
+
+    def test_internship_salary_bounds_are_30k_to_70k_monthly(self):
+        for amount in (30000, 45000, 70000):
+            lead = rank_lead({"title":"Frontend Developer Intern","source":"hh","location":"Россия","salary":{"from":amount,"currency":"RUR"},"description":"Оплачиваемая стажировка. JavaScript, HTML, CSS.","experience":"Без опыта"})
+            self.assertTrue(lead["eligible"], lead.get("rank_reason"))
+        for amount in (29000, 71000):
+            lead = rank_lead({"title":"Frontend Developer Intern","source":"hh","location":"Россия","salary":{"from":amount,"currency":"RUR"},"description":"Оплачиваемая стажировка. JavaScript, HTML, CSS.","experience":"Без опыта"})
+            self.assertFalse(lead["eligible"])
+
+    def test_salary_range_crossing_bounds_requires_manual_review(self):
+        lead = rank_lead({"title":"Junior Frontend Developer","source":"hh","location":"Россия","experience":"Без опыта","salary":{"from":45000,"to":60000,"currency":"RUR"},"description":"JavaScript, HTML, CSS."})
+        self.assertFalse(lead["eligible"])
+        self.assertEqual(lead["rank_reason"], "salary requires manual review")
+
+    def test_annual_rub_salary_is_normalized_to_monthly(self):
+        lead = rank_lead({"title":"Junior Frontend Developer","source":"hh","location":"Россия","experience":"Без опыта","salary":{"from":600000,"currency":"RUR","period":"year"},"description":"JavaScript, HTML, CSS."})
         self.assertTrue(lead["eligible"], lead.get("rank_reason"))
-        self.assertEqual(lead["opportunity_type"], "junior_vacancy")
 
     def test_hybrid_is_rejected_even_in_yekaterinburg(self):
         lead = rank_lead({
