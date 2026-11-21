@@ -267,12 +267,39 @@ def build_filter_report(leads):
 
     reasons = Counter()
     passed = 0
+    geo_examples = []
     for lead in items:
         decision = rank_lead(lead)
         if decision.get("eligible"):
             passed += 1
         else:
-            reasons[str(decision.get("rank_reason") or "unknown")] += 1
+            reason = str(decision.get("rank_reason") or "unknown")
+            reasons[reason] += 1
+            if reason == "explicit location/work-authorization restriction" and len(geo_examples) < 5:
+                from profit_ranker import INTERNATIONAL_SOURCES
+                source = str(lead.get("source") or "unknown").lower()
+                location = str(lead.get("location") or "не указана").strip()
+                text = " ".join(str(lead.get(key) or "") for key in
+                                ("location", "description", "requirements")).lower()
+                if any(term in text for term in (
+                    "work authorization", "work authorisation",
+                    "visa sponsorship is not available", "no visa sponsorship",
+                    "right to work in", "must reside in", "must be based in",
+                    "residents of", "us only", "uk only", "eu only",
+                    "europe only", "canada only",
+                )):
+                    diagnosis = "В тексте есть требование по месту проживания или разрешению на работу"
+                elif source in INTERNATIONAL_SOURCES:
+                    diagnosis = "Нет явного подтверждения, что работодатель нанимает из России"
+                else:
+                    diagnosis = "Найдено явное ограничение по географии или праву на работу"
+                geo_examples.append({
+                    "title": str(lead.get("title") or "Без названия")[:100],
+                    "source": source,
+                    "location": location[:100],
+                    "diagnosis": diagnosis,
+                    "url": str(lead.get("url") or ""),
+                })
 
     labels = {
         "internship/trainee excluded": "Стажировка/trainee исключена текущими правилами",
@@ -286,6 +313,7 @@ def build_filter_report(leads):
         "SQL outside confirmed stack": "SQL вне подтверждённого стека",
         "known stale vacancy (2023)": "Устаревшая вакансия",
         "salary below configured floor": "Зарплата ниже внутреннего порога",
+        "salary above configured ceiling": "Зарплата выше установленного максимума 70 000 ₽",
         "explicit location/work-authorization restriction": "География или право на работу не подходят",
         "non-target job title": "Нецелевая должность",
         "job title outside target roles": "Название вне целевых Frontend/React ролей",
@@ -319,10 +347,19 @@ def build_filter_report(leads):
     lines.extend([
         "",
         "Как трактовать результат:",
-        "- Зарплата ниже порога — можно пересмотреть только если пользователь изменит нижнюю границу.",
+        "- Зарплата выше максимума 70 000 ₽ исключается; нижнего порога зарплаты нет.",
         "- Офис/неподходящий гибрид/география — не исправляется формулировкой резюме.",
         "- Недостаточный Junior-сигнал или неподдерживаемый обязательный стек — проверять описание вручную; "
         "не приписывать коммерческий опыт или отсутствующие технологии.",
         "- Внутренний ранкер показывает первую причину отказа, а не окончательный вердикт работодателя.",
     ])
+    if geo_examples:
+        lines.extend(["", "ПРИМЕРЫ ГЕОГРАФИЧЕСКИХ ИСКЛЮЧЕНИЙ (до 5):"])
+        for example in geo_examples:
+            lines.append(
+                f"- {example['title']} [{example['source']}] — "
+                f"{example['location']}; {example['diagnosis']}"
+            )
+            if example["url"]:
+                lines.append(example["url"])
     return "\n".join(lines)

@@ -157,3 +157,42 @@ def test_residence_requirement_accepts_russia_but_rejects_foreign_only():
             "location": "Worldwide", "work_mode": "REMOTE"}
     assert rank_lead({**base, "description": "React TypeScript. Applicants must reside in Russia."})["eligible"]
     assert not rank_lead({**base, "description": "React TypeScript. Applicants must reside in the US."})["eligible"]
+
+
+
+def test_junior_plus_is_allowed_but_middle_and_senior_are_not():
+    base = {"source": "hh", "title": "Junior+ React Developer",
+            "description": "React TypeScript", "work_mode": "REMOTE",
+            "experience": "1–3 года"}
+    assert rank_lead(base)["eligible"]
+    assert not rank_lead({**base, "title": "Middle React Developer"})["eligible"]
+    assert not rank_lead({**base, "title": "Senior React Developer"})["eligible"]
+
+
+def test_russian_salary_ceiling_is_limited_to_70000_and_unknown_is_kept():
+    base = {"source": "hh", "title": "Junior React Developer",
+            "description": "React TypeScript", "work_mode": "REMOTE"}
+    assert rank_lead({**base, "salary": {"from": 60000, "to": 70000, "currency": "RUR"}})["eligible"]
+    assert rank_lead({**base, "salary": {"from": 40000, "to": 55000, "currency": "RUB"}})["eligible"]
+    over = rank_lead({**base, "salary": {"from": 60000, "to": 80000, "currency": "RUB"}})
+    assert not over["eligible"]
+    assert over["rank_reason"] == "salary above configured ceiling"
+    assert rank_lead({**base, "salary": None})["eligible"]
+
+
+
+def test_filter_report_includes_safe_geography_examples():
+    from ats_evaluator import build_filter_report
+
+    base = {"title": "Junior React Developer", "work_mode": "REMOTE",
+            "experience": "1–3 года", "url": "https://jobs.example/vacancy/1"}
+    report = build_filter_report([
+        {**base, "source": "remotive", "location": "Worldwide",
+         "description": "React TypeScript"},
+        {**base, "source": "hh", "location": "US only",
+         "description": "React TypeScript"},
+    ])
+    assert "ПРИМЕРЫ ГЕОГРАФИЧЕСКИХ ИСКЛЮЧЕНИЙ" in report
+    assert "Нет явного подтверждения" in report
+    assert "В тексте есть требование" in report
+    assert "https://jobs.example/vacancy/1" in report

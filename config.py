@@ -25,7 +25,7 @@ DEFAULT_FILTERS = {
         'html', 'css', 'scss', 'llm', 'ai agents', 'mcp', 'openai api',
     ],
     'exclude_keywords': ['senior', 'lead', 'manager', 'director'],
-    'min_salary': 60000,
+    'min_salary': 0,\n    'max_salary': 70000,
     # Search the Russian market: remote, hybrid and office roles are eligible.
     'remote_only': False,
     'hybrid_cities': [],

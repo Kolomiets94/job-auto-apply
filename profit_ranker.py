@@ -74,30 +74,34 @@ def _money(lead: Dict[str, Any]) -> float:
 
 
 def _explicit_salary_rejected(lead: Dict[str, Any]) -> bool:
+    """Reject unpaid placements only; no minimum salary was configured."""
     if str(lead.get("source") or "").lower() in FREELANCE_SOURCES:
         return False
     if is_placement(lead.get("title")):
         return not placement_is_paid(lead)
-    salary = lead.get("salary")
-    if not salary:
-        return False
-    source = str(lead.get("source") or "").lower()
-    if isinstance(salary, dict):
-        currency = str(salary.get("currency") or "").upper()
-        vals = [x for x in (salary.get("from"), salary.get("to"), salary.get("amount")) if isinstance(x, (int, float))]
-        amount = max(vals) if vals else None
-        if amount is None:
-            return False
-        if currency in ("RUR", "RUB"):
-            return amount < 60000
-        if currency in ("USD", "$"):
-            # RemoteOK-style annual salaries are converted to a monthly comparison.
-            period = str(salary.get("period") or "").lower()
-            monthly = amount / 12.0 if period in ("year", "yearly", "annual", "annually") else amount
-            if not period and source == "remoteok" and amount > 12000:
-                monthly = amount / 12.0
-            return monthly < 1000
     return False
+
+
+def _explicit_salary_above_ceiling(lead: Dict[str, Any]) -> bool:
+    """Reject a known RUB salary ceiling above the candidate's 70k monthly cap.
+
+    Unknown salaries remain eligible for review. For a range, either endpoint
+    above the cap is enough to show that the advertised maximum exceeds it.
+    """
+    if str(lead.get("source") or "").lower() in FREELANCE_SOURCES:
+        return False
+    salary = lead.get("salary")
+    if not isinstance(salary, dict):
+        return False
+    currency = str(salary.get("currency") or "").upper()
+    if currency not in ("RUR", "RUB"):
+        return False
+    cap = 70000
+    values = [
+        value for value in (salary.get("from"), salary.get("to"), salary.get("amount"))
+        if isinstance(value, (int, float)) and not isinstance(value, bool)
+    ]
+    return bool(values) and max(values) > cap
 
 
 def _location_rejected(lead: Dict[str, Any], text: str) -> bool:
@@ -297,7 +301,9 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     if re.search(r"\bqa\b|tester|тестиров|quality assurance|автотест", title, re.I):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "non-target QA role"}
     # Exclude non-Junior roles by title, not incidental descriptions.
-    if re.search(r"\bjunior\s*\+", title) or any(x in title for x in BLOCK) or re.search(r"(?<![a-z])vue(?![a-z])", title):
+    if (any(x in title for x in BLOCK)
+            or (is_placement(title) and re.search(r"\\bjunior\\s*\\+", title))
+            or re.search(r"(?<![a-z])vue(?![a-z])", title)):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "excluded job title"}
     # Remote is allowed across Russia and internationally only when the
     # location policy below confirms that a candidate based in Russia may work.
@@ -337,6 +343,8 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "known stale vacancy (2023)"}
     if _explicit_salary_rejected(lead):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "salary below configured floor"}
+    if _explicit_salary_above_ceiling(lead):
+        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "salary above configured ceiling"}
     if _location_rejected(lead, text):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "explicit location/work-authorization restriction"}
 

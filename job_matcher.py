@@ -87,8 +87,14 @@ class JobMatcher:
                             continue
 
                         salary = item.get("salary")
-                        if salary and salary.get("from") and salary["from"] < filters.get("min_salary", 0):
-                            continue
+                        if salary and str(salary.get("currency") or "").upper() in ("RUR", "RUB"):
+                            salary_values = [
+                                value for value in (salary.get("from"), salary.get("to"))
+                                if isinstance(value, (int, float))
+                            ]
+                            maximum = filters.get("max_salary")
+                            if maximum and salary_values and max(salary_values) > maximum:
+                                continue
 
                         description = await self._get_vacancy_description(item.get("id"))
                         vacancies.append({
