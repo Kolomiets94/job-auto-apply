@@ -286,6 +286,7 @@ def build_filter_report(leads):
         "SQL outside confirmed stack": "SQL вне подтверждённого стека",
         "known stale vacancy (2023)": "Устаревшая вакансия",
         "salary below configured floor": "Зарплата ниже внутреннего порога",
+        "salary above configured ceiling": "Зарплата выше установленного максимума 70 000 ₽",
         "explicit location/work-authorization restriction": "География или право на работу не подходят",
         "non-target job title": "Нецелевая должность",
         "job title outside target roles": "Название вне целевых Frontend/React ролей",
