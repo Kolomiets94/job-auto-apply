@@ -173,6 +173,7 @@ def test_russian_salary_ceiling_is_limited_to_70000_and_unknown_is_kept():
     base = {"source": "hh", "title": "Junior React Developer",
             "description": "React TypeScript", "work_mode": "REMOTE"}
     assert rank_lead({**base, "salary": {"from": 60000, "to": 70000, "currency": "RUR"}})["eligible"]
+    assert rank_lead({**base, "salary": {"from": 40000, "to": 55000, "currency": "RUB"}})["eligible"]
     over = rank_lead({**base, "salary": {"from": 60000, "to": 80000, "currency": "RUB"}})
     assert not over["eligible"]
     assert over["rank_reason"] == "salary above configured ceiling"
