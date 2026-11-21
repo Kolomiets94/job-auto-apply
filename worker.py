@@ -107,6 +107,7 @@ def collect_all():
     COLLECTION_ERRORS.clear()
     COLLECTION_RAW_COUNT = 0
     leads = []
+    hh_available = True
     for tag, query in QUERIES:
         try:
             matches = hh_search(tag, query)
@@ -117,10 +118,11 @@ def collect_all():
             if isinstance(exc, HHAccessUnavailable):
                 # Every remaining query uses the same unavailable channel.
                 # Avoid repeating a blocked API request for each search term.
+                hh_available = False
                 break
 
     # Also collect HH hybrid vacancies in Yekaterinburg; the ranker rejects hybrid roles elsewhere.
-    for tag, query in QUERIES:
+    for tag, query in (QUERIES if hh_available else []):
         try:
             matches = hh_search_hybrid(tag, query)
             print(f"[collector] hh hybrid {tag} / {query}: {len(matches)} leads", flush=True)
