@@ -15,10 +15,18 @@ def test_accepts_explicit_one_year_frontend_and_rejects_higher_experience():
     assert not rank_lead({**base, "experience": "от 1 года", "title": "Middle Frontend React Developer"})["eligible"]
 
 
-def test_internship_requires_confirmed_payment():
+def test_all_internships_are_included_regardless_of_payment_confirmation():
     lead = {"source": "hh", "title": "Junior React internship", "description": "React"}
-    assert not rank_lead(lead)["eligible"]
-    assert rank_lead({**lead, "description": "Paid internship. React"})["eligible"]
+    unknown = rank_lead(lead)
+    assert unknown["eligible"] and not unknown["salary_review_required"]
+    unpaid = rank_lead({**lead, "description": "Unpaid internship. React",
+                        "salary": {"from": 0, "currency": "RUB"}})
+    assert unpaid["eligible"] and not unpaid["salary_review_required"]
+    paid = rank_lead({**lead, "description": "Paid internship. React",
+                      "salary": {"from": 50000, "currency": "RUB"}})
+    assert paid["eligible"] and not paid["salary_review_required"]
+    above_cap = rank_lead({**lead, "salary": {"from": 50001, "currency": "RUB"}})
+    assert not above_cap["eligible"]
 
 
 def test_required_sql_rejected_and_explicit_optional_sql_allowed():
@@ -83,12 +91,12 @@ def test_entry_level_layout_without_junior_title():
     assert not rank_lead({**base, "requirements": "SQL required"})["eligible"]
 
 
-def test_work_format_policy_is_remote_only_everywhere():
+def test_work_format_policy_allows_remote_and_local_hybrid_only():
     base = {"source": "hh", "title": "Junior React Developer", "description": "React TypeScript", "work_mode": "REMOTE"}
     assert rank_lead({**base, "work_mode": "REMOTE", "location": "Москва"})["eligible"]
-    assert not rank_lead({**base, "work_mode": "HYBRID",
-                          "work_format": [{"id": "HYBRID", "name": "Гибридный формат"}],
-                          "location": "Екатеринбург"})["eligible"]
+    assert rank_lead({**base, "work_mode": "HYBRID",
+                      "work_format": [{"id": "HYBRID", "name": "Гибридный формат"}],
+                      "location": "Екатеринбург"})["eligible"]
     assert not rank_lead({**base, "work_mode": "HYBRID",
                           "work_format": [{"id": "HYBRID", "name": "Гибридный формат"}],
                           "location": "Санкт-Петербург"})["eligible"]

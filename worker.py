@@ -14,7 +14,7 @@ from freelancehunt_adapter import collect_freelancehunt
 from job_matcher import JobMatcher
 from ats_evaluator import review_lead, build_market_report, build_filter_report
 from ats_conditions import assess_job_conditions
-from profit_ranker import rank_leads, FREELANCE_SOURCES, ROLE_PRIORITY, _role_category
+from profit_ranker import rank_leads, rank_lead, FREELANCE_SOURCES, ROLE_PRIORITY, _role_category
 from proposal_writer import make_proposal
 from application_dispatcher import dispatch
 from queue_store import enqueue, enqueue_many, set_state, submitted_today, submitted_this_week, was_submitted, queued_leads, save_outreach_drafts, list_outreach, build_outcome_feedback_report
@@ -107,6 +107,7 @@ def collect_all():
     COLLECTION_ERRORS.clear()
     COLLECTION_RAW_COUNT = 0
     leads = []
+    hh_available = True
     for tag, query in QUERIES:
         try:
             matches = hh_search(tag, query)
@@ -117,9 +118,19 @@ def collect_all():
             if isinstance(exc, HHAccessUnavailable):
                 # Every remaining query uses the same unavailable channel.
                 # Avoid repeating a blocked API request for each search term.
+                hh_available = False
                 break
 
-    # Fully remote only: do not spend HH requests on hybrid vacancies.
+    # Also collect HH hybrid vacancies in Yekaterinburg; the ranker rejects hybrid roles elsewhere.
+    for tag, query in (QUERIES if hh_available else []):
+        try:
+            matches = hh_search_hybrid(tag, query)
+            print(f"[collector] hh hybrid {tag} / {query}: {len(matches)} leads", flush=True)
+            leads += matches
+        except Exception as exc:
+            record_collection_error(f"hh-hybrid:{tag}:{query}", exc)
+            if isinstance(exc, HHAccessUnavailable):
+                break
 
     try:
         leads += remoteok()
@@ -284,6 +295,11 @@ def run():
         if not lead.get("unavailable") and is_new_publication(lead)
     ])
     ranked_jobs = rank_leads(job_leads)
+    # Salary-ambiguous leads are excluded from dispatch and shown for human review.
+    salary_review_jobs = [
+        item for item in (rank_lead(lead) for lead in job_leads)
+        if item.get("eligible") and item.get("salary_review_required") and item.get("url")
+    ]
 
     fresh_freelance = []
     freelance_candidates = []
@@ -328,7 +344,6 @@ def run():
     freelance_held_back = bool(ranked_jobs and ranked_freelance)
     # Diagnose why collected Junior Frontend/layout leads never reach dispatch.
     from collections import Counter
-    from profit_ranker import rank_lead
     eligibility = {}
     for role in ("frontend", "layout", "qa"):
         relevant = [lead for lead in leads if not is_freelance(lead) and _role_category(lead) == role]
@@ -406,6 +421,7 @@ def run():
         "paused_browser_hosts": [],
         "email_submitted_after_browser_pause": 0,
         "paid_placements_ranked": sum(is_placement(lead.get("title")) and not is_freelance(lead) for lead in ranked_jobs),
+        "salary_manual_review": len(salary_review_jobs),
     }
     results = []
     notifications = []
@@ -416,6 +432,14 @@ def run():
 
     for lead in ranked:
         freelance = is_freelance(lead)
+        if lead.get("salary_review_required"):
+            results.append({
+                "title": lead.get("title"), "source": lead.get("source"),
+                "url": lead.get("url"), "status": "NEEDS_HUMAN",
+                "reason": "salary requires manual review",
+            })
+            stats["needs_human"] += 1
+            continue
         # QA applications are opt-in: prioritize the candidate's primary
         # Frontend / HTML-CSS roles instead of silently submitting QA.
         # QA vacancies remain visible in reports for later review.
@@ -841,6 +865,14 @@ def run():
     summary_message += "\n\n" + build_market_report(job_leads)
     summary_message += "\n\n" + build_filter_report(job_leads)
     summary_message += "\n\n" + build_outcome_feedback_report()
+    if salary_review_jobs:
+        summary_message += "\n\nРучная проверка зарплаты — отклики НЕ отправляются:"
+        for lead in salary_review_jobs[:10]:
+            summary_message += (
+                f"\n- {str(lead.get('title') or 'Вакансия')[:90]} "
+                f"[{lead.get('source') or '?'}] — зарплата не указана или требует уточнения"
+                f"\n{lead.get('url')}"
+            )
     if ranked_jobs:
         summary_message += "\n\nПодходящие вакансии:"
         for lead in ranked_jobs[:5]:
