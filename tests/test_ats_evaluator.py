@@ -89,7 +89,7 @@ def test_filter_report_keeps_internal_reasons_separate():
     assert "Вакансий проверено внутренним ранкером: 3" in report
     assert "Прошли внутренние фильтры: 1; исключены: 2." in report
     assert "Офисный формат" in report
-    assert "Зарплата ниже внутреннего порога" in report
+    assert "Зарплата вне допустимого диапазона" in report
     assert "первая сработавшая причина" in report
 
 
