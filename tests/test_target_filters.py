@@ -91,12 +91,12 @@ def test_entry_level_layout_without_junior_title():
     assert not rank_lead({**base, "requirements": "SQL required"})["eligible"]
 
 
-def test_work_format_policy_is_remote_only_everywhere():
+def test_work_format_policy_allows_remote_and_local_hybrid_only():
     base = {"source": "hh", "title": "Junior React Developer", "description": "React TypeScript", "work_mode": "REMOTE"}
     assert rank_lead({**base, "work_mode": "REMOTE", "location": "Москва"})["eligible"]
-    assert not rank_lead({**base, "work_mode": "HYBRID",
-                          "work_format": [{"id": "HYBRID", "name": "Гибридный формат"}],
-                          "location": "Екатеринбург"})["eligible"]
+    assert rank_lead({**base, "work_mode": "HYBRID",
+                      "work_format": [{"id": "HYBRID", "name": "Гибридный формат"}],
+                      "location": "Екатеринбург"})["eligible"]
     assert not rank_lead({**base, "work_mode": "HYBRID",
                           "work_format": [{"id": "HYBRID", "name": "Гибридный формат"}],
                           "location": "Санкт-Петербург"})["eligible"]
