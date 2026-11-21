@@ -17,8 +17,10 @@ def test_accepts_explicit_one_year_frontend_and_rejects_higher_experience():
 
 def test_internship_requires_confirmed_payment():
     lead = {"source": "hh", "title": "Junior React internship", "description": "React"}
-    assert not rank_lead(lead)["eligible"]
-    assert rank_lead({**lead, "description": "Paid internship. React"})["eligible"]
+    unknown = rank_lead(lead)
+    assert unknown["eligible"] and unknown["salary_review_required"]
+    paid = rank_lead({**lead, "description": "Paid internship. React"})
+    assert paid["eligible"] and paid["salary_review_required"]
 
 
 def test_required_sql_rejected_and_explicit_optional_sql_allowed():
