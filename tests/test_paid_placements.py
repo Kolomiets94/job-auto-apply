@@ -8,13 +8,16 @@ class PaidPlacementTests(unittest.TestCase):
         for title in ("Frontend Intern", "Стажёр React", "Практикант HTML CSS", "Стажировка верстальщик"):
             with self.subTest(title=title):
                 lead = rank_lead({"source": "hh", "title": title, "location": "Россия",
-                                  "salary": {"from": 15000, "currency": "RUB"}})
+                                  "salary": {"from": 30000, "currency": "RUB"}})
                 self.assertTrue(lead["eligible"], lead.get("rank_reason"))
                 self.assertEqual(lead["opportunity_type"], "paid_placement")
-    def test_unknown_unpaid_and_zero_compensation_are_rejected(self):
-        for description, salary in (("React", None), ("Unpaid React internship", {"from": 15000}),
+    def test_missing_salary_is_manual_review_but_unpaid_and_zero_are_rejected(self):
+        unknown = rank_lead({"source": "hh", "title": "React Intern", "description": "React"})
+        self.assertTrue(unknown["eligible"])
+        self.assertTrue(unknown["salary_review_required"])
+        for description, salary in (("Unpaid React internship", {"from": 30000, "currency": "RUB"}),
                                     ("Неоплачиваемая практика React", None),
-                                    ("Стажировка React без оплаты", None), ("React", {"from": 0})):
+                                    ("Стажировка React без оплаты", None), ("React", {"from": 0, "currency": "RUB"})):
             with self.subTest(description=description):
                 self.assertFalse(rank_lead({"source": "hh", "title": "React Intern",
                                            "description": description, "salary": salary})["eligible"])
@@ -23,7 +26,7 @@ class PaidPlacementTests(unittest.TestCase):
         self.assertFalse(rank_lead({"source": "remotive", "title": "Paid Frontend Internship",
                                    "location": "Worldwide", "description": "React"})["eligible"])
         self.assertFalse(rank_lead({"source": "hh", "title": "Junior React",
-                                    "salary": {"from": 15000, "currency": "RUB"}})["eligible"])
+                                    "salary": {"from": 30000, "currency": "RUB"}})["eligible"])
 
     def test_other_requirements_still_apply(self):
         base = {"source": "hh", "title": "Paid Frontend Intern", "description": "React", "location": "Россия", "salary": {"from": 15000, "currency": "RUB"}}
