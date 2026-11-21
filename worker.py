@@ -14,7 +14,7 @@ from freelancehunt_adapter import collect_freelancehunt
 from job_matcher import JobMatcher
 from ats_evaluator import review_lead, build_market_report, build_filter_report
 from ats_conditions import assess_job_conditions
-from profit_ranker import rank_leads, FREELANCE_SOURCES, ROLE_PRIORITY, _role_category
+from profit_ranker import rank_leads, rank_lead, FREELANCE_SOURCES, ROLE_PRIORITY, _role_category
 from proposal_writer import make_proposal
 from application_dispatcher import dispatch
 from queue_store import enqueue, enqueue_many, set_state, submitted_today, submitted_this_week, was_submitted, queued_leads, save_outreach_drafts, list_outreach, build_outcome_feedback_report
@@ -284,6 +284,11 @@ def run():
         if not lead.get("unavailable") and is_new_publication(lead)
     ])
     ranked_jobs = rank_leads(job_leads)
+    # Salary-ambiguous leads are excluded from dispatch and shown for human review.
+    salary_review_jobs = [
+        item for item in (rank_lead(lead) for lead in job_leads)
+        if item.get("salary_review_required") and item.get("url")
+    ]
 
     fresh_freelance = []
     freelance_candidates = []
@@ -406,6 +411,7 @@ def run():
         "paused_browser_hosts": [],
         "email_submitted_after_browser_pause": 0,
         "paid_placements_ranked": sum(is_placement(lead.get("title")) and not is_freelance(lead) for lead in ranked_jobs),
+        "salary_manual_review": len(salary_review_jobs),
     }
     results = []
     notifications = []
@@ -841,6 +847,14 @@ def run():
     summary_message += "\n\n" + build_market_report(job_leads)
     summary_message += "\n\n" + build_filter_report(job_leads)
     summary_message += "\n\n" + build_outcome_feedback_report()
+    if salary_review_jobs:
+        summary_message += "\n\nРучная проверка зарплаты — отклики НЕ отправляются:"
+        for lead in salary_review_jobs[:10]:
+            summary_message += (
+                f"\n- {str(lead.get('title') or 'Вакансия')[:90]} "
+                f"[{lead.get('source') or '?'}] — зарплата не указана или требует уточнения"
+                f"\n{lead.get('url')}"
+            )
     if ranked_jobs:
         summary_message += "\n\nПодходящие вакансии:"
         for lead in ranked_jobs[:5]:
