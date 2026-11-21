@@ -283,6 +283,7 @@ def build_filter_report(leads):
         "hybrid work is excluded; fully remote only": "Гибридный формат",
         "remote work format is not confirmed": "Удалённый формат не подтверждён",
         "hybrid is allowed only in Yekaterinburg": "Гибрид не в Екатеринбурге",
+        "hybrid work is allowed only in Yekaterinburg": "Гибрид не в Екатеринбурге",
         "remote work format is not confirmed": "Удалённый формат не подтверждён",
         "mandatory nonlocal relocation": "Обязательный переезд в другой город",
         "mandatory unsupported stack": "Обязательный неподдерживаемый стек",
