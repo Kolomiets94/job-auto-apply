@@ -6,7 +6,12 @@ from browser_apply import _storage_state, _looks_like_challenge
 from entry_level import is_entry_level
 
 JUNIOR = re.compile(r"(?<![a-z])(?:junior|джуниор|джун|младший|младшая)(?![a-zа-я])", re.I)
-EXCLUDED = re.compile(r"full[ -]?stack|фул[ -]?ст[еэ]к|middle|senior|lead|junior\s*\+|junior\s+plus", re.I)
+EXCLUDED = re.compile(r"full[ -]?stack|фул[ -]?ст[еэ]к|middle|senior|lead", re.I)
+
+
+def hh_web_session_available():
+    """Return whether an HH browser session is configured and parseable."""
+    return bool(_storage_state())
 
 
 def title_matches_category(title, category):
@@ -28,7 +33,7 @@ def search_hh_web(category, query):
         raise RuntimeError("HH browser search needs a saved session")
     url = "https://hh.ru/search/vacancy?" + urlencode({
         "text": query, "order_by": "publication_time",
-        "items_on_page": "50",
+        "items_on_page": "50", "work_format": "REMOTE",
     })
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -59,14 +64,14 @@ def search_hh_web(category, query):
                 title = card.get("title", "")
                 if not title_matches_category(title, category):
                     continue
-                # Candidate accepts on-site/hybrid work in Moscow and St Petersburg.
-                if not card.get("remote") and card.get("location") not in ("Москва", "Санкт-Петербург"):
+                # Fail closed: only explicitly remote vacancies are valid in this fallback.
+                if not card.get("remote"):
                     continue
                 experience = re.search(r"\b[1-9]\s*[–—-]\s*[1-9]\s*(?:лет|год[а]?)|(?:от|from)\s*\d+\s*(?:лет|год[а]?|years?)", card.get("description", ""), re.I)
                 results.append({
                     **card, "source": "hh", "category": category,
                     "experience": experience.group(0) if experience else "",
-                    "collection_method": "hh_web",
+                    "collection_method": "hh_web", "work_mode": "REMOTE",
                 })
             return results
         finally:
