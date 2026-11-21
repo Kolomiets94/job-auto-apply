@@ -2,7 +2,8 @@ import re, json, hashlib, os
 from datetime import datetime, timezone
 import requests
 from freelance_sources import collect_freelance
-from entry_level import is_placement, placement_is_paid
+from entry_level import is_placement
+from salary_policy import salary_decision
 
 HH_API="https://api.hh.ru/vacancies"
 QUERIES=[
@@ -52,32 +53,10 @@ class HHAccessUnavailable(RuntimeError):
 
 
 def salary_ok(v):
-    """Keep hh.ru vacancies paying at least the configured RUB floor when salary is explicit.
-
-    Regular vacancies without salary remain eligible. Placements require confirmed
-    payment and may pay below the regular-job salary floor.
-    """
-    if is_placement(v.get("name")):
-        return placement_is_paid({**v, "title": v.get("name"), "description": " ".join(str(x or "") for x in (v.get("snippet") or {}).values())})
-    salary = v.get("salary")
-    if not salary:
-        return True
-
-    currency = str(salary.get("currency") or "").upper()
-    if currency not in ("RUR", "RUB"):
-        return True
-
-    minimum = int(os.getenv("HH_MIN_SALARY_RUB", "60000"))
-    salary_from = salary.get("from")
-    salary_to = salary.get("to")
-
-    if isinstance(salary_from, (int, float)):
-        return salary_from >= minimum
-
-    if isinstance(salary_to, (int, float)):
-        return salary_to >= minimum
-
-    return True
+    """Keep in-range offers; ambiguous salary stays visible for manual review."""
+    lead = {**v, "title": v.get("name") or v.get("title"),
+            "description": " ".join(str(x or "") for x in (v.get("snippet") or {}).values())}
+    return salary_decision(lead) != "rejected"
 
 
 def ok(v):
