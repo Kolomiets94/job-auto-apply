@@ -1,15 +1,15 @@
 import main
 
 
-def test_rejects_explicit_rub_salary_below_60000(monkeypatch):
+def test_rejects_explicit_rub_salary_below_50000(monkeypatch):
     monkeypatch.setenv("HH_MIN_SALARY_RUB", "60000")
-    vacancy = {"salary": {"from": 50000, "to": 55000, "currency": "RUR"}}
+    vacancy = {"salary": {"from": 49000, "to": 49000, "currency": "RUR"}}
     assert main.salary_ok(vacancy) is False
 
 
-def test_accepts_explicit_rub_salary_from_60000(monkeypatch):
+def test_keeps_explicit_rub_salary_within_monthly_cap(monkeypatch):
     monkeypatch.setenv("HH_MIN_SALARY_RUB", "60000")
-    vacancy = {"salary": {"from": 60000, "to": 90000, "currency": "RUR"}}
+    vacancy = {"salary": {"from": 60000, "to": 70000, "currency": "RUR"}}
     assert main.salary_ok(vacancy) is True
 
 
