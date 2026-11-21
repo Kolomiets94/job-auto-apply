@@ -263,6 +263,8 @@ def _work_format_rejection(lead: Dict[str, Any]) -> str | None:
         return "hybrid work is excluded; fully remote only"
     if mode == "office":
         return "office work is excluded; fully remote only"
+    if mode != "remote":
+        return "remote work format is not confirmed"
     return None
 
 
