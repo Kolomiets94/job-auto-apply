@@ -15,12 +15,18 @@ def test_accepts_explicit_one_year_frontend_and_rejects_higher_experience():
     assert not rank_lead({**base, "experience": "от 1 года", "title": "Middle Frontend React Developer"})["eligible"]
 
 
-def test_internship_requires_confirmed_payment():
+def test_all_internships_are_included_regardless_of_payment_confirmation():
     lead = {"source": "hh", "title": "Junior React internship", "description": "React"}
     unknown = rank_lead(lead)
-    assert unknown["eligible"] and unknown["salary_review_required"]
-    paid = rank_lead({**lead, "description": "Paid internship. React"})
-    assert paid["eligible"] and paid["salary_review_required"]
+    assert unknown["eligible"] and not unknown["salary_review_required"]
+    unpaid = rank_lead({**lead, "description": "Unpaid internship. React",
+                        "salary": {"from": 0, "currency": "RUB"}})
+    assert unpaid["eligible"] and not unpaid["salary_review_required"]
+    paid = rank_lead({**lead, "description": "Paid internship. React",
+                      "salary": {"from": 50000, "currency": "RUB"}})
+    assert paid["eligible"] and not paid["salary_review_required"]
+    above_cap = rank_lead({**lead, "salary": {"from": 50001, "currency": "RUB"}})
+    assert not above_cap["eligible"]
 
 
 def test_required_sql_rejected_and_explicit_optional_sql_allowed():
