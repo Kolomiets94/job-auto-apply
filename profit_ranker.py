@@ -1,7 +1,8 @@
 """Rank leads by expected profitability and resume fit."""
 import re
 from typing import Any, Dict
-from entry_level import is_entry_level, is_placement, placement_is_paid
+from entry_level import is_entry_level, is_placement
+from salary_policy import salary_decision
 
 SKILLS = {
     "react": 1.0, "typescript": 1.0, "javascript": .8, "js": .45, "html": .7,
@@ -74,30 +75,7 @@ def _money(lead: Dict[str, Any]) -> float:
 
 
 def _explicit_salary_rejected(lead: Dict[str, Any]) -> bool:
-    if str(lead.get("source") or "").lower() in FREELANCE_SOURCES:
-        return False
-    if is_placement(lead.get("title")):
-        return not placement_is_paid(lead)
-    salary = lead.get("salary")
-    if not salary:
-        return False
-    source = str(lead.get("source") or "").lower()
-    if isinstance(salary, dict):
-        currency = str(salary.get("currency") or "").upper()
-        vals = [x for x in (salary.get("from"), salary.get("to"), salary.get("amount")) if isinstance(x, (int, float))]
-        amount = max(vals) if vals else None
-        if amount is None:
-            return False
-        if currency in ("RUR", "RUB"):
-            return amount < 60000
-        if currency in ("USD", "$"):
-            # RemoteOK-style annual salaries are converted to a monthly comparison.
-            period = str(salary.get("period") or "").lower()
-            monthly = amount / 12.0 if period in ("year", "yearly", "annual", "annually") else amount
-            if not period and source == "remoteok" and amount > 12000:
-                monthly = amount / 12.0
-            return monthly < 1000
-    return False
+    return salary_decision(lead) == "rejected"
 
 
 def _location_rejected(lead: Dict[str, Any], text: str) -> bool:
@@ -280,8 +258,11 @@ def _work_mode(lead: Dict[str, Any]) -> str:
 
 
 def _work_format_rejection(lead: Dict[str, Any]) -> str | None:
-    # The candidate is searching the Russian market and accepts remote,
-    # hybrid and office roles. Keep the detected format as metadata for display.
+    mode = _work_mode(lead)
+    if mode == "hybrid":
+        return "hybrid work is excluded; fully remote only"
+    if mode == "office":
+        return "office work is excluded; fully remote only"
     return None
 
 
@@ -335,8 +316,11 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     # Do not send a real application to this archived-era posting.
     if "remote-job.ru/vacancy/show/729285/" in str(lead.get("url") or ""):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "known stale vacancy (2023)"}
-    if _explicit_salary_rejected(lead):
-        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "salary below configured floor"}
+    salary_status = salary_decision(lead)
+    if salary_status == "rejected":
+        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "salary outside configured range or unpaid placement"}
+    if salary_status == "manual_review":
+        return {**lead, "profit_score": 0, "eligible": False, "salary_review_required": True, "rank_reason": "salary requires manual review"}
     if _location_rejected(lead, text):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "explicit location/work-authorization restriction"}
 
