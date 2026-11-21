@@ -74,29 +74,11 @@ def _money(lead: Dict[str, Any]) -> float:
 
 
 def _explicit_salary_rejected(lead: Dict[str, Any]) -> bool:
+    """Reject unpaid placements only; no minimum salary was configured."""
     if str(lead.get("source") or "").lower() in FREELANCE_SOURCES:
         return False
     if is_placement(lead.get("title")):
         return not placement_is_paid(lead)
-    salary = lead.get("salary")
-    if not salary:
-        return False
-    source = str(lead.get("source") or "").lower()
-    if isinstance(salary, dict):
-        currency = str(salary.get("currency") or "").upper()
-        vals = [x for x in (salary.get("from"), salary.get("to"), salary.get("amount")) if isinstance(x, (int, float))]
-        amount = max(vals) if vals else None
-        if amount is None:
-            return False
-        if currency in ("RUR", "RUB"):
-            return amount < 60000
-        if currency in ("USD", "$"):
-            # RemoteOK-style annual salaries are converted to a monthly comparison.
-            period = str(salary.get("period") or "").lower()
-            monthly = amount / 12.0 if period in ("year", "yearly", "annual", "annually") else amount
-            if not period and source == "remoteok" and amount > 12000:
-                monthly = amount / 12.0
-            return monthly < 1000
     return False
 
 
