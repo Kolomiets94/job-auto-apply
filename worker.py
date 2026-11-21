@@ -287,7 +287,7 @@ def run():
     # Salary-ambiguous leads are excluded from dispatch and shown for human review.
     salary_review_jobs = [
         item for item in (rank_lead(lead) for lead in job_leads)
-        if item.get("salary_review_required") and item.get("url")
+        if item.get("eligible") and item.get("salary_review_required") and item.get("url")
     ]
 
     fresh_freelance = []
@@ -333,7 +333,6 @@ def run():
     freelance_held_back = bool(ranked_jobs and ranked_freelance)
     # Diagnose why collected Junior Frontend/layout leads never reach dispatch.
     from collections import Counter
-    from profit_ranker import rank_lead
     eligibility = {}
     for role in ("frontend", "layout", "qa"):
         relevant = [lead for lead in leads if not is_freelance(lead) and _role_category(lead) == role]
@@ -422,6 +421,14 @@ def run():
 
     for lead in ranked:
         freelance = is_freelance(lead)
+        if lead.get("salary_review_required"):
+            results.append({
+                "title": lead.get("title"), "source": lead.get("source"),
+                "url": lead.get("url"), "status": "NEEDS_HUMAN",
+                "reason": "salary requires manual review",
+            })
+            stats["needs_human"] += 1
+            continue
         # QA applications are opt-in: prioritize the candidate's primary
         # Frontend / HTML-CSS roles instead of silently submitting QA.
         # QA vacancies remain visible in reports for later review.
