@@ -165,3 +165,17 @@ def test_residence_requirement_accepts_russia_but_rejects_foreign_only():
             "location": "Worldwide", "work_mode": "REMOTE"}
     assert rank_lead({**base, "description": "React TypeScript. Applicants must reside in Russia."})["eligible"]
     assert not rank_lead({**base, "description": "React TypeScript. Applicants must reside in the US."})["eligible"]
+
+
+
+def test_junior_plus_frontend_is_included_within_regular_salary_range():
+    base = {
+        "source": "hh",
+        "title": "Junior+ React Developer",
+        "description": "React TypeScript",
+        "work_mode": "REMOTE",
+        "salary": {"from": 50000, "to": 70000, "currency": "RUB", "period": "month"},
+    }
+    result = rank_lead(base)
+    assert result["eligible"]
+    assert not result["salary_review_required"]
