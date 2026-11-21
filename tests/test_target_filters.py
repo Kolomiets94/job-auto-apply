@@ -193,5 +193,5 @@ def test_filter_report_includes_safe_geography_examples():
     ])
     assert "ПРИМЕРЫ ГЕОГРАФИЧЕСКИХ ИСКЛЮЧЕНИЙ" in report
     assert "Нет явного подтверждения" in report
-    assert "явное ограничение" in report
+    assert "В тексте есть требование" in report
     assert "https://jobs.example/vacancy/1" in report
