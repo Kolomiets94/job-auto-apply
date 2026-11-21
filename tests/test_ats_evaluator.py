@@ -79,7 +79,7 @@ def test_filter_report_keeps_internal_reasons_separate():
             "title": "Junior React Frontend Developer",
             "source": "hh",
             "experience": "Без опыта",
-            "salary": {"from": 50000, "currency": "RUR"},
+            "salary": {"from": 49000, "currency": "RUR"},
             "description": "Удалённая работа. React, TypeScript.",
         },
     ]
