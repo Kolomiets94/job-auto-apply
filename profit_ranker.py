@@ -1,7 +1,7 @@
 """Rank leads by expected profitability and resume fit."""
 import re
 from typing import Any, Dict
-from entry_level import is_entry_level, is_placement, placement_is_paid
+from entry_level import is_entry_level, is_placement
 from salary_policy import salary_decision
 
 SKILLS = {
@@ -273,8 +273,6 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     excluded_employers = ("aston", "preax", "edmagit")
     if any(re.search(rf"(?<![a-zа-я0-9]){re.escape(name)}(?![a-zа-я0-9])", employer) for name in excluded_employers):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "excluded employer"}
-    if is_placement(title) and not placement_is_paid(lead):
-        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "placement compensation not confirmed"}
     if re.search(r"\bqa\b|tester|тестиров|quality assurance|автотест", title, re.I):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "non-target QA role"}
     # Exclude non-Junior roles by title, not incidental descriptions.
@@ -368,7 +366,7 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
 
     salary_status = salary_decision(lead)
     if salary_status == "rejected":
-        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "salary below configured floor"}
+        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "salary outside configured range"}
     salary_review_required = salary_status == "manual_review"
 
     matched = [k for k in SKILLS if k in text]
