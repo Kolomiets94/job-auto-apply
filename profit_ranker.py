@@ -1,7 +1,7 @@
 """Rank leads by expected profitability and resume fit."""
 import re
 from typing import Any, Dict
-from entry_level import is_entry_level, is_placement
+from entry_level import is_entry_level, is_placement, placement_is_paid
 from salary_policy import salary_decision
 
 SKILLS = {
@@ -316,11 +316,6 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     # Do not send a real application to this archived-era posting.
     if "remote-job.ru/vacancy/show/729285/" in str(lead.get("url") or ""):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "known stale vacancy (2023)"}
-    salary_status = salary_decision(lead)
-    if salary_status == "rejected":
-        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "salary outside configured range or unpaid placement"}
-    if salary_status == "manual_review":
-        return {**lead, "profit_score": 0, "eligible": False, "salary_review_required": True, "rank_reason": "salary requires manual review"}
     if _location_rejected(lead, text):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "explicit location/work-authorization restriction"}
 
@@ -371,6 +366,11 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     if source in FREELANCE_SOURCES and any(x in text for x in FREELANCE_TOO_COMPLEX):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "freelance project too complex/out of scope"}
 
+    salary_status = salary_decision(lead)
+    if salary_status == "rejected":
+        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "salary below configured floor"}
+    salary_review_required = salary_status == "manual_review"
+
     matched = [k for k in SKILLS if k in text]
     fit = sum(SKILLS[k] for k in matched) / max(sum(SKILLS.values()), 1)
     budget = _money(lead)
@@ -407,7 +407,8 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
         # One relevant skill is enough to enter the shortlist; safety filters above still apply.
         "eligible": bool(matched) and score >= 8,
         "matched_skills": matched,
-        "rank_reason": "role priority + skill fit + budget + speed + competition + resume fit",
+        "salary_review_required": salary_review_required,
+        "rank_reason": "salary requires manual review" if salary_review_required else "role priority + skill fit + budget + speed + competition + resume fit",
     }
 
 
