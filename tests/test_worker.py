@@ -54,7 +54,8 @@ def test_hh_block_without_session_stops_repeated_queries_but_other_sources_conti
          patch.object(worker, "collect_freelancer_com", return_value=[]):
         assert worker.collect_all() == [lead]
     assert hh.call_count == 1
-    assert len(worker.COLLECTION_ERRORS) == 1
+    assert len(worker.COLLECTION_ERRORS) == 2
+    assert worker.COLLECTION_ERRORS[1]["source"] == "hh-web"
 
 
 def test_run_keeps_no_email_lead_for_confirmation():
