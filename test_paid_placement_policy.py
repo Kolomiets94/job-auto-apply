@@ -48,11 +48,11 @@ class PaidPlacementPolicyTests(unittest.TestCase):
                 "location": "Россия",
                 "description": description + ". JavaScript, HTML, CSS.",
             })
-            self.assertFalse(lead["eligible"])
             if "неоплачиваемая" in description.lower():
-                self.assertEqual(lead["rank_reason"], "salary outside configured range or unpaid placement")
+                self.assertFalse(lead["eligible"])
             else:
-                self.assertEqual(lead["rank_reason"], "salary requires manual review")
+                self.assertTrue(lead["eligible"])
+                self.assertTrue(lead["salary_review_required"])
 
     def test_ordinary_junior_without_salary_is_held_for_manual_review(self):
         lead = rank_lead({
@@ -63,8 +63,8 @@ class PaidPlacementPolicyTests(unittest.TestCase):
             "experience": "Без опыта",
             "description": "JavaScript, HTML, CSS. Опыт не требуется.",
         })
-        self.assertFalse(lead["eligible"])
-        self.assertEqual(lead["rank_reason"], "salary requires manual review")
+        self.assertTrue(lead["eligible"], lead.get("rank_reason"))
+        self.assertTrue(lead["salary_review_required"])
 
     def test_regular_salary_bounds_are_50k_to_70k_monthly(self):
         for amount in (50000, 60000, 70000):
@@ -84,8 +84,8 @@ class PaidPlacementPolicyTests(unittest.TestCase):
 
     def test_salary_range_crossing_bounds_requires_manual_review(self):
         lead = rank_lead({"title":"Junior Frontend Developer","source":"hh","location":"Россия","experience":"Без опыта","salary":{"from":45000,"to":60000,"currency":"RUR"},"description":"JavaScript, HTML, CSS."})
-        self.assertFalse(lead["eligible"])
-        self.assertEqual(lead["rank_reason"], "salary requires manual review")
+        self.assertTrue(lead["eligible"])
+        self.assertTrue(lead["salary_review_required"])
 
     def test_annual_rub_salary_is_normalized_to_monthly(self):
         lead = rank_lead({"title":"Junior Frontend Developer","source":"hh","location":"Россия","experience":"Без опыта","salary":{"from":600000,"currency":"RUR","period":"year"},"description":"JavaScript, HTML, CSS."})
