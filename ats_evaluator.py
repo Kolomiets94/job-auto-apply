@@ -140,15 +140,6 @@ def build_market_report(leads):
         "Нужно освоить дополнительно: в этой выборке устойчивого повторяющегося пробела по технологиям не выявлено; " +
         "не добавляй новые технологии без необходимости.",
     ])
-    if geo_examples:
-        lines.extend(["", "ПРИМЕРЫ ГЕОГРАФИЧЕСКИХ ИСКЛЮЧЕНИЙ (до 5):"])
-        for example in geo_examples:
-            lines.append(
-                f"- {example['title']} [{example['source']}] — "
-                f"{example['location']}; {example['diagnosis']}"
-            )
-            if example["url"]:
-                lines.append(example["url"])
     return "\n".join(lines)
 
 
@@ -362,4 +353,13 @@ def build_filter_report(leads):
         "не приписывать коммерческий опыт или отсутствующие технологии.",
         "- Внутренний ранкер показывает первую причину отказа, а не окончательный вердикт работодателя.",
     ])
+    if geo_examples:
+        lines.extend(["", "ПРИМЕРЫ ГЕОГРАФИЧЕСКИХ ИСКЛЮЧЕНИЙ (до 5):"])
+        for example in geo_examples:
+            lines.append(
+                f"- {example['title']} [{example['source']}] — "
+                f"{example['location']}; {example['diagnosis']}"
+            )
+            if example["url"]:
+                lines.append(example["url"])
     return "\n".join(lines)
