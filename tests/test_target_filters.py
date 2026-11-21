@@ -177,3 +177,21 @@ def test_russian_salary_ceiling_is_limited_to_70000_and_unknown_is_kept():
     assert not over["eligible"]
     assert over["rank_reason"] == "salary above configured ceiling"
     assert rank_lead({**base, "salary": None})["eligible"]
+
+
+
+def test_filter_report_includes_safe_geography_examples():
+    from ats_evaluator import build_filter_report
+
+    base = {"title": "Junior React Developer", "work_mode": "REMOTE",
+            "experience": "1–3 года", "url": "https://jobs.example/vacancy/1"}
+    report = build_filter_report([
+        {**base, "source": "remotive", "location": "Worldwide",
+         "description": "React TypeScript"},
+        {**base, "source": "hh", "location": "US only",
+         "description": "React TypeScript"},
+    ])
+    assert "ПРИМЕРЫ ГЕОГРАФИЧЕСКИХ ИСКЛЮЧЕНИЙ" in report
+    assert "Нет явного подтверждения" in report
+    assert "явное ограничение" in report
+    assert "https://jobs.example/vacancy/1" in report
