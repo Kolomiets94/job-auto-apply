@@ -258,15 +258,8 @@ def _work_mode(lead: Dict[str, Any]) -> str:
 
 
 def _work_format_rejection(lead: Dict[str, Any]) -> str | None:
-    mode = _work_mode(lead)
-    if mode == "hybrid":
-        if _is_yekaterinburg(lead):
-            return None
-        return "hybrid work is allowed only in Yekaterinburg"
-    if mode == "office":
-        return "office work is excluded; fully remote only"
-    if mode != "remote":
-        return "remote work format is not confirmed"
+    # Russian-market search accepts remote, hybrid and office vacancies nationwide.
+    # The detected mode remains metadata; it is not an eligibility gate.
     return None
 
 
@@ -282,9 +275,8 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     # Exclude non-Junior roles by title, not incidental descriptions.
     if any(x in title for x in BLOCK) or re.search(r"(?<![a-z])vue(?![a-z])", title):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "excluded job title"}
-    # Remote is allowed across Russia and internationally only when the
-    # location policy below confirms that a candidate based in Russia may work.
-    # Hybrid is allowed only in Yekaterinburg; office/on-site is never allowed.
+    # Russian-market roles may be remote, hybrid or office nationwide.
+    # International roles still pass the explicit residence/work-authorization checks below.
     work_format_rejection = _work_format_rejection(lead)
     if work_format_rejection:
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": work_format_rejection}
