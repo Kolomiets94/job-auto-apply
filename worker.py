@@ -752,7 +752,7 @@ def run():
         if reason == "unknown_employer_question":
             questions = item.get("unanswered_questions") or ([detail] if detail else [])
             for question in questions[:10]:
-                detail_lines.append("  HH employer question (answer required): " + str(question).replace("\\n", " ")[:300])
+                detail_lines.append("  HH employer question (answer required): " + str(question).replace("\n", " ")[:300])
         if url:
             detail_lines.append(url)
 
@@ -882,15 +882,15 @@ def run():
         _work_mode(lead) for lead in ranked_jobs
         if str(lead.get("url") or "") in drafted_urls
     )
-    summary_message += "\\n\\nФОРМАТ РАБОТЫ (вакансии):"
+    summary_message += "\n\\nФОРМАТ РАБОТЫ (вакансии):"
     for mode in ("remote", "hybrid", "office", "unknown"):
         label = format_labels[mode]
         summary_message += (
-            f"\\n- {label}: проверено {checked_formats[mode]}, "
+            f"\n- {label}: проверено {checked_formats[mode]}, "
             f"прошло фильтры {eligible_formats[mode]}, "
             f"черновиков {drafted_formats[mode]}"
         )
-    summary_message += "\\nУдалёнка, гибрид и офис учитываются по всей России; "
+    summary_message += "\nУдалёнка, гибрид и офис учитываются по всей России; "
     summary_message += "формат не указан — отдельно, без автоматического приравнивания к удалёнке. "
     summary_message += "Черновики не отправлены."
     summary_message += "\n\n" + build_market_report(job_leads)
