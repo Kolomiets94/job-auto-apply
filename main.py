@@ -155,8 +155,8 @@ def _hh_search(tag, q, work_format, area=None, max_pages=6):
 
 
 def hh_search(tag, q):
-    """Search fully remote HH vacancies across Russia."""
-    return _hh_search(tag, q, work_format="REMOTE")
+    """Search HH vacancies across Russia in all work formats."""
+    return _hh_search(tag, q, work_format=None)
 
 
 def hh_search_hybrid(tag, q):
