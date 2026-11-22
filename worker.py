@@ -14,7 +14,7 @@ from freelancehunt_adapter import collect_freelancehunt
 from job_matcher import JobMatcher
 from ats_evaluator import review_lead, build_market_report, build_filter_report
 from ats_conditions import assess_job_conditions
-from profit_ranker import rank_leads, rank_lead, FREELANCE_SOURCES, ROLE_PRIORITY, _role_category
+from profit_ranker import rank_leads, rank_lead, FREELANCE_SOURCES, ROLE_PRIORITY, _role_category, _work_mode
 from proposal_writer import make_proposal
 from application_dispatcher import dispatch
 from queue_store import enqueue, enqueue_many, set_state, submitted_today, submitted_this_week, was_submitted, queued_leads, save_outreach_drafts, list_outreach, build_outcome_feedback_report
@@ -862,6 +862,37 @@ def run():
         f"Ошибок: {stats['failed']}\n"
         "Вакансии — приоритет. Фриланс используется только если подходящих вакансий нет."
     )
+    # Work-format visibility: compare all checked employment leads with those
+    # surviving the ranker, and count drafts separately when DRY_RUN is active.
+    from collections import Counter
+    format_labels = {
+        "remote": "удалёнка",
+        "hybrid": "гибрид",
+        "office": "офис",
+        "unknown": "формат не указан",
+    }
+    checked_formats = Counter(_work_mode(lead) for lead in job_leads)
+    eligible_formats = Counter(_work_mode(lead) for lead in ranked_jobs)
+    drafted_urls = {
+        str(item.get("url") or "")
+        for item in results
+        if item.get("status") == "DRAFT" and item.get("url")
+    }
+    drafted_formats = Counter(
+        _work_mode(lead) for lead in ranked_jobs
+        if str(lead.get("url") or "") in drafted_urls
+    )
+    summary_message += "\\n\\nФОРМАТ РАБОТЫ (вакансии):"
+    for mode in ("remote", "hybrid", "office", "unknown"):
+        label = format_labels[mode]
+        summary_message += (
+            f"\\n- {label}: проверено {checked_formats[mode]}, "
+            f"прошло фильтры {eligible_formats[mode]}, "
+            f"черновиков {drafted_formats[mode]}"
+        )
+    summary_message += "\\nУдалёнка, гибрид и офис учитываются по всей России; "
+    summary_message += "формат не указан — отдельно, без автоматического приравнивания к удалёнке. "
+    summary_message += "Черновики не отправлены."
     summary_message += "\n\n" + build_market_report(job_leads)
     summary_message += "\n\n" + build_filter_report(job_leads)
     summary_message += "\n\n" + build_outcome_feedback_report()
