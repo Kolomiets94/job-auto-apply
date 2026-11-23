@@ -3,6 +3,24 @@ from unittest.mock import patch
 import worker
 
 
+
+def test_resume_env_accepts_multiline_inline_text(monkeypatch):
+    resume = ("Frontend developer\\n" + "React TypeScript HTML CSS " * 20)
+    monkeypatch.setenv("RESUME", resume)
+    monkeypatch.delenv("RESUME_TEXT", raising=False)
+    monkeypatch.delenv("RESUME_FILE", raising=False)
+    assert worker.load_resume_text() == resume
+
+
+def test_resume_env_reads_existing_text_file(monkeypatch, tmp_path):
+    path = tmp_path / "resume.txt"
+    path.write_text("Frontend developer with React and TypeScript experience.", encoding="utf-8")
+    monkeypatch.setenv("RESUME", str(path))
+    monkeypatch.delenv("RESUME_TEXT", raising=False)
+    monkeypatch.delenv("RESUME_FILE", raising=False)
+    assert "React" in worker.load_resume_text()
+
+
 def test_collect_all_deduplicates_urls(monkeypatch):
     monkeypatch.setattr(worker, "JOB_COLLECTORS", ())
     same = {"source": "hh", "title": "React Junior", "url": "https://example.com/1"}
