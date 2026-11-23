@@ -66,7 +66,9 @@ def ok(v):
     # Team descriptions may mention senior colleagues or a team lead.
     # The target vacancy's title determines its advertised seniority.
     if any(x in title for x in level_terms): return False
-    if any(x in text for x in EXCLUDE if x not in level_terms): return False
+    # Description mentions may be optional or incidental. The ranker checks
+    # mandatory unsupported technologies against their requirement context.
+    if any(x in title for x in EXCLUDE if x not in level_terms): return False
     if not salary_ok(v): return False
     # Paid placements are intentionally retained for ranking; salary_ok rejects unpaid or unclear ones.
     return True
@@ -170,7 +172,7 @@ def remoteok():
         data=requests.get("https://remoteok.com/api",headers=UA,timeout=20).json(); out=[]
         for v in data[1:]:
             text=((v.get("position") or "")+" "+(v.get("description") or "")).lower()
-            if any(x in text for x in ("react","typescript","javascript","frontend","front-end","html","css")) and not any(x in text for x in EXCLUDE):
+            if any(x in text for x in ("react","typescript","javascript","frontend","front-end","html","css")) and not any(x in (v.get("position") or "").lower() for x in EXCLUDE):
                 out.append({"source":"remoteok","category":"frontend","title":v.get("position"),"company":v.get("company"),"url":v.get("url"),"apply_url":v.get("apply_url"),"apply_email":v.get("apply_email"),"description":v.get("description"),"location":v.get("location"),"salary_min":v.get("salary_min"),"salary_max":v.get("salary_max"),"published":v.get("date")})
         return out[:50]
     except Exception:return []

@@ -144,7 +144,7 @@ def build_market_report(leads):
 
 
 ROLE_TERMS = ("frontend", "front-end", "front end", "react", "фронтенд", "фронтэнд", "веб-разработчик")
-JUNIOR_TERMS = ("junior", "entry-level", "entry level", "intern", "trainee", "без опыта", "начинающ")
+JUNIOR_TERMS = ("junior", "junior+", "jr.", "entry-level", "entry level", "graduate", "intern", "trainee", "без опыта", "начинающ", "младший", "стажиров", "0-1", "0–1", "0-2", "0–2")
 
 
 def _text(value):
@@ -164,7 +164,7 @@ def review_lead(lead, resume_text):
     """Attach explainable ATS-style fields without rejecting a vacancy."""
     resume = _text(resume_text).lower()
     title = _text(lead.get("title") or lead.get("name")).lower()
-    description = _text(lead.get("description") or lead.get("requirements")).lower()
+    description = " ".join(filter(None, (_text(lead.get("description")).strip(), _text(lead.get("requirements")).strip()))).lower()
     vacancy = " ".join((title, description, _text(lead.get("key_skills")))).lower()
 
     advertised = []

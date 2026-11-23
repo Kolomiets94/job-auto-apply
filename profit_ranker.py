@@ -1,7 +1,7 @@
 """Rank leads by expected profitability and resume fit."""
 import re
 from typing import Any, Dict
-from entry_level import is_entry_level, is_placement
+from entry_level import has_entry_level_signal, is_placement
 from salary_policy import salary_decision
 
 SKILLS = {
@@ -252,14 +252,15 @@ def _work_mode(lead: Dict[str, Any]) -> str:
 
     source = str(lead.get("source") or "").lower()
     # These sources only publish remote jobs or apply an explicit remote filter.
-    if source == "hh" or source in FREELANCE_SOURCES or source in REMOTE_ONLY_SOURCES:
+    if source in FREELANCE_SOURCES or source in REMOTE_ONLY_SOURCES:
         return "remote"
     return "unknown"
 
 
 def _work_format_rejection(lead: Dict[str, Any]) -> str | None:
-    # Russian-market search accepts remote, hybrid and office vacancies nationwide.
-    # The detected mode remains metadata; it is not an eligibility gate.
+    # User policy: remote, hybrid and office are all acceptable throughout Russia.
+    # Unknown format remains a separate diagnostic category, never relabeled remote.
+    # International residence/work-authorization checks run independently.
     return None
 
 
@@ -290,6 +291,13 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     local = _is_yekaterinburg(lead)
     if relocation and not local:
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "mandatory nonlocal relocation"}
+    business_travel = re.search(
+        r"готовност[ьи] к командировк\w* обязательн\w*|командировк\w* обязательн\w*|"
+        r"обязательн\w*.{0,35}командировк\w*|business travel required|"
+        r"must travel|willingness to travel required", details, re.I,
+    )
+    if business_travel:
+        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "mandatory business travel"}
     # Keep mandatory unsupported frameworks excluded, while allowing optional mentions.
     requirements = " ".join(str(lead.get(k) or "") for k in ("description", "requirements")).lower()
     required_parts = re.split(r"[\n.!?;]", requirements)
@@ -299,12 +307,19 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
            and any(marker in part for marker in ("required", "must have", "mandatory", "обязательно", "требуется"))
            for part in required_parts):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "mandatory unsupported stack"}
-    # SQL is outside the confirmed stack. Clearly optional mentions are allowed.
-    sql_parts = re.split(r"[\n.!?;]", text)
+    # Reject SQL only when it is explicitly stated as a requirement.
+    sql_parts = re.split(r"[\n.!?;]", " ".join(str(lead.get(k) or "") for k in ("description", "requirements")))
     optional_sql = ("optional", "nice to have", "nice-to-have", "not required",
-                    "не требуется", "необязател", "будет плюсом", "как плюс")
-    if any(re.search(r"\b(?:sql|mysql|postgresql)\b", part) and
-           not any(marker in part for marker in optional_sql) for part in sql_parts):
+                    "не требуется", "необязател", "будет плюсом", "как плюс", "желательно")
+    required_sql = ("required", "must have", "mandatory", "requirement", "обязательно",
+                    "обязателен", "обязательна", "требуется", "необходимо", "необходим")
+    sql_is_required = any(
+        re.search(r"\b(?:sql|mysql|postgresql)\b", part)
+        and not any(marker in part for marker in optional_sql)
+        and any(marker in part for marker in required_sql)
+        for part in sql_parts
+    )
+    if sql_is_required:
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "SQL outside confirmed stack"}
     # Known stale listing: Thimble.cz remote-job vacancy from September 2023.
     # Do not send a real application to this archived-era posting.
@@ -331,18 +346,13 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
         if re.search(r"(?<![\d–—-])\b[4-9]\s*(?:год|года|лет|years?)", experience):
             return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "experience above 3 years"}
         # Generic layout titles must still show an entry-level signal.
-        if category_for_experience == "layout" and not is_entry_level(title):
-            entry_signal = any(term in (experience + " " + details) for term in (
-                "начинающ", "без опыта", "не требуется опыт", "no experience",
-                "entry level", "entry-level",
-            ))
-            if not entry_signal:
-                return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "layout entry level not confirmed"}
+        if category_for_experience == "layout" and not has_entry_level_signal(title + " " + experience + " " + details):
+            return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "layout entry level not confirmed"}
         if category_for_experience != "layout":
             one_year = bool(re.search(r"(?:от|from|at least)\s*1\s*(?:год|года|year)|\b1\s*\+?\s*(?:год|года|year)", experience))
             zero_to_three = bool(re.search(r"\b[01]\s*[-–—]\s*3\s*(?:год|года|лет|years?)", experience))
             no_experience = bool(re.search(r"без опыта|не требуется опыт|no experience|entry.level|0\s*[-–—]\s*[12]\s*(?:год|года|лет|years?)", experience + " " + details))
-            if not is_entry_level(title) and not (one_year or zero_to_three or no_experience):
+            if not has_entry_level_signal(title + " " + experience + " " + details) and not (one_year or zero_to_three or no_experience):
                 return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "not Junior or 0-3 years"}
             # A range ending at 3 years is acceptable; "from 3 years" is not.
             if re.search(r"(?<![\d–—-])\b[4-9]\s*(?:[-–—]\s*\d+\s*)?(?:год|года|лет|years?)", experience):

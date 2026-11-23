@@ -1,16 +1,31 @@
 """Shared entry-level titles and confirmed internship compensation."""
 import re
 
-JUNIOR = re.compile(r"(?<![a-zа-я])(?:junior|jr\.?|джуниор|джун|младший|младшая)(?![a-zа-я])", re.I)
-PLACEMENT = re.compile(r"\bintern(?:ship)?\b|\btrainee\b|стаж[её]р|стажиров|практикант|практик[ауы]\b|практике\b", re.I)
+JUNIOR = re.compile(
+    r"(?<![a-zа-я])(?:junior(?:\s*\+)?|jr\.?|entry[ -]?level|graduate|"
+    r"джуниор|джун|младший|младшая|начинающий|начинающая)(?![a-zа-я])", re.I
+)
+PLACEMENT = re.compile(
+    r"\bintern(?:ship)?\b|\btrainee\b|стаж[её]р|стажиров|практикант|практик[ауы]\b|практике\b", re.I
+)
+ENTRY_CONTEXT = re.compile(
+    r"без\s+опыта|не\s+требуется\s+опыт|опыт\s+не\s+обязателен|"
+    r"no\s+experience|entry[ -]?level|graduate|начинающ\w*\s+специалист|"
+    r"старт\s+карьер\w*|0\s*[-–—]\s*[12]\s*(?:год|года|лет|years?)", re.I
+)
 
 
 def is_placement(title):
     return bool(PLACEMENT.search(str(title or "")))
 
 
+def has_entry_level_signal(text):
+    value = str(text or "")
+    return bool(JUNIOR.search(value) or PLACEMENT.search(value) or ENTRY_CONTEXT.search(value))
+
+
 def is_entry_level(title):
-    return bool(JUNIOR.search(str(title or ""))) or is_placement(title)
+    return has_entry_level_signal(title)
 
 
 def placement_is_paid(lead):
@@ -24,6 +39,5 @@ def placement_is_paid(lead):
         return True
     if re.search(r"\bpaid\s+(?:[\w/-]+\s+){0,4}(?:internship|intern|trainee|placement)\b|\b(?:internship|intern|trainee|placement)\s*(?:is|:|-)?\s*paid\b|оплачиваем|стажиров\w*\s+оплачива|практик\w*\s+оплачива|\bстипендия\b|\bstipend\b", text):
         return True
-    # Explicit compensation amounts in descriptions or textual salary fields.
     compensation = str(salary or "") + " " + text
     return bool(re.search(r"(?:зарплата|оклад|оплата|salary|compensation|стипендия|stipend)\s*[:—-]?\s*(?:от|from)?\s*[1-9][\d\s.,]*\s*(?:₽|руб|rub|rur|usd|eur|доллар|евро|\$|€)", compensation, re.I))
