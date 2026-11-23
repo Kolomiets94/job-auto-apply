@@ -17,6 +17,7 @@ from ats_conditions import assess_job_conditions
 from profit_ranker import rank_leads, rank_lead, FREELANCE_SOURCES, ROLE_PRIORITY, _role_category, _work_mode
 from proposal_writer import make_proposal
 from application_dispatcher import dispatch
+from application_approval import live_applications_approved
 from queue_store import enqueue, enqueue_many, set_state, submitted_today, submitted_this_week, was_submitted, queued_leads, save_outreach_drafts, list_outreach, build_outcome_feedback_report
 from notification_rules import format_notification, should_notify
 from telegram_notifier import send_message, send_notification
@@ -265,7 +266,7 @@ def _uses_browser(lead):
     return _browser_scope(lead) is not None
 
 
-def run():
+def run(force_dry_run=False):
     from aggregator_origin import reset_origin_diagnostics, origin_diagnostics
     from entry_level import is_placement
     global COLLECTION_RAW_COUNT
@@ -375,7 +376,11 @@ def run():
     weekly_total_limit = _application_limit("WEEKLY_TOTAL_LIMIT")
     weekly_submitted_count = submitted_this_week()
     total_hourly_limit = _application_limit("HOURLY_TOTAL_LIMIT")
-    dry_run = os.getenv("DRY_RUN", "0").strip().lower() in ("1", "true", "yes")
+    # Real submissions require a separate, explicit user approval.
+    # Until AUTO_APPLY_APPROVED=1 is configured, always remain in draft mode.
+    dry_run = (force_dry_run
+               or os.getenv("DRY_RUN", "0").strip().lower() in ("1", "true", "yes")
+               or not live_applications_approved())
     job_limit = _application_limit("HOURLY_JOB_LIMIT")
     freelance_limit = _application_limit("HOURLY_FREELANCE_LIMIT")
 
@@ -403,7 +408,11 @@ def run():
         "backlog_rechecked": len(candidates),
         "descriptions_enriched": sum(bool(lead.get("enriched")) for lead in enriched),
         "unavailable_skipped": sum(bool(lead.get("unavailable")) for lead in enriched),
+        # Keep the legacy combined count while exposing the two channels
+        # separately so freelance fallback cannot be mistaken for job vacancies.
         "ranked": len(ranked),
+        "jobs_ranked": len(ranked_jobs),
+        "primary_ranked": len(ranked),
         "submitted": 0,
         "drafted": 0,
         "submitted_by_role": {"frontend": 0, "layout": 0, "qa": 0, "freelance": 0},
@@ -528,16 +537,7 @@ def run():
                 "message": format_notification(lead),
             })
 
-        if dry_run:
-            proposal = make_proposal(lead)
-            stats["drafted"] += 1
-            results.append({"id": lid, "title": lead.get("title"), "source": lead.get("source"),
-                            "url": lead.get("url"), "status": "DRAFT", "reason": "dry_run",
-                            "proposal": proposal})
-            continue
-
-        # Live applications require an explicitly configured, truthful candidate profile.
-        # Without it, keep the lead visible but never submit a fabricated default CV.
+        # Never generate an application from an invented or missing candidate profile.
         if not load_resume_text():
             set_state(lid, "NEEDS_HUMAN")
             stats["needs_human"] += 1
@@ -549,6 +549,14 @@ def run():
                 "status": "NEEDS_HUMAN",
                 "reason": "verified_resume_missing",
             })
+            continue
+
+        if dry_run:
+            proposal = make_proposal(lead)
+            stats["drafted"] += 1
+            results.append({"id": lid, "title": lead.get("title"), "source": lead.get("source"),
+                            "url": lead.get("url"), "status": "DRAFT", "reason": "dry_run",
+                            "proposal": proposal})
             continue
 
         try:

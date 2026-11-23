@@ -241,6 +241,8 @@ def run_hunter():
     # Never allow anonymous internet requests to submit real job applications.
     if not _authorized():
         return jsonify({"error": "unauthorized"}), 401
+    if request.headers.get("X-Hunter-Live-Approval", "") != "APPLY":
+        return jsonify({"error": "explicit_live_approval_required"}), 403
     return jsonify(run_worker())
 
 
@@ -376,7 +378,9 @@ def _start_one_shot_from_deploy():
 
     def run_in_background():
         try:
-            report = run_worker()
+            # Deploy-triggered diagnostics are always drafts, even if live
+            # application approval is configured for a separate manual run.
+            report = run_worker(force_dry_run=True)
             stats = report.get("stats", {})
             fields = ("found", "fresh_unique", "unique_checked", "ranked",
                       "job_ranked", "job_actionable", "drafted", "submitted",

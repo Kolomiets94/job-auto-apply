@@ -36,6 +36,7 @@ def test_worldwide_does_not_override_explicit_restriction():
 
 
 def test_mailto_uses_real_delivery_and_checks_rejection(monkeypatch):
+    monkeypatch.setenv('AUTO_APPLY_APPROVED', '1')
     for k,v in {'AUTO_SEND_EMAIL':'1','SMTP_HOST':'smtp.example.com','SMTP_USER':'alex@example.com','SMTP_PASSWORD':'x'}.items():
         monkeypatch.setenv(k,v)
     lead = {'apply_url': 'mailto:jobs@example.com', 'title': 'Junior Frontend'}

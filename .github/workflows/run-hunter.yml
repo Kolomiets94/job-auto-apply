@@ -17,11 +17,13 @@ jobs:
       - name: Trigger protected Render worker
         env:
           HUNTER_RUN_TOKEN: ${{ secrets.HUNTER_RUN_TOKEN }}
+          CONFIRM_LIVE: ${{ inputs.confirm_live }}
         run: |
           TOKEN="$(printf '%s' "$HUNTER_RUN_TOKEN" | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
           test -n "$TOKEN" || { echo "Missing GitHub Actions secret HUNTER_RUN_TOKEN"; exit 1; }
           curl --fail-with-body --silent --show-error --max-time 3500 \
             -X POST "https://job-freelance-hunter.onrender.com/run" \
             -H "Authorization: Bearer $TOKEN" \
+            -H "X-Hunter-Live-Approval: $CONFIRM_LIVE" \
             -H "Content-Type: application/json" \
             -d '{}'

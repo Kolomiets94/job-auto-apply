@@ -141,12 +141,12 @@ def _location_rejected(lead: Dict[str, Any], text: str) -> bool:
         # Residence in Russia is itself a valid geographic match, including
         # listings whose location field is broader (for example, Europe).
         explicit_russia = re.search(
-            r"\b(?:open to|accept(?:ing)?|hire(?:s|d|ing)?|work from|based in|residing in|"
+            r"\b(?:open to|accept(?:ing)?|hire(?:s|d|ing)?|work from|residing in|"
             r"must reside in|must be located in|must live in|residents? of|"
-            r"candidates? in|applicants? in|eligible in|available in|remote in)\b.{0,45}\brussia\b|"
-            r"\brussia\b.{0,45}\b(?:eligible|allowed|accepted|available|remote|based|candidates|applicants|hire)\b|"
-            r"(?:можно|доступн[аоы]?|принимаем|нанимаем|кандидат[ыа]?|работать|удал[её]нно|проживать).{0,45}росси[яию]|"
-            r"росси[яию].{0,45}(?:можно|доступн[аоы]?|принимаем|нанимаем|кандидат[ыа]?|работать|удал[её]нно|проживать)",
+            r"candidates? in|applicants? in|eligible in|available in|remote in)\b[^\n.!?;]{0,45}\brussia\b|"
+            r"\brussia\b[^\n.!?;]{0,45}\b(?:eligible|allowed|accepted|available|remote|candidates|applicants|hire)\b|"
+            r"(?:можно|доступн[аоы]?|принимаем|нанимаем|кандидат[ыа]?|работать|удал[её]нно|проживать)[^\n.!?;]{0,45}росси[яию]|"
+            r"росси[яию][^\n.!?;]{0,45}(?:можно|доступн[аоы]?|принимаем|нанимаем|кандидат[ыа]?|работать|удал[её]нно|проживать)",
             eligibility_text,
         )
         if explicit_russia or re.search(r"\brussia\b|росси[яию]", location):
@@ -251,16 +251,33 @@ def _work_mode(lead: Dict[str, Any]) -> str:
         return "remote"
 
     source = str(lead.get("source") or "").lower()
-    # These sources only publish remote jobs or apply an explicit remote filter.
-    if source == "hh" or source in FREELANCE_SOURCES or source in REMOTE_ONLY_SOURCES:
+    # Only sources whose collection query/filter guarantees remote-only results
+    # may infer remote when the listing omits a structured work-mode field.
+    # HH is deliberately excluded: an absent HH work format is unknown.
+    if source in FREELANCE_SOURCES or source in REMOTE_ONLY_SOURCES:
         return "remote"
     return "unknown"
 
 
 def _work_format_rejection(lead: Dict[str, Any]) -> str | None:
-    # Russian-market search accepts remote, hybrid and office vacancies nationwide.
-    # The detected mode remains metadata; it is not an eligibility gate.
-    return None
+    """Enforce the documented work-mode policy for employment vacancies.
+
+    Remote roles are accepted only when remote is explicit or guaranteed by a
+    remote-only source. Hybrid is limited to Yekaterinburg; office and unknown
+    formats fail closed. Freelance projects use a separate eligibility policy.
+    """
+    source = str(lead.get("source") or "").lower()
+    if source in FREELANCE_SOURCES:
+        return None
+
+    mode = _work_mode(lead)
+    if mode == "remote":
+        return None
+    if mode == "hybrid":
+        return None if _is_yekaterinburg(lead) else "hybrid is allowed only in Yekaterinburg"
+    if mode == "office":
+        return "office work is excluded; fully remote only"
+    return "remote work format is not confirmed"
 
 
 def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
@@ -275,8 +292,8 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     # Exclude non-Junior roles by title, not incidental descriptions.
     if any(x in title for x in BLOCK) or re.search(r"(?<![a-z])vue(?![a-z])", title):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "excluded job title"}
-    # Russian-market roles may be remote, hybrid or office nationwide.
-    # International roles still pass the explicit residence/work-authorization checks below.
+    # Employment roles must be explicitly remote or come from a guaranteed remote-only source.
+    # Hybrid is limited to Yekaterinburg; office and unknown formats are excluded.
     work_format_rejection = _work_format_rejection(lead)
     if work_format_rejection:
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": work_format_rejection}
@@ -302,9 +319,14 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     # SQL is outside the confirmed stack. Clearly optional mentions are allowed.
     sql_parts = re.split(r"[\n.!?;]", text)
     optional_sql = ("optional", "nice to have", "nice-to-have", "not required",
-                    "не требуется", "необязател", "будет плюсом", "как плюс")
-    if any(re.search(r"\b(?:sql|mysql|postgresql)\b", part) and
-           not any(marker in part for marker in optional_sql) for part in sql_parts):
+                    "not mandatory", "preferred", "would be a plus",
+                    "не требуется", "необязател", "будет плюсом", "как плюс",
+                    "желательно", "приветствуется")
+    sql_mentions = [part for part in sql_parts
+                    if re.search(r"\b(?:sql|mysql|postgresql)\b", part)]
+    # Explicitly optional/preferred SQL is not a hard blocker.
+    # SQL without an optional qualifier remains excluded from the confirmed stack.
+    if any(not any(marker in part for marker in optional_sql) for part in sql_mentions):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "SQL outside confirmed stack"}
     # Known stale listing: Thimble.cz remote-job vacancy from September 2023.
     # Do not send a real application to this archived-era posting.
@@ -342,7 +364,11 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
             one_year = bool(re.search(r"(?:от|from|at least)\s*1\s*(?:год|года|year)|\b1\s*\+?\s*(?:год|года|year)", experience))
             zero_to_three = bool(re.search(r"\b[01]\s*[-–—]\s*3\s*(?:год|года|лет|years?)", experience))
             no_experience = bool(re.search(r"без опыта|не требуется опыт|no experience|entry.level|0\s*[-–—]\s*[12]\s*(?:год|года|лет|years?)", experience + " " + details))
-            if not is_entry_level(title) and not (one_year or zero_to_three or no_experience):
+            # The entry-level signal may appear in the description rather than
+            # the title (common on Russian job boards). Check both, while keeping
+            # explicit senior experience limits above as hard blockers.
+            entry_level_signal = is_entry_level(title + " " + details)
+            if not entry_level_signal and not (one_year or zero_to_three or no_experience):
                 return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "not Junior or 0-3 years"}
             # A range ending at 3 years is acceptable; "from 3 years" is not.
             if re.search(r"(?<![\d–—-])\b[4-9]\s*(?:[-–—]\s*\d+\s*)?(?:год|года|лет|years?)", experience):

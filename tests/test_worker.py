@@ -135,6 +135,7 @@ def test_role_priority_is_preserved_over_channel_priority():
 
 def test_two_challenges_pause_browser_but_allow_email(monkeypatch):
     monkeypatch.setenv("RESUME_TEXT", "JavaScript HTML CSS учебные проекты")
+    monkeypatch.setenv("AUTO_APPLY_APPROVED", "1")
     leads = [
         {"source": "remote_job_ru", "category": "frontend", "title": f"Junior React {i}",
          "url": f"https://remote-job.ru/vacancy/show/{i}/react"} for i in (1, 2, 3)
@@ -180,6 +181,8 @@ def test_draft_run_prepares_letter_without_dispatch_or_state_change(monkeypatch)
     lead = {"source": "hh", "category": "frontend", "title": "Junior React Developer",
             "url": "https://hh.ru/vacancy/1234", "description": "React", "match_score": 90}
     monkeypatch.setenv("DRY_RUN", "1")
+    monkeypatch.setenv("RESUME_TEXT", "JavaScript HTML CSS учебные проекты")
+    monkeypatch.delenv("AUTO_APPLY_APPROVED", raising=False)
     monkeypatch.setattr(worker, "JOB_COLLECTORS", ())
     monkeypatch.setattr("lead_enrichment.enrich_lead", lambda item: item)
     with patch.object(worker, "collect_all", return_value=[lead]), \
@@ -204,8 +207,46 @@ def test_draft_run_prepares_letter_without_dispatch_or_state_change(monkeypatch)
     set_state.assert_not_called()
 
 
+
+
+def test_dispatcher_itself_blocks_live_actions_without_global_approval(monkeypatch):
+    from application_dispatcher import dispatch
+    monkeypatch.delenv("AUTO_APPLY_APPROVED", raising=False)
+    with patch("application_dispatcher.application_time_allowed", return_value=True), \
+         patch("application_dispatcher._send_email") as send_email, \
+         patch("application_dispatcher.dispatch_browser") as browser:
+        result = dispatch({"source": "jobicy", "apply_email": "jobs@example.com"}, "draft")
+    assert result == {"status": "SKIPPED", "reason": "auto_apply_not_approved"}
+    send_email.assert_not_called()
+    browser.assert_not_called()
+
+def test_live_dispatch_requires_explicit_global_approval(monkeypatch):
+    monkeypatch.setenv("RESUME_TEXT", "JavaScript HTML CSS учебные проекты")
+    monkeypatch.delenv("DRY_RUN", raising=False)
+    monkeypatch.delenv("AUTO_APPLY_APPROVED", raising=False)
+    lead = {"source": "jobicy", "category": "frontend", "title": "Junior React Developer",
+            "url": "https://jobicy.com/jobs/approval-gate", "description": "React"}
+    monkeypatch.setattr(worker, "JOB_COLLECTORS", ())
+    monkeypatch.setattr("lead_enrichment.enrich_lead", lambda item: item)
+    with patch.object(worker, "collect_all", return_value=[lead]), \
+         patch.object(worker, "queued_leads", return_value=[]), \
+         patch.object(worker, "enqueue", return_value="approval-gate"), \
+         patch.object(worker, "rank_leads", return_value=[lead]), \
+         patch.object(worker, "apply_resume_matching", side_effect=lambda items: items), \
+         patch.object(worker, "was_submitted", return_value=False), \
+         patch.object(worker, "submitted_today", return_value=0), \
+         patch.object(worker, "set_state"), \
+         patch.object(worker, "dispatch") as dispatch, \
+         patch.object(worker, "send_message", return_value={"status": "SENT"}):
+        report = worker.run()
+    dispatch.assert_not_called()
+    assert report["stats"]["submitted"] == 0
+    assert report["stats"]["drafted"] == 1
+    assert report["results"][0]["status"] == "DRAFT"
+
 def test_total_hourly_cap_counts_across_job_and_freelance(monkeypatch):
     monkeypatch.setenv("RESUME_TEXT", "JavaScript HTML CSS учебные проекты")
+    monkeypatch.setenv("AUTO_APPLY_APPROVED", "1")
     leads = [
         {"source": "jobicy", "category": "frontend", "title": "Junior React",
          "url": "https://example.com/job", "apply_email": "jobs@example.com"},

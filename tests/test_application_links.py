@@ -22,7 +22,7 @@ class ApplicationLinkTests(unittest.TestCase):
         import application_dispatcher
         lead = job_sources.job('jobicy', 'Junior React Developer', 'https://board.example/job/1',
                                '<a href="mailto:jobs@example.org">Отправьте резюме</a>')
-        with patch.dict(os.environ, {'AUTO_SEND_EMAIL': '1', 'SMTP_HOST': 'smtp.example.org',
+        with patch.dict(os.environ, {'AUTO_APPLY_APPROVED': '1', 'AUTO_SEND_EMAIL': '1', 'SMTP_HOST': 'smtp.example.org',
                                      'SMTP_USER': 'candidate@example.org', 'SMTP_PASSWORD': 'dummy'}), \
              patch.object(application_dispatcher, 'application_time_allowed', return_value=True), \
              patch('application_dispatcher.smtplib.SMTP_SSL') as smtp:
@@ -55,3 +55,17 @@ class ApplicationLinkTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+def test_direct_email_sender_requires_global_approval(monkeypatch):
+    from unittest.mock import patch
+    from application_dispatcher import _send_email
+    monkeypatch.delenv("AUTO_APPLY_APPROVED", raising=False)
+    monkeypatch.setenv("AUTO_SEND_EMAIL", "1")
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.org")
+    monkeypatch.setenv("SMTP_USER", "candidate@example.org")
+    monkeypatch.setenv("SMTP_PASSWORD", "test-password")
+    with patch("application_dispatcher.smtplib.SMTP_SSL") as smtp:
+        result = _send_email({"apply_email": "jobs@example.org", "title": "Junior React"}, "Hello")
+    assert result == {"status": "SKIPPED", "reason": "auto_apply_not_approved"}
+    smtp.assert_not_called()

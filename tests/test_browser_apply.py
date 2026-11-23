@@ -33,6 +33,7 @@ def test_invalid_storage_state_json_is_ignored(monkeypatch):
 
 
 def test_remote_job_requires_name_and_email(monkeypatch):
+    monkeypatch.setenv("AUTO_APPLY_APPROVED", "1")
     monkeypatch.setenv("AUTO_BROWSER_APPLY", "1")
     monkeypatch.delenv("REMOTE_JOB_NAME", raising=False)
     monkeypatch.delenv("REMOTE_JOB_EMAIL", raising=False)
@@ -58,6 +59,7 @@ def test_remote_job_is_routed_to_browser_handler(monkeypatch):
 
 
 def test_remote_job_requires_phone_before_browser_launch(monkeypatch):
+    monkeypatch.setenv("AUTO_APPLY_APPROVED", "1")
     monkeypatch.setenv("AUTO_BROWSER_APPLY", "1")
     monkeypatch.setenv("REMOTE_JOB_NAME", "Applicant")
     monkeypatch.setenv("REMOTE_JOB_EMAIL", "applicant@example.org")
@@ -148,3 +150,17 @@ def test_hh_live_requirements_override_search_snippet():
                                                      "description": "React TypeScript"})
     assert not result["eligible"]
     assert result["rank_reason"] == "SQL outside confirmed stack"
+
+
+def test_hh_direct_handler_requires_global_approval(monkeypatch):
+    monkeypatch.setenv("AUTO_BROWSER_APPLY", "1")
+    monkeypatch.delenv("AUTO_APPLY_APPROVED", raising=False)
+    result = browser_apply.apply_hh({"url": "https://hh.ru/vacancy/123"}, "hello", storage_state={"cookies": []})
+    assert result == {"status": "SKIPPED", "reason": "auto_apply_not_approved"}
+
+
+def test_remote_job_direct_handler_requires_global_approval(monkeypatch):
+    monkeypatch.setenv("AUTO_BROWSER_APPLY", "1")
+    monkeypatch.delenv("AUTO_APPLY_APPROVED", raising=False)
+    result = browser_apply.apply_remote_job({"url": "https://remote-job.ru/vacancy/show/123/test"}, "hello")
+    assert result == {"status": "SKIPPED", "reason": "auto_apply_not_approved"}

@@ -8,6 +8,7 @@ import os
 import re
 from typing import Dict
 from application_schedule import application_time_allowed
+from application_approval import live_applications_approved
 
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
@@ -300,6 +301,8 @@ def apply_hh(lead: Dict, proposal: str, storage_state=None) -> Dict[str, str]:
         return {"status": "SKIPPED", "reason": "unsupported_browser_source"}
     if not _enabled():
         return {"status": "SHORTLISTED", "reason": "browser_apply_disabled"}
+    if not live_applications_approved():
+        return {"status": "SKIPPED", "reason": "auto_apply_not_approved"}
 
     state = _storage_state(storage_state)
     if not state:
@@ -439,6 +442,8 @@ def apply_remote_job(lead: Dict, proposal: str) -> Dict[str, str]:
         return {"status": "SKIPPED", "reason": "unsupported_browser_source"}
     if not _enabled():
         return {"status": "SHORTLISTED", "reason": "browser_apply_disabled"}
+    if not live_applications_approved():
+        return {"status": "SKIPPED", "reason": "auto_apply_not_approved"}
 
     name = os.getenv("REMOTE_JOB_NAME", "").strip()
     email = (os.getenv("REMOTE_JOB_EMAIL", "") or os.getenv("SMTP_USER", "")).strip()

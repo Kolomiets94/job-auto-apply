@@ -47,7 +47,7 @@ class ExternalDeliveryTests(unittest.TestCase):
         playwright = Mock()
         browser = playwright.chromium.launch.return_value
         browser.new_page.return_value = page
-        env = {'AUTO_BROWSER_APPLY': '1', 'REMOTE_JOB_NAME': 'Alexander Kolomiets',
+        env = {'AUTO_APPLY_APPROVED': '1', 'AUTO_BROWSER_APPLY': '1', 'REMOTE_JOB_NAME': 'Alexander Kolomiets',
                'REMOTE_JOB_EMAIL': 'candidate@example.org', 'REMOTE_JOB_PHONE': '+70000000000'}
         with patch.dict(os.environ, env), patch.object(external, 'sync_playwright') as start, \
              patch.object(external, 'application_time_allowed', return_value=True):

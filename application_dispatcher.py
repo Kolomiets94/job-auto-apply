@@ -11,11 +11,14 @@ from urllib.parse import urlsplit, unquote
 from email.message import EmailMessage
 
 from application_schedule import application_time_allowed
+from application_approval import live_applications_approved
 from browser_apply import dispatch_browser
 from freelancehunt_adapter import add_bid
 
 
 def _send_email(lead, proposal):
+    if not live_applications_approved():
+        return {"status": "SKIPPED", "reason": "auto_apply_not_approved"}
     email = lead.get("apply_email")
     apply_url = str(lead.get("apply_url") or "")
     if not email and urlsplit(apply_url).scheme == "mailto":
@@ -59,13 +62,17 @@ def _send_email(lead, proposal):
 
 
 def dispatch(lead, proposal):
+    # Defense in depth: direct callers cannot bypass the user's global approval.
+    if not live_applications_approved():
+        return {"status": "SKIPPED", "reason": "auto_apply_not_approved"}
+
     if not application_time_allowed():
         return {"status": "SKIPPED", "reason": "outside_application_hours"}
 
     if lead.get("paid_bid") is True:
         return {"status": "SKIPPED", "reason": "paid_bid"}
 
-    # The user authorized automatic applications; report outcomes via the worker.
+    # The worker enforces the explicit AUTO_APPLY_APPROVED gate before dispatch.
     if lead.get("source") == "freelancehunt" and lead.get("can_api_bid"):
         return add_bid(lead, proposal)
 
