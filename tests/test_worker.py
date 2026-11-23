@@ -208,6 +208,18 @@ def test_draft_run_prepares_letter_without_dispatch_or_state_change(monkeypatch)
 
 
 
+
+def test_dispatcher_itself_blocks_live_actions_without_global_approval(monkeypatch):
+    from application_dispatcher import dispatch
+    monkeypatch.delenv("AUTO_APPLY_APPROVED", raising=False)
+    with patch("application_dispatcher.application_time_allowed", return_value=True), \
+         patch("application_dispatcher._send_email") as send_email, \
+         patch("application_dispatcher.dispatch_browser") as browser:
+        result = dispatch({"source": "jobicy", "apply_email": "jobs@example.com"}, "draft")
+    assert result == {"status": "SKIPPED", "reason": "auto_apply_not_approved"}
+    send_email.assert_not_called()
+    browser.assert_not_called()
+
 def test_live_dispatch_requires_explicit_global_approval(monkeypatch):
     monkeypatch.setenv("RESUME_TEXT", "JavaScript HTML CSS учебные проекты")
     monkeypatch.delenv("DRY_RUN", raising=False)
