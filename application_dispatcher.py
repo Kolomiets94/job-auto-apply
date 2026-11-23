@@ -65,7 +65,7 @@ def dispatch(lead, proposal):
     if lead.get("paid_bid") is True:
         return {"status": "SKIPPED", "reason": "paid_bid"}
 
-    # The user authorized automatic applications; report outcomes via the worker.
+    # The worker enforces the explicit AUTO_APPLY_APPROVED gate before dispatch.
     if lead.get("source") == "freelancehunt" and lead.get("can_api_bid"):
         return add_bid(lead, proposal)
 
