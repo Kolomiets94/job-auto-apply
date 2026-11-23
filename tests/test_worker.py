@@ -3,6 +3,40 @@ from unittest.mock import patch
 import worker
 
 
+
+def test_resume_env_accepts_multiline_inline_text(monkeypatch):
+    resume = ("Frontend developer\n" + "React TypeScript HTML CSS " * 20)
+    monkeypatch.setenv("RESUME", resume)
+    monkeypatch.delenv("RESUME_TEXT", raising=False)
+    monkeypatch.delenv("RESUME_FILE", raising=False)
+    assert worker.load_resume_text() == resume.strip()
+
+
+def test_resume_env_reads_existing_text_file(monkeypatch, tmp_path):
+    path = tmp_path / "resume.txt"
+    path.write_text("Frontend developer with React and TypeScript experience.", encoding="utf-8")
+    monkeypatch.setenv("RESUME", str(path))
+    monkeypatch.delenv("RESUME_TEXT", raising=False)
+    monkeypatch.delenv("RESUME_FILE", raising=False)
+    assert "React" in worker.load_resume_text()
+
+
+
+def test_resume_text_setting_takes_precedence_over_resume_alias(monkeypatch):
+    monkeypatch.setenv("RESUME_TEXT", "preferred resume text")
+    monkeypatch.setenv("RESUME", "fallback resume text")
+    assert worker.load_resume_text() == "preferred resume text"
+
+
+def test_invalid_resume_file_fails_closed(monkeypatch, tmp_path):
+    path = tmp_path / "resume.rtf"
+    path.write_text("A sufficiently long but unsupported resume document.", encoding="utf-8")
+    monkeypatch.setenv("RESUME", str(path))
+    monkeypatch.delenv("RESUME_TEXT", raising=False)
+    monkeypatch.delenv("RESUME_FILE", raising=False)
+    assert worker.load_resume_text() == ""
+
+
 def test_collect_all_deduplicates_urls(monkeypatch):
     monkeypatch.setattr(worker, "JOB_COLLECTORS", ())
     same = {"source": "hh", "title": "React Junior", "url": "https://example.com/1"}
