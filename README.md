@@ -61,3 +61,9 @@ gunicorn app:app --bind 0.0.0.0:10000
 Поиск охватывает Россию и международные источники; международные вакансии проходят только при прямом подтверждении, что кандидат, проживающий в России, может работать на эту компанию. Метки worldwide/anywhere/global/remote сами по себе недостаточны. Повторные отклики исключаются. Перед реальным использованием проверьте источники, фильтры, авторизацию и правила конкретной площадки.
 
 Автор: [Alexander Kolomiets](https://github.com/Kolomiets94).
+
+
+## Gmail API (HTTPS, без SMTP/IMAP)
+На бесплатном Render почта работает через Gmail API по HTTPS/443. В Google Cloud нужно включить Gmail API, создать OAuth Client ID и получить refresh token с областью `https://www.googleapis.com/auth/gmail.modify`. В Render задать секреты `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`. Переменная `GMAIL_API_USER` — адрес ящика; если она не задана, используется `SMTP_USER`. OAuth-секреты хранятся только в Render Environment, не в репозитории и не в чате.
+
+Проверка авторизации: защищённый GET `/health/gmail-api` с заголовком `Authorization: Bearer <HUNTER_RUN_TOKEN>`. Проверка только читает профиль Gmail и не отправляет письма. Отправка через Gmail API остаётся выключенной при `AUTO_SEND_EMAIL=0`.
