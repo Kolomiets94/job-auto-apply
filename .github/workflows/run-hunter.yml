@@ -21,7 +21,7 @@ jobs:
           TOKEN="$(printf '%s' "$HUNTER_RUN_TOKEN" | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
           test -n "$TOKEN" || { echo "Missing GitHub Actions secret HUNTER_RUN_TOKEN"; exit 1; }
           curl --fail-with-body --silent --show-error --max-time 3500 \
-            -X POST "https://job-auto-apply-5wmf.onrender.com/run" \
+            -X POST "https://job-freelance-hunter.onrender.com/run" \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
             -d '{}'
