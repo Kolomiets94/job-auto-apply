@@ -337,3 +337,36 @@ def test_collect_freelance_all_deduplicates_only_when_requested(monkeypatch):
         leads = worker.collect_freelance_all()
     assert leads == [same]
     assert worker.COLLECTION_RAW_COUNT == 2
+
+
+
+def test_build_job_source_diagnostics_reports_funnel_and_rejection_reasons():
+    candidates = [
+        {"source": "hh", "title": "Junior React Developer"},
+        {"source": "hh", "title": "Junior Frontend Developer"},
+        {"source": "jobicy", "title": "Junior React Developer"},
+    ]
+    enriched = [
+        {**candidates[0], "enriched": True},
+        {**candidates[1], "enrichment_error": "source_http_403"},
+        {**candidates[2], "unavailable": True, "enrichment_error": "vacancy_unavailable"},
+    ]
+    assessed = [
+        {**candidates[0], "description": "React TypeScript", "work_mode": "office"},
+        {**candidates[1], "description": "React TypeScript", "work_mode": "remote"},
+    ]
+
+    result = worker.build_job_source_diagnostics(candidates, enriched, assessed)
+
+    assert result["hh"]["candidate_count"] == 2
+    assert result["hh"]["enriched_count"] == 1
+    assert result["hh"]["assessed_count"] == 2
+    assert result["hh"]["eligible_count"] == 1
+    assert result["hh"]["rejected_reasons"] == {
+        "office work is excluded; fully remote only": 1
+    }
+    assert result["hh"]["enrichment_errors"] == {"source_http_403": 1}
+    assert result["jobicy"]["unavailable_count"] == 1
+    assert result["jobicy"]["assessed_count"] == 0
+    assert "description" not in str(result)
+    assert "url" not in str(result)
