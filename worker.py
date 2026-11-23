@@ -536,16 +536,7 @@ def run():
                 "message": format_notification(lead),
             })
 
-        if dry_run:
-            proposal = make_proposal(lead)
-            stats["drafted"] += 1
-            results.append({"id": lid, "title": lead.get("title"), "source": lead.get("source"),
-                            "url": lead.get("url"), "status": "DRAFT", "reason": "dry_run",
-                            "proposal": proposal})
-            continue
-
-        # Live applications require an explicitly configured, truthful candidate profile.
-        # Without it, keep the lead visible but never submit a fabricated default CV.
+        # Never generate an application from an invented or missing candidate profile.
         if not load_resume_text():
             set_state(lid, "NEEDS_HUMAN")
             stats["needs_human"] += 1
@@ -557,6 +548,14 @@ def run():
                 "status": "NEEDS_HUMAN",
                 "reason": "verified_resume_missing",
             })
+            continue
+
+        if dry_run:
+            proposal = make_proposal(lead)
+            stats["drafted"] += 1
+            results.append({"id": lid, "title": lead.get("title"), "source": lead.get("source"),
+                            "url": lead.get("url"), "status": "DRAFT", "reason": "dry_run",
+                            "proposal": proposal})
             continue
 
         try:
