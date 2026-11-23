@@ -20,3 +20,12 @@ def test_external_browser_disabled(monkeypatch):
     monkeypatch.delenv("AUTO_BROWSER_APPLY", raising=False)
     result = external_form_apply.apply_external({"apply_url": "https://jobs.example.org/apply"}, "Hello")
     assert result["reason"] == "browser_apply_disabled"
+
+
+def test_external_form_direct_handler_requires_global_approval(monkeypatch):
+    monkeypatch.setenv("EXTERNAL_APPLY_HOSTS", "jobs.example.org")
+    monkeypatch.setenv("AUTO_BROWSER_APPLY", "1")
+    monkeypatch.delenv("AUTO_APPLY_APPROVED", raising=False)
+    result = external_form_apply.apply_external({"apply_url": "https://jobs.example.org/apply"}, "Hello")
+    assert result["status"] == "SKIPPED"
+    assert result["reason"] == "auto_apply_not_approved"
