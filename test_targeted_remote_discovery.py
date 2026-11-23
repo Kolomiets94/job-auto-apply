@@ -66,3 +66,25 @@ def test_remotive_uses_documented_keyword_search_and_deduplicates(monkeypatch):
     assert [params["search"] for _, params in calls] == ["react", "frontend"]
     assert len(leads) == 1
     assert leads[0]["source"] == "remotive"
+
+
+def test_structured_entry_level_experience_is_accepted():
+    from profit_ranker import rank_lead
+
+    decision = rank_lead({
+        "source": "jobicy",
+        "title": "Frontend Developer",
+        "company": "Example",
+        "url": "https://jobicy.com/jobs/123-frontend",
+        "location": "Worldwide",
+        "experience": "Entry",
+        "description": "Remote role. Applicants in Russia are eligible. React and TypeScript.",
+        "salary": {
+            "from": 50000,
+            "to": 70000,
+            "currency": "RUB",
+            "period": "Monthly",
+        },
+    })
+
+    assert decision["eligible"] is True
