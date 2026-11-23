@@ -59,6 +59,10 @@ def _send_email(lead, proposal):
 
 
 def dispatch(lead, proposal):
+    # Defense in depth: direct callers cannot bypass the user's global approval.
+    if os.getenv("AUTO_APPLY_APPROVED", "0").strip().lower() not in ("1", "true", "yes"):
+        return {"status": "SKIPPED", "reason": "auto_apply_not_approved"}
+
     if not application_time_allowed():
         return {"status": "SKIPPED", "reason": "outside_application_hours"}
 
