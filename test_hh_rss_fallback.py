@@ -119,3 +119,40 @@ def test_hh_rss_candidate_is_enriched_even_without_junior_in_title(monkeypatch):
 
     assert enriched["enriched"] is True
     assert "Формат работы: удалённо" in enriched["description"]
+
+
+def test_mandatory_nextjs_is_not_treated_as_confirmed_skill():
+    from profit_ranker import rank_lead
+
+    lead = {
+        "source": "hh",
+        "title": "Junior Frontend Developer",
+        "location": "Москва",
+        "experience": "Без опыта",
+        "description": "Remote work. No experience required.",
+        "requirements": "Requirements: React and Next.js",
+        "salary": {"from": 60000, "to": 60000, "currency": "RUB", "period": "month"},
+    }
+
+    ranked = rank_lead(lead)
+
+    assert ranked["eligible"] is False
+    assert ranked["rank_reason"] == "mandatory unsupported stack"
+
+
+def test_optional_nextjs_does_not_block_react_vacancy():
+    from profit_ranker import rank_lead
+
+    lead = {
+        "source": "hh",
+        "title": "Junior Frontend Developer",
+        "location": "Москва",
+        "experience": "Без опыта",
+        "description": "Remote work. No experience required.",
+        "requirements": "Requirements: React. Next.js will be a plus.",
+        "salary": {"from": 60000, "to": 60000, "currency": "RUB", "period": "month"},
+    }
+
+    ranked = rank_lead(lead)
+
+    assert ranked["eligible"] is True
