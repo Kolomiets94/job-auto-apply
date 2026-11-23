@@ -317,13 +317,13 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
            for part in required_parts):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "mandatory unsupported stack"}
     # SQL is outside the confirmed stack. Clearly optional mentions are allowed.
-    sql_parts = re.split(r"[\\n.!?;]", text)
+    sql_parts = re.split(r"[\n.!?;]", text)
     optional_sql = ("optional", "nice to have", "nice-to-have", "not required",
                     "not mandatory", "preferred", "would be a plus",
                     "не требуется", "необязател", "будет плюсом", "как плюс",
                     "желательно", "приветствуется")
     sql_mentions = [part for part in sql_parts
-                    if re.search(r"\\b(?:sql|mysql|postgresql)\\b", part)]
+                    if re.search(r"\b(?:sql|mysql|postgresql)\b", part)]
     # Explicitly optional/preferred SQL is not a hard blocker.
     # SQL without an optional qualifier remains excluded from the confirmed stack.
     if any(not any(marker in part for marker in optional_sql) for part in sql_mentions):
