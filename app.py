@@ -498,7 +498,6 @@ def email_test():
 
 
 
-def 
 def _start_smtp_connectivity_check():
     """One-shot DNS/TLS connectivity check only; never authenticates or sends mail."""
     marker = os.getenv("SMTP_CONNECTIVITY_DIAGNOSTIC_ID", "").strip()
@@ -570,8 +569,7 @@ def _start_smtp_connectivity_check():
             app.logger.exception("Could not save SMTP connectivity diagnostic")
 
 
-_start_smtp_self_test()
-_start_smtp_connectivity_check():
+def _start_smtp_self_test():
     """Send one fixed SMTP self-test only when a one-shot deploy marker is set."""
     marker = os.getenv("SMTP_DIAGNOSTIC_ID", "").strip()
     if not marker:
@@ -669,3 +667,4 @@ _start_smtp_connectivity_check():
 
 
 _start_smtp_self_test()
+_start_smtp_connectivity_check()
