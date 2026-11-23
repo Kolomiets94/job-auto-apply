@@ -458,3 +458,40 @@ _start_gmail_reply_monitor()
 _start_telegram_diagnostic()
 
 _start_one_shot_from_deploy()
+
+@app.post("/email/test")
+def email_test():
+    """Send exactly one fixed SMTP test message from SMTP_USER to itself."""
+    if not _authorized():
+        return jsonify({"error": "unauthorized"}), 401
+
+    import smtplib
+    from email.message import EmailMessage
+
+    host = os.getenv("SMTP_HOST", "").strip()
+    user = os.getenv("SMTP_USER", "").strip()
+    password = os.getenv("SMTP_PASSWORD", "").strip()
+    if not all((host, user, password)):
+        return jsonify({"error": "smtp_not_configured"}), 503
+
+    message = EmailMessage()
+    message["From"] = user
+    message["To"] = user
+    message["Subject"] = "Job AutoApply — SMTP test"
+    message.set_content(
+        "Это одноразовое тестовое письмо Job AutoApply. "
+        "Оно проверяет SMTP и не связано с откликами на вакансии."
+    )
+    try:
+        with smtplib.SMTP_SSL(
+            host, int(os.getenv("SMTP_PORT") or "465"), timeout=30
+        ) as smtp:
+            smtp.login(user, password)
+            refused = smtp.send_message(message, from_addr=user, to_addrs=[user])
+        if refused:
+            return jsonify({"error": "smtp_recipient_rejected"}), 502
+        app.logger.info("SMTP self-test accepted by server")
+        return jsonify({"status": "sent", "recipient": user}), 200
+    except Exception as exc:
+        app.logger.warning("SMTP self-test failed: %s", type(exc).__name__)
+        return jsonify({"error": "smtp_test_failed", "reason": type(exc).__name__}), 502
