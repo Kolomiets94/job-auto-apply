@@ -403,7 +403,12 @@ def run():
         "backlog_rechecked": len(candidates),
         "descriptions_enriched": sum(bool(lead.get("enriched")) for lead in enriched),
         "unavailable_skipped": sum(bool(lead.get("unavailable")) for lead in enriched),
+        # Keep the legacy combined count while exposing the two channels
+        # separately so freelance fallback cannot be mistaken for job vacancies.
         "ranked": len(ranked),
+        "jobs_ranked": len(ranked_jobs),
+        "freelance_ranked": len(ranked_freelance),
+        "primary_ranked": len(ranked),
         "submitted": 0,
         "drafted": 0,
         "submitted_by_role": {"frontend": 0, "layout": 0, "qa": 0, "freelance": 0},
