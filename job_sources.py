@@ -275,7 +275,7 @@ def remote_job_ru():
                 absolute = urljoin(url, html.unescape(href))
                 parts = __import__('urllib.parse', fromlist=['urlsplit']).urlsplit(absolute)
                 if (parts.scheme != 'https' or parts.hostname not in ('remote-job.ru', 'www.remote-job.ru')
-                        or not re.search(r'/vacancy/show/\\d+', parts.path, re.I)):
+                        or not re.search(r'/vacancy/show/\d+', parts.path, re.I)):
                     continue
                 title = clean(label)
                 if title and absolute not in seen:
