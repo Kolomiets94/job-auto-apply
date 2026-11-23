@@ -67,7 +67,7 @@ class WorkModePolicyTests(unittest.TestCase):
             "source": "remoteok",
             "title": "Junior React Developer",
             "location": "Worldwide",
-            "description": "Candidates must be based in Russia.",
+            "description": "Candidates must reside in Russia.",
         }
         self.assertFalse(_location_rejected(lead, _text(lead)))
 
