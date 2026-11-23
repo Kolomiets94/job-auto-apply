@@ -1,7 +1,7 @@
 """Regression tests for conservative employment work-mode filtering."""
 import unittest
 
-from profit_ranker import _work_format_rejection, _work_mode
+from profit_ranker import _work_format_rejection, _work_mode, rank_lead
 
 
 class WorkModePolicyTests(unittest.TestCase):
@@ -50,6 +50,19 @@ class WorkModePolicyTests(unittest.TestCase):
     def test_freelance_does_not_use_employment_work_mode_gate(self):
         lead = {"source": "freelancer_com"}
         self.assertIsNone(_work_format_rejection(lead))
+
+    def test_junior_signal_in_description_is_recognized(self):
+        lead = {
+            "source": "hh",
+            "title": "Frontend Developer",
+            "description": "Junior position. React and JavaScript.",
+            "work_mode": "remote",
+            "location": "Россия",
+            "salary": {"from": 60000, "to": 60000, "currency": "RUB", "period": "month"},
+        }
+        ranked = rank_lead(lead)
+        self.assertNotEqual(ranked.get("rank_reason"), "not Junior or 0-3 years")
+        self.assertTrue(ranked.get("eligible"))
 
 
 if __name__ == "__main__":
