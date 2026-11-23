@@ -76,3 +76,13 @@ def test_closed_freelancehunt_project_is_not_reported_as_failed(code, monkeypatc
     with patch.object(fh.requests, "post", return_value=Mock(status_code=code)):
         result = dispatch(lead(), "Hello")
     assert result == {"status": "SKIPPED", "reason": "project_unavailable"}
+
+
+def test_freelancehunt_direct_api_requires_global_approval(monkeypatch):
+    monkeypatch.setenv("AUTO_FREELANCE_APPLY", "1")
+    monkeypatch.setenv("FREELANCEHUNT_TOKEN", "test-token")
+    monkeypatch.delenv("AUTO_APPLY_APPROVED", raising=False)
+    with patch.object(fh.requests, "post") as post:
+        result = fh.add_bid(lead(), "Hello", days=3)
+    assert result == {"status": "SKIPPED", "reason": "auto_apply_not_approved"}
+    post.assert_not_called()
