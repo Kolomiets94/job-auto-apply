@@ -133,17 +133,17 @@ def hh_rss_search(tag, q, area=None, remote_only=True):
             continue
         seen.add(url)
         raw_description = item.findtext("description") or ""
-        description = re.sub(r"\\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", raw_description))).strip()
-        company_match = re.search(r"Вакансия компании:\\s*([^<]+)", raw_description, re.I)
-        region_match = re.search(r"Регион:\\s*([^<]+)", raw_description, re.I)
+        description = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", raw_description))).strip()
+        company_match = re.search(r"Вакансия компании:\s*([^<]+)", raw_description, re.I)
+        region_match = re.search(r"Регион:\s*([^<]+)", raw_description, re.I)
         salary_match = re.search(
-            r"(?:дохода:\\s*)?(?:от\\s*)?(\\d[\\d\\s\\u00a0]*)(?:\\s*до\\s*(\\d[\\d\\s\\u00a0]*))?\\s*(₽|руб(?:лей|ля|ль)?\\.?|RUB|RUR|USD|\\$|EUR|€)",
+            r"(?:дохода:\s*)?(?:от\s*)?(\d[\d\s\u00a0]*)(?:\s*до\s*(\d[\d\s\u00a0]*))?\s*(₽|руб(?:лей|ля|ль)?\.?|RUB|RUR|USD|\$|EUR|€)",
             description, re.I,
         )
         salary = None
         if salary_match:
             def amount(value):
-                return float(re.sub(r"\\s+", "", value).replace(",", "."))
+                return float(re.sub(r"\s+", "", value).replace(",", "."))
             currency = salary_match.group(3).upper()
             if currency == "₽" or currency.startswith("РУБ"):
                 currency = "RUB"
