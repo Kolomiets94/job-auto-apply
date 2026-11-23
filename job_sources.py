@@ -221,45 +221,69 @@ def zarplata():
     return _vacancy_listing('zarplata', 'https://zarplata.ru/vacancies/junior-developer/udalennaya_rabota')
 
 
+REMOTE_JOB_RU_QUERIES = (
+    'junior frontend', 'junior react', 'верстальщик html css', 'junior qa',
+    'стажер frontend', 'frontend intern', 'стажер верстальщик',
+    'практикант верстальщик', 'стажер тестировщик', 'QA intern',
+    # Broader role-first searches catch listings that omit "junior" from the title.
+    'React Frontend разработчик', 'Frontend-разработчик',
+    'HTML CSS верстальщик',
+)
+REMOTE_JOB_RU_PAGES = {
+    'React Frontend разработчик': 3,
+    'Frontend-разработчик': 2,
+}
+
+
 def remote_job_ru():
     out = []
     seen = set()
-    for query in ('junior frontend', 'junior react', 'верстальщик html css', 'junior qa',
-                  'стажер frontend', 'frontend intern', 'стажер верстальщик',
-                  'практикант верстальщик', 'стажер тестировщик', 'QA intern'):
-        url = 'https://remote-job.ru/search'
-        page = response(url, **{'search[query]': query, 'search[searchType]': 'vacancy'}).text
-        from html.parser import HTMLParser
-        class Links(HTMLParser):
-            def __init__(self):
-                super().__init__()
+    from html.parser import HTMLParser
+
+    class Links(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.href = None
+            self.parts = []
+            self.items = []
+
+        def handle_starttag(self, tag, attrs):
+            if tag == 'a':
+                self.href = dict(attrs).get('href')
+                self.parts = []
+
+        def handle_data(self, data):
+            if self.href:
+                self.parts.append(data)
+
+        def handle_endtag(self, tag):
+            if tag == 'a' and self.href:
+                self.items.append((self.href, ' '.join(self.parts)))
                 self.href = None
                 self.parts = []
-                self.items = []
-            def handle_starttag(self, tag, attrs):
-                if tag == 'a':
-                    self.href = dict(attrs).get('href')
-                    self.parts = []
-            def handle_data(self, data):
-                if self.href:
-                    self.parts.append(data)
-            def handle_endtag(self, tag):
-                if tag == 'a' and self.href:
-                    self.items.append((self.href, ' '.join(self.parts)))
-                    self.href = None
-                    self.parts = []
-        parser = Links()
-        parser.feed(page)
-        for href, label in parser.items:
-            absolute = urljoin(url, html.unescape(href))
-            if not re.search(r'/vacanc(?:y|ies)/|/vacancy/', absolute, re.I):
-                continue
-            title = clean(label)
-            if title and absolute not in seen:
-                seen.add(absolute)
-                out.append(job('remote_job_ru', title, absolute, title, language='ru'))
-    return out
 
+    url = 'https://remote-job.ru/search'
+    for query in REMOTE_JOB_RU_QUERIES:
+        for page_number in range(1, REMOTE_JOB_RU_PAGES.get(query, 1) + 1):
+            params = {'search[query]': query, 'search[searchType]': 'vacancy'}
+            if page_number > 1:
+                params['page'] = page_number
+            page = response(url, **params).text
+            parser = Links()
+            parser.feed(page)
+            for href, label in parser.items:
+                absolute = urljoin(url, html.unescape(href))
+                parts = __import__('urllib.parse', fromlist=['urlsplit']).urlsplit(absolute)
+                if (parts.scheme != 'https' or parts.hostname not in ('remote-job.ru', 'www.remote-job.ru')
+                        or not re.search(r'/vacancy/show/\d+', parts.path, re.I)):
+                    continue
+                title = clean(label)
+                if title and absolute not in seen:
+                    seen.add(absolute)
+                    out.append(job('remote_job_ru', title, absolute, title, language='ru'))
+                if len(out) >= 120:
+                    return out
+    return out
 
 def superjob():
     """Official SuperJob API when its app key is configured."""
