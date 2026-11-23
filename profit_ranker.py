@@ -144,9 +144,9 @@ def _location_rejected(lead: Dict[str, Any], text: str) -> bool:
             r"\b(?:open to|accept(?:ing)?|hire(?:s|d|ing)?|work from|residing in|"
             r"must reside in|must be located in|must live in|residents? of|"
             r"candidates? in|applicants? in|eligible in|available in|remote in)\b.{0,45}\brussia\b|"
-            r"\brussia\b.{0,45}\b(?:eligible|allowed|accepted|available|remote|candidates|applicants|hire)\b|"
-            r"(?:можно|доступн[аоы]?|принимаем|нанимаем|кандидат[ыа]?|работать|удал[её]нно|проживать).{0,45}росси[яию]|"
-            r"росси[яию].{0,45}(?:можно|доступн[аоы]?|принимаем|нанимаем|кандидат[ыа]?|работать|удал[её]нно|проживать)",
+            r"\brussia\b[^\n.!?;]{0,45}\b(?:eligible|allowed|accepted|available|remote|candidates|applicants|hire)\b|"
+            r"(?:можно|доступн[аоы]?|принимаем|нанимаем|кандидат[ыа]?|работать|удал[её]нно|проживать)[^\n.!?;]{0,45}росси[яию]|"
+            r"росси[яию][^\n.!?;]{0,45}(?:можно|доступн[аоы]?|принимаем|нанимаем|кандидат[ыа]?|работать|удал[её]нно|проживать)",
             eligibility_text,
         )
         if explicit_russia or re.search(r"\brussia\b|росси[яию]", location):
