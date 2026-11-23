@@ -2,6 +2,7 @@
 
 import os
 import traceback
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from job_sources import JOB_COLLECTORS
 
@@ -29,9 +30,24 @@ DEFAULT_RESUME_TEXT = ""  # Never invent skills or project history when no verif
 
 
 def load_resume_text():
+    # RESUME_TEXT is the explicit inline-text setting. RESUME is a backwards-
+    # compatible alias and may contain either resume text or an existing file path.
     text = os.getenv("RESUME_TEXT", "").strip()
     if text:
         return text
+
+    resume_value = os.getenv("RESUME", "").strip()
+    if resume_value:
+        try:
+            candidate = Path(resume_value).expanduser()
+            if candidate.is_file():
+                return extract_resume_text(str(candidate))
+        except (OSError, ResumeParseError) as exc:
+            print(f"[resume] RESUME file could not be read; live applications remain blocked: {type(exc).__name__}", flush=True)
+            return DEFAULT_RESUME_TEXT
+        # A non-path value is treated as the resume text itself.
+        return resume_value
+
     path = os.getenv("RESUME_FILE", "resume/profile.txt")
     try:
         return extract_resume_text(path)
