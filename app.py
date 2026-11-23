@@ -370,7 +370,7 @@ def _start_one_shot_from_deploy():
             stats = report.get("stats", {})
             fields = ("found", "fresh_unique", "unique_checked", "ranked",
                       "job_ranked", "job_actionable", "drafted", "submitted",
-                      "smtp_configured", "freelancehunt_token_configured",
+                      "gmail_api_configured", "freelancehunt_token_configured",
                       "remote_job_identity_configured", "collection_errors")
             print("[one-shot] complete", {key: stats.get(key) for key in fields}, flush=True)
             drafts = [item for item in report.get("results", [])
