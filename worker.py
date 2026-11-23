@@ -285,6 +285,60 @@ def _uses_browser(lead):
     return _browser_scope(lead) is not None
 
 
+
+def build_job_source_diagnostics(candidates, enriched, assessed):
+    """Summarize the employment-vacancy funnel without exposing listing text or PII."""
+    from collections import Counter, defaultdict
+
+    by_source = defaultdict(lambda: {
+        "candidate_count": 0,
+        "enriched_count": 0,
+        "unavailable_count": 0,
+        "enrichment_errors": Counter(),
+        "assessed_count": 0,
+        "eligible_count": 0,
+        "rejected_reasons": Counter(),
+        "roles": Counter(),
+    })
+    for lead in candidates:
+        source = str(lead.get("source") or "unknown")
+        by_source[source]["candidate_count"] += 1
+    for lead in enriched:
+        source = str(lead.get("source") or "unknown")
+        item = by_source[source]
+        if lead.get("enriched"):
+            item["enriched_count"] += 1
+        if lead.get("unavailable"):
+            item["unavailable_count"] += 1
+        error = lead.get("enrichment_error")
+        if error:
+            item["enrichment_errors"][str(error)] += 1
+    for lead in assessed:
+        source = str(lead.get("source") or "unknown")
+        item = by_source[source]
+        item["assessed_count"] += 1
+        item["roles"][_role_category(lead)] += 1
+        ranked = rank_lead(lead)
+        if ranked.get("eligible"):
+            item["eligible_count"] += 1
+        else:
+            item["rejected_reasons"][str(ranked.get("rank_reason") or "unknown")] += 1
+
+    result = {}
+    for source, item in sorted(by_source.items()):
+        result[source] = {
+            "candidate_count": item["candidate_count"],
+            "enriched_count": item["enriched_count"],
+            "unavailable_count": item["unavailable_count"],
+            "enrichment_errors": dict(item["enrichment_errors"].most_common(5)),
+            "assessed_count": item["assessed_count"],
+            "eligible_count": item["eligible_count"],
+            "rejected_reasons": dict(item["rejected_reasons"].most_common(8)),
+            "roles": dict(item["roles"]),
+        }
+    return result
+
+
 def run(force_dry_run=False):
     from aggregator_origin import reset_origin_diagnostics, origin_diagnostics
     from entry_level import is_placement
@@ -378,6 +432,10 @@ def run(force_dry_run=False):
             "rejected_reasons": dict(rejected.most_common(8)),
         }
     print(f"[eligibility] {eligibility}", flush=True)
+    job_source_diagnostics = build_job_source_diagnostics(
+        job_candidates, enriched_jobs, job_leads
+    )
+    print(f"[job_source_diagnostics] {job_source_diagnostics}", flush=True)
 
     daily_limits = {
         "jobs_submitted": _application_limit("DAILY_JOB_LIMIT"),
@@ -417,6 +475,7 @@ def run(force_dry_run=False):
         "qa_found": sum(_role_category(lead) == "qa" and not is_freelance(lead) for lead in leads),
         "source_counts": source_counts,
         "eligibility_diagnostics": eligibility,
+        "job_source_diagnostics": job_source_diagnostics,
         "collection_errors": list(COLLECTION_ERRORS),
         "resume_configured": bool(load_resume_text()),
         "found": len(leads),
