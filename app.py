@@ -208,6 +208,21 @@ def _run_startup_hh_diagnostic():
 # Run independently so a slow HH response does not block service startup.
 threading.Thread(target=_run_startup_hh_diagnostic, name="hh-session-diagnostic", daemon=True).start()
 
+@app.get("/health/gmail-api")
+def gmail_api_health():
+    """Read-only Gmail OAuth/profile check; never sends email."""
+    if not _authorized():
+        return jsonify({"error": "unauthorized"}), 401
+    from gmail_api import get_profile, is_configured
+    if not is_configured():
+        return jsonify({"gmail_api": "not_configured"}), 503
+    try:
+        return jsonify({"gmail_api": "ok", **get_profile()})
+    except Exception as exc:
+        app.logger.warning("Gmail API health check failed: %s", type(exc).__name__)
+        return jsonify({"gmail_api": "unavailable", "reason": type(exc).__name__}), 502
+
+
 @app.get("/health/db")
 def database_health():
     if not _authorized():
@@ -428,9 +443,9 @@ def _start_telegram_diagnostic():
 
 def _start_gmail_reply_monitor():
     """Poll Gmail for application replies while the Render process is awake."""
+    from gmail_api import is_configured
     required = (
-        os.getenv("IMAP_USER") or os.getenv("SMTP_USER"),
-        os.getenv("IMAP_PASSWORD") or os.getenv("SMTP_PASSWORD"),
+        is_configured(),
         os.getenv("TELEGRAM_BOT_TOKEN"),
         os.getenv("TELEGRAM_CHAT_ID"),
     )
@@ -461,210 +476,21 @@ _start_one_shot_from_deploy()
 
 @app.post("/email/test")
 def email_test():
-    """Send exactly one fixed SMTP test message from SMTP_USER to itself."""
+    """Send one Gmail API test only when AUTO_SEND_EMAIL is explicitly enabled."""
     if not _authorized():
         return jsonify({"error": "unauthorized"}), 401
-
-    import smtplib
-    from email.message import EmailMessage
-
-    host = os.getenv("SMTP_HOST", "").strip()
-    user = os.getenv("SMTP_USER", "").strip()
-    password = os.getenv("SMTP_PASSWORD", "").strip()
-    if not all((host, user, password)):
-        return jsonify({"error": "smtp_not_configured"}), 503
-
-    message = EmailMessage()
-    message["From"] = user
-    message["To"] = user
-    message["Subject"] = "Job AutoApply — SMTP test"
-    message.set_content(
-        "Это одноразовое тестовое письмо Job AutoApply. "
-        "Оно проверяет SMTP и не связано с откликами на вакансии."
-    )
+    if os.getenv("AUTO_SEND_EMAIL", "0").strip() != "1":
+        return jsonify({"error": "email_sending_disabled"}), 409
+    from gmail_api import is_configured, send_message
+    if not is_configured():
+        return jsonify({"error": "gmail_api_not_configured"}), 503
+    user = os.getenv("GMAIL_API_USER") or os.getenv("SMTP_USER", "")
     try:
-        with smtplib.SMTP_SSL(
-            host, int(os.getenv("SMTP_PORT") or "465"), timeout=30
-        ) as smtp:
-            smtp.login(user, password)
-            refused = smtp.send_message(message, from_addr=user, to_addrs=[user])
-        if refused:
-            return jsonify({"error": "smtp_recipient_rejected"}), 502
-        app.logger.info("SMTP self-test accepted by server")
-        return jsonify({"status": "sent", "recipient": user}), 200
+        send_message(user, "Job AutoApply — Gmail API test", "Тест Gmail API. Не является откликом на вакансию.")
+        return jsonify({"status": "accepted_by_gmail_api"}), 200
     except Exception as exc:
-        app.logger.warning("SMTP self-test failed: %s", type(exc).__name__)
-        return jsonify({"error": "smtp_test_failed", "reason": type(exc).__name__}), 502
+        app.logger.warning("Gmail API test failed: %s", type(exc).__name__)
+        return jsonify({"error": "gmail_api_test_failed", "reason": type(exc).__name__}), 502
 
 
 
-def _start_smtp_connectivity_check():
-    """One-shot DNS/TLS connectivity check only; never authenticates or sends mail."""
-    marker = os.getenv("SMTP_CONNECTIVITY_DIAGNOSTIC_ID", "").strip()
-    if not marker:
-        return
-    try:
-        from queue_store import _db
-        with _db() as connection:
-            connection.execute(
-                "CREATE TABLE IF NOT EXISTS hunter_smtp_diagnostics "
-                "(id TEXT PRIMARY KEY, started_at TEXT NOT NULL, outcome TEXT)"
-            )
-            claim = connection.execute(
-                "INSERT INTO hunter_smtp_diagnostics (id, started_at) "
-                "VALUES (?, ?) ON CONFLICT (id) DO NOTHING",
-                (marker, datetime.now(timezone.utc).isoformat()),
-            )
-            claimed = claim.rowcount == 1
-    except Exception:
-        app.logger.exception("Could not claim SMTP connectivity diagnostic")
-        return
-    if not claimed:
-        return
-
-    outcome = "failed"
-    host = os.getenv("SMTP_HOST", "").strip()
-    try:
-        import smtplib
-        if not host:
-            outcome = "not_configured"
-            print("[smtp-connectivity] missing SMTP_HOST", flush=True)
-        else:
-            port = int(os.getenv("SMTP_PORT") or "465")
-            # SMTP_SSL performs DNS lookup, TCP connect and TLS handshake only.
-            # No login(), sendmail(), or send_message() calls are made.
-            with smtplib.SMTP_SSL(host, port, timeout=10):
-                pass
-            outcome = "tls_connected"
-            print("[smtp-connectivity] DNS/TCP/TLS connection successful; no login or email sent", flush=True)
-    except Exception as exc:
-        error_number = getattr(exc, "errno", None)
-        try:
-            import errno as errno_module
-            error_code = errno_module.errorcode.get(error_number) if error_number is not None else None
-        except Exception:
-            error_code = None
-        if isinstance(exc, TimeoutError):
-            category = "timeout"
-        elif error_number is not None:
-            category = str(error_code or "os_error")
-        else:
-            category = type(exc).__name__
-        print(
-            "[smtp-connectivity] failed:",
-            "exception=" + type(exc).__name__,
-            "category=" + category,
-            "errno=" + str(error_number if error_number is not None else "unavailable"),
-            flush=True,
-        )
-    finally:
-        try:
-            from queue_store import _db
-            with _db() as connection:
-                connection.execute(
-                    "UPDATE hunter_smtp_diagnostics SET outcome=? WHERE id=?",
-                    (outcome, marker),
-                )
-        except Exception:
-            app.logger.exception("Could not save SMTP connectivity diagnostic")
-
-
-def _start_smtp_self_test():
-    """Send one fixed SMTP self-test only when a one-shot deploy marker is set."""
-    marker = os.getenv("SMTP_DIAGNOSTIC_ID", "").strip()
-    if not marker:
-        return
-    try:
-        from queue_store import _db
-        with _db() as connection:
-            connection.execute(
-                "CREATE TABLE IF NOT EXISTS hunter_smtp_diagnostics "
-                "(id TEXT PRIMARY KEY, started_at TEXT NOT NULL, outcome TEXT)"
-            )
-            claim = connection.execute(
-                "INSERT INTO hunter_smtp_diagnostics (id, started_at) "
-                "VALUES (?, ?) ON CONFLICT (id) DO NOTHING",
-                (marker, datetime.now(timezone.utc).isoformat()),
-            )
-            claimed = claim.rowcount == 1
-    except Exception:
-        app.logger.exception("Could not claim SMTP diagnostic")
-        return
-    if not claimed:
-        return
-
-    def send_test():
-        outcome = "failed"
-        try:
-            import smtplib
-            from email.message import EmailMessage
-            host = os.getenv("SMTP_HOST", "").strip()
-            user = os.getenv("SMTP_USER", "").strip()
-            password = os.getenv("SMTP_PASSWORD", "").strip()
-            missing = [
-                key for key, value in (
-                    ("SMTP_HOST", host),
-                    ("SMTP_USER", user),
-                    ("SMTP_PASSWORD", password),
-                ) if not value
-            ]
-            if missing:
-                outcome = "not_configured"
-                print("[smtp-diagnostic] not configured; missing=" + ",".join(missing), flush=True)
-                return
-            message = EmailMessage()
-            message["From"] = user
-            message["To"] = user
-            message["Subject"] = "Job AutoApply — SMTP test"
-            message.set_content(
-                "Это одноразовое тестовое письмо Job AutoApply. "
-                "Оно проверяет SMTP и не связано с откликами на вакансии."
-            )
-            with smtplib.SMTP_SSL(
-                host, int(os.getenv("SMTP_PORT") or "465"), timeout=30
-            ) as smtp:
-                smtp.login(user, password)
-                refused = smtp.send_message(message, from_addr=user, to_addrs=[user])
-            if refused:
-                outcome = "recipient_rejected"
-                print("[smtp-diagnostic] recipient rejected", flush=True)
-            else:
-                outcome = "sent"
-                print("[smtp-diagnostic] SMTP server accepted self-test", flush=True)
-        except Exception as exc:
-            outcome = type(exc).__name__
-            # Log only structured OS error metadata; never print exception text or secrets.
-            error_number = getattr(exc, "errno", None)
-            try:
-                import errno as errno_module
-                error_code = errno_module.errorcode.get(error_number) if error_number is not None else None
-            except Exception:
-                error_code = None
-            if isinstance(exc, TimeoutError):
-                print("[smtp-diagnostic] failed:", type(exc).__name__, "category=timeout", flush=True)
-            elif error_number is not None:
-                print(
-                    "[smtp-diagnostic] failed:", type(exc).__name__,
-                    "errno=" + str(error_number),
-                    "code=" + str(error_code or "unknown"),
-                    flush=True,
-                )
-            else:
-                print("[smtp-diagnostic] failed:", type(exc).__name__, "errno=unavailable", flush=True)
-        finally:
-            try:
-                from queue_store import _db
-                with _db() as connection:
-                    connection.execute(
-                        "UPDATE hunter_smtp_diagnostics SET outcome=? WHERE id=?",
-                        (outcome, marker),
-                    )
-            except Exception:
-                app.logger.exception("Could not record SMTP diagnostic outcome")
-
-    threading.Thread(target=send_test, name="smtp-self-test", daemon=True).start()
-    print("[smtp-diagnostic] one-shot test claimed", flush=True)
-
-
-_start_smtp_self_test()
-_start_smtp_connectivity_check()
