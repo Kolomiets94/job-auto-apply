@@ -121,7 +121,7 @@ def collect_all():
                 hh_available = False
                 break
 
-    # Also collect HH hybrid vacancies in Yekaterinburg; the ranker rejects hybrid roles elsewhere.
+    # Supplement the nationwide HH search with a targeted Yekaterinburg hybrid query.
     for tag, query in (QUERIES if hh_available else []):
         try:
             matches = hh_search_hybrid(tag, query)
