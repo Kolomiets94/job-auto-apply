@@ -50,6 +50,7 @@ def test_respects_daily_application_limit(monkeypatch):
 def test_submitted_result_increments_daily_total(monkeypatch):
     monkeypatch.setenv("DAILY_JOB_LIMIT", "10")
     monkeypatch.setenv("RESUME_TEXT", "JavaScript HTML CSS учебные проекты")
+    monkeypatch.setenv("AUTO_APPLY_APPROVED", "1")
     lead = _lead()
     with patch.object(worker, "collect_all", return_value=[lead]), \
          patch.object(worker, "rank_leads", return_value=[lead]), \
