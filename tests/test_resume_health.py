@@ -11,7 +11,7 @@ def test_resume_status_reports_configured_without_exposing_content(monkeypatch):
     response = app.test_client().get("/health/resume/status")
 
     assert response.status_code == 200
-    assert response.get_json() == {"resume_configured": True, "source": "RESUME"}
+    assert response.get_json() == {"resume_configured": True, "source": "RESUME", "resume_alias_present": True, "resume_text_present": False}
     assert secret_resume not in response.get_data(as_text=True)
 
 
@@ -24,4 +24,4 @@ def test_resume_status_reports_missing_resume(monkeypatch):
     response = app.test_client().get("/health/resume/status")
 
     assert response.status_code == 200
-    assert response.get_json() == {"resume_configured": False, "source": "none"}
+    assert response.get_json() == {"resume_configured": False, "source": "none", "resume_alias_present": False, "resume_text_present": False}

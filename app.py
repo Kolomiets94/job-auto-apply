@@ -333,7 +333,12 @@ def public_resume_status():
             source = "RESUME"
         else:
             source = "RESUME_FILE"
-        return jsonify({"resume_configured": configured, "source": source if configured else "none"})
+        return jsonify({
+            "resume_configured": configured,
+            "source": source if configured else "none",
+            "resume_alias_present": bool(os.getenv("RESUME", "").strip()),
+            "resume_text_present": bool(os.getenv("RESUME_TEXT", "").strip()),
+        })
     except Exception:
         app.logger.warning("Public resume configuration check failed")
         return jsonify({"resume_configured": False, "source": "unavailable"}), 503
