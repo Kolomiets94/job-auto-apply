@@ -375,7 +375,11 @@ def run():
     weekly_total_limit = _application_limit("WEEKLY_TOTAL_LIMIT")
     weekly_submitted_count = submitted_this_week()
     total_hourly_limit = _application_limit("HOURLY_TOTAL_LIMIT")
-    dry_run = os.getenv("DRY_RUN", "0").strip().lower() in ("1", "true", "yes")
+    # Real submissions require a separate, explicit user approval.
+    # Until AUTO_APPLY_APPROVED=1 is configured, always remain in draft mode.
+    auto_apply_approved = os.getenv("AUTO_APPLY_APPROVED", "0").strip().lower() in ("1", "true", "yes")
+    dry_run = (os.getenv("DRY_RUN", "0").strip().lower() in ("1", "true", "yes")
+               or not auto_apply_approved)
     job_limit = _application_limit("HOURLY_JOB_LIMIT")
     freelance_limit = _application_limit("HOURLY_FREELANCE_LIMIT")
 
