@@ -38,14 +38,17 @@ def load_resume_text():
 
     resume_value = os.getenv("RESUME", "").strip()
     if resume_value:
-        try:
-            candidate = Path(resume_value).expanduser()
-            if candidate.is_file():
-                return extract_resume_text(str(candidate))
-        except (OSError, ResumeParseError) as exc:
-            print(f"[resume] RESUME file could not be read; live applications remain blocked: {type(exc).__name__}", flush=True)
-            return DEFAULT_RESUME_TEXT
-        # A non-path value is treated as the resume text itself.
+        # Resume text is commonly multiline and can exceed the OS filename
+        # limit. Only probe short, single-line values as possible file paths.
+        if "\n" not in resume_value and "\r" not in resume_value and len(resume_value) <= 240:
+            try:
+                candidate = Path(resume_value).expanduser()
+                if candidate.is_file():
+                    return extract_resume_text(str(candidate))
+            except (OSError, ResumeParseError) as exc:
+                print(f"[resume] RESUME file could not be read; live applications remain blocked: {type(exc).__name__}", flush=True)
+                return DEFAULT_RESUME_TEXT
+        # Multiline/long values are inline resume text, not filesystem paths.
         return resume_value
 
     path = os.getenv("RESUME_FILE", "resume/profile.txt")
