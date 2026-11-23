@@ -12,6 +12,7 @@ SOURCE_HOSTS = {
     'geekjob': {'geekjob.ru'}, 'getmatch': {'getmatch.ru'},
     'zarplata': {'zarplata.ru'}, 'remoteok': {'remoteok.com'},
     'remote_job_ru': {'remote-job.ru', 'www.remote-job.ru'},
+    'hh': {'hh.ru', 'www.hh.ru'},
 }
 
 
