@@ -614,7 +614,7 @@ def run():
     stats["gmail_api_configured"] = __import__("gmail_api").is_configured()
     stats["remote_job_identity_configured"] = (
         bool(os.getenv("REMOTE_JOB_NAME")) and bool(os.getenv("REMOTE_JOB_PHONE"))
-        and bool(os.getenv("REMOTE_JOB_EMAIL") or os.getenv("SMTP_USER"))
+        and bool(os.getenv("REMOTE_JOB_EMAIL") or os.getenv("GMAIL_API_USER") or os.getenv("SMTP_USER"))
     )
 
     # Show matching employment vacancies independently of freelance projects.
