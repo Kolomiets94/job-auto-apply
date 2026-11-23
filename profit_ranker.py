@@ -307,7 +307,7 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     required_sql = ("required", "must have", "mandatory", "requirement", "обязательно",
                     "обязателен", "обязательна", "требуется", "необходимо", "необходим")
     sql_is_required = any(
-        re.search(r"\\b(?:sql|mysql|postgresql)\\b", part)
+        re.search(r"\b(?:sql|mysql|postgresql)\b", part)
         and not any(marker in part for marker in optional_sql)
         and any(marker in part for marker in required_sql)
         for part in sql_parts
