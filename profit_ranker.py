@@ -311,7 +311,7 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     requirements = " ".join(str(lead.get(k) or "") for k in ("description", "requirements")).lower()
     required_parts = re.split(r"[\n.!?;]", requirements)
     optional_markers = ("optional", "nice to have", "nice-to-have", "not required", "необязател", "будет плюсом", "как плюс")
-    unsupported = ("vue", "angular", "full stack", "fullstack", "react native", "flutter")
+    unsupported = ("vue", "angular", "full stack", "fullstack", "react native", "flutter", "next.js", "nextjs")
     if any(any(term in part for term in unsupported) and not any(marker in part for marker in optional_markers)
            and any(marker in part for marker in ("required", "must have", "mandatory", "обязательно", "требуется"))
            for part in required_parts):
