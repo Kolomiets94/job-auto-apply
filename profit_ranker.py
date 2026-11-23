@@ -252,14 +252,15 @@ def _work_mode(lead: Dict[str, Any]) -> str:
 
     source = str(lead.get("source") or "").lower()
     # These sources only publish remote jobs or apply an explicit remote filter.
-    if source == "hh" or source in FREELANCE_SOURCES or source in REMOTE_ONLY_SOURCES:
+    if source in FREELANCE_SOURCES or source in REMOTE_ONLY_SOURCES:
         return "remote"
     return "unknown"
 
 
 def _work_format_rejection(lead: Dict[str, Any]) -> str | None:
-    # Russian-market search accepts remote, hybrid and office vacancies nationwide.
-    # The detected mode remains metadata; it is not an eligibility gate.
+    # User policy: remote, hybrid and office are all acceptable throughout Russia.
+    # Unknown format remains a separate diagnostic category, never relabeled remote.
+    # International residence/work-authorization checks run independently.
     return None
 
 
@@ -299,12 +300,19 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
            and any(marker in part for marker in ("required", "must have", "mandatory", "обязательно", "требуется"))
            for part in required_parts):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "mandatory unsupported stack"}
-    # SQL is outside the confirmed stack. Clearly optional mentions are allowed.
-    sql_parts = re.split(r"[\n.!?;]", text)
+    # Reject SQL only when it is explicitly stated as a requirement.
+    sql_parts = re.split(r"[\n.!?;]", " ".join(str(lead.get(k) or "") for k in ("description", "requirements")))
     optional_sql = ("optional", "nice to have", "nice-to-have", "not required",
-                    "не требуется", "необязател", "будет плюсом", "как плюс")
-    if any(re.search(r"\b(?:sql|mysql|postgresql)\b", part) and
-           not any(marker in part for marker in optional_sql) for part in sql_parts):
+                    "не требуется", "необязател", "будет плюсом", "как плюс", "желательно")
+    required_sql = ("required", "must have", "mandatory", "requirement", "обязательно",
+                    "обязателен", "обязательна", "требуется", "необходимо", "необходим")
+    sql_is_required = any(
+        re.search(r"\\b(?:sql|mysql|postgresql)\\b", part)
+        and not any(marker in part for marker in optional_sql)
+        and any(marker in part for marker in required_sql)
+        for part in sql_parts
+    )
+    if sql_is_required:
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "SQL outside confirmed stack"}
     # Known stale listing: Thimble.cz remote-job vacancy from September 2023.
     # Do not send a real application to this archived-era posting.
