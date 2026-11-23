@@ -498,7 +498,80 @@ def email_test():
 
 
 
-def _start_smtp_self_test():
+def 
+def _start_smtp_connectivity_check():
+    """One-shot DNS/TLS connectivity check only; never authenticates or sends mail."""
+    marker = os.getenv("SMTP_CONNECTIVITY_DIAGNOSTIC_ID", "").strip()
+    if not marker:
+        return
+    try:
+        from queue_store import _db
+        with _db() as connection:
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS hunter_smtp_diagnostics "
+                "(id TEXT PRIMARY KEY, started_at TEXT NOT NULL, outcome TEXT)"
+            )
+            claim = connection.execute(
+                "INSERT INTO hunter_smtp_diagnostics (id, started_at) "
+                "VALUES (?, ?) ON CONFLICT (id) DO NOTHING",
+                (marker, datetime.now(timezone.utc).isoformat()),
+            )
+            claimed = claim.rowcount == 1
+    except Exception:
+        app.logger.exception("Could not claim SMTP connectivity diagnostic")
+        return
+    if not claimed:
+        return
+
+    outcome = "failed"
+    host = os.getenv("SMTP_HOST", "").strip()
+    try:
+        import smtplib
+        if not host:
+            outcome = "not_configured"
+            print("[smtp-connectivity] missing SMTP_HOST", flush=True)
+        else:
+            port = int(os.getenv("SMTP_PORT") or "465")
+            # SMTP_SSL performs DNS lookup, TCP connect and TLS handshake only.
+            # No login(), sendmail(), or send_message() calls are made.
+            with smtplib.SMTP_SSL(host, port, timeout=10):
+                pass
+            outcome = "tls_connected"
+            print("[smtp-connectivity] DNS/TCP/TLS connection successful; no login or email sent", flush=True)
+    except Exception as exc:
+        error_number = getattr(exc, "errno", None)
+        try:
+            import errno as errno_module
+            error_code = errno_module.errorcode.get(error_number) if error_number is not None else None
+        except Exception:
+            error_code = None
+        if isinstance(exc, TimeoutError):
+            category = "timeout"
+        elif error_number is not None:
+            category = str(error_code or "os_error")
+        else:
+            category = type(exc).__name__
+        print(
+            "[smtp-connectivity] failed:",
+            "exception=" + type(exc).__name__,
+            "category=" + category,
+            "errno=" + str(error_number if error_number is not None else "unavailable"),
+            flush=True,
+        )
+    finally:
+        try:
+            from queue_store import _db
+            with _db() as connection:
+                connection.execute(
+                    "UPDATE hunter_smtp_diagnostics SET outcome=? WHERE id=?",
+                    (outcome, marker),
+                )
+        except Exception:
+            app.logger.exception("Could not save SMTP connectivity diagnostic")
+
+
+_start_smtp_self_test()
+_start_smtp_connectivity_check():
     """Send one fixed SMTP self-test only when a one-shot deploy marker is set."""
     marker = os.getenv("SMTP_DIAGNOSTIC_ID", "").strip()
     if not marker:
