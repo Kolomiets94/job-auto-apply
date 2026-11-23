@@ -5,7 +5,7 @@ import worker
 
 
 def test_resume_env_accepts_multiline_inline_text(monkeypatch):
-    resume = ("Frontend developer\\n" + "React TypeScript HTML CSS " * 20)
+    resume = ("Frontend developer\n" + "React TypeScript HTML CSS " * 20)
     monkeypatch.setenv("RESUME", resume)
     monkeypatch.delenv("RESUME_TEXT", raising=False)
     monkeypatch.delenv("RESUME_FILE", raising=False)
