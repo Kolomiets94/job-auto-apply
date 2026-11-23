@@ -292,8 +292,8 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     # Exclude non-Junior roles by title, not incidental descriptions.
     if any(x in title for x in BLOCK) or re.search(r"(?<![a-z])vue(?![a-z])", title):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "excluded job title"}
-    # Russian-market roles may be remote, hybrid or office nationwide.
-    # International roles still pass the explicit residence/work-authorization checks below.
+    # Employment roles must be explicitly remote or come from a guaranteed remote-only source.
+    # Hybrid is limited to Yekaterinburg; office and unknown formats are excluded.
     work_format_rejection = _work_format_rejection(lead)
     if work_format_rejection:
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": work_format_rejection}
