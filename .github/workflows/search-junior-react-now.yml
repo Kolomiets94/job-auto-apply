@@ -44,3 +44,5 @@ jobs:
               "collection_errors": COLLECTION_ERRORS, "applications_sent": 0,
           }, ensure_ascii=False, default=str), flush=True)
           PY
+
+# Manual search trigger: search-only, never submits applications.
