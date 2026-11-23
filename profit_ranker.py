@@ -141,10 +141,10 @@ def _location_rejected(lead: Dict[str, Any], text: str) -> bool:
         # Residence in Russia is itself a valid geographic match, including
         # listings whose location field is broader (for example, Europe).
         explicit_russia = re.search(
-            r"\b(?:open to|accept(?:ing)?|hire(?:s|d|ing)?|work from|based in|residing in|"
+            r"\b(?:open to|accept(?:ing)?|hire(?:s|d|ing)?|work from|residing in|"
             r"must reside in|must be located in|must live in|residents? of|"
             r"candidates? in|applicants? in|eligible in|available in|remote in)\b.{0,45}\brussia\b|"
-            r"\brussia\b.{0,45}\b(?:eligible|allowed|accepted|available|remote|based|candidates|applicants|hire)\b|"
+            r"\brussia\b.{0,45}\b(?:eligible|allowed|accepted|available|remote|candidates|applicants|hire)\b|"
             r"(?:можно|доступн[аоы]?|принимаем|нанимаем|кандидат[ыа]?|работать|удал[её]нно|проживать).{0,45}росси[яию]|"
             r"росси[яию].{0,45}(?:можно|доступн[аоы]?|принимаем|нанимаем|кандидат[ыа]?|работать|удал[её]нно|проживать)",
             eligibility_text,
