@@ -16,7 +16,7 @@ def test_accepts_explicit_one_year_frontend_and_rejects_higher_experience():
 
 
 def test_all_internships_are_included_regardless_of_payment_confirmation():
-    lead = {"source": "hh", "title": "Junior React internship", "description": "React"}
+    lead = {"source": "hh", "title": "Junior React internship", "description": "React", "work_mode": "REMOTE"}
     unknown = rank_lead(lead)
     assert unknown["eligible"] and not unknown["salary_review_required"]
     unpaid = rank_lead({**lead, "description": "Unpaid internship. React",
