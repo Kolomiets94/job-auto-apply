@@ -321,6 +321,24 @@ def run_scheduled():
         response["run_id"] = run_id
     return jsonify(response), 202
 
+@app.get("/health/resume/status")
+def public_resume_status():
+    """Read-only resume configuration probe; never expose resume content or identity."""
+    try:
+        from worker import load_resume_text
+        configured = bool(load_resume_text().strip())
+        if os.getenv("RESUME_TEXT", "").strip():
+            source = "RESUME_TEXT"
+        elif os.getenv("RESUME", "").strip():
+            source = "RESUME"
+        else:
+            source = "RESUME_FILE"
+        return jsonify({"resume_configured": configured, "source": source if configured else "none"})
+    except Exception:
+        app.logger.warning("Public resume configuration check failed")
+        return jsonify({"resume_configured": False, "source": "unavailable"}), 503
+
+
 @app.get("/health/db")
 def database_health():
     if not _authorized():
