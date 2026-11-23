@@ -155,8 +155,8 @@ def _hh_search(tag, q, work_format, area=None, max_pages=6):
 
 
 def hh_search(tag, q):
-    """Search HH vacancies across Russia in all work formats."""
-    return _hh_search(tag, q, work_format=None)
+    """Search HH vacancies for explicit remote work across Russia."""
+    return _hh_search(tag, q, work_format="REMOTE")
 
 
 def hh_search_hybrid(tag, q):
@@ -180,6 +180,10 @@ def collect():
     jobs=[]
     for tag,q in QUERIES:
         try:jobs+=hh_search(tag,q)
+        except Exception:pass
+    # Hybrid is a separate channel restricted to Yekaterinburg.
+    for tag,q in HYBRID_QUERIES:
+        try:jobs+=hh_search_hybrid(tag,q)
         except Exception:pass
     jobs+=remoteok()
     try: jobs+=collect_freelance()
