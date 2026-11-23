@@ -10,7 +10,7 @@ class NoBudgetFloorTests(unittest.TestCase):
         lead = {'source': 'freelancehunt', 'external_id': '123', 'title': 'Вёрстка лендинга', 'budget': budget}
         def response(*args, **kwargs):
             return Mock(status_code=201, json=lambda: {'data': {'id': '456', 'attributes': {'comment': kwargs['json']['comment']}}})
-        with patch.dict(os.environ, {'AUTO_FREELANCE_APPLY': '1', 'FREELANCEHUNT_TOKEN': 'dummy'}), \
+        with patch.dict(os.environ, {'AUTO_APPLY_APPROVED': '1', 'AUTO_FREELANCE_APPLY': '1', 'FREELANCEHUNT_TOKEN': 'dummy'}), \
              patch.object(fh, 'application_time_allowed', return_value=True), \
              patch.object(fh.requests, 'post', side_effect=response) as send:
             result = fh.add_bid(lead, 'Individual proposal')
