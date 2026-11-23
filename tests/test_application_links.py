@@ -22,7 +22,7 @@ class ApplicationLinkTests(unittest.TestCase):
         import application_dispatcher
         lead = job_sources.job('jobicy', 'Junior React Developer', 'https://board.example/job/1',
                                '<a href="mailto:jobs@example.org">Отправьте резюме</a>')
-        with patch.dict(os.environ, {'AUTO_SEND_EMAIL': '1', 'SMTP_HOST': 'smtp.example.org',
+        with patch.dict(os.environ, {'AUTO_APPLY_APPROVED': '1', 'AUTO_SEND_EMAIL': '1', 'SMTP_HOST': 'smtp.example.org',
                                      'SMTP_USER': 'candidate@example.org', 'SMTP_PASSWORD': 'dummy'}), \
              patch.object(application_dispatcher, 'application_time_allowed', return_value=True), \
              patch('application_dispatcher.smtplib.SMTP_SSL') as smtp:
