@@ -407,7 +407,6 @@ def run():
         # separately so freelance fallback cannot be mistaken for job vacancies.
         "ranked": len(ranked),
         "jobs_ranked": len(ranked_jobs),
-        "freelance_ranked": len(ranked_freelance),
         "primary_ranked": len(ranked),
         "submitted": 0,
         "drafted": 0,
