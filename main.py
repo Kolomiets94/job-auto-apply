@@ -1,4 +1,6 @@
-import re, json, hashlib, os
+import re, json, hashlib, os, html
+from urllib.parse import urlsplit
+from xml.etree import ElementTree as ET
 from datetime import datetime, timezone
 import requests
 from freelance_sources import collect_freelance
@@ -73,6 +75,7 @@ def ok(v):
 
 
 _HH_YEKATERINBURG_AREA_ID = None
+_HH_API_DISABLED = False
 
 
 def hh_yekaterinburg_area_id():
@@ -94,6 +97,86 @@ def hh_yekaterinburg_area_id():
             return _HH_YEKATERINBURG_AREA_ID
         stack.extend(area.get("areas") or [])
     raise HHAccessUnavailable("Could not resolve Yekaterinburg area ID from HH directory")
+
+
+
+def hh_rss_search(tag, q, area=None, remote_only=True):
+    """Fallback to HH's public RSS search when anonymous vacancy API access is blocked.
+
+    RSS results are candidates only: lead_enrichment fetches the public vacancy
+    page, and the normal ranker still requires an explicit remote/hybrid mode,
+    supported stack, location, and salary eligibility.
+    """
+    params = {"text": q}
+    if area:
+        params["area"] = str(area)
+    if remote_only:
+        params["schedule"] = "remote"
+        params["area"] = str(area or 113)  # Russia only; never worldwide RSS.
+    response = requests.get(
+        "https://hh.ru/search/vacancy/rss",
+        params=params,
+        headers=UA,
+        timeout=20,
+    )
+    response.raise_for_status()
+    root = ET.fromstring(response.content)
+    leads, seen = [], set()
+    for item in root.findall(".//item"):
+        title = (item.findtext("title") or "").strip()
+        url = (item.findtext("link") or "").strip()
+        parts = urlsplit(url)
+        if (not title or parts.scheme != "https" or parts.hostname not in ("hh.ru", "www.hh.ru")
+                or not re.fullmatch(r"/vacancy/\d+/?", parts.path)):
+            continue
+        if url in seen:
+            continue
+        seen.add(url)
+        raw_description = item.findtext("description") or ""
+        description = re.sub(r"\\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", raw_description))).strip()
+        company_match = re.search(r"Вакансия компании:\\s*([^<]+)", raw_description, re.I)
+        region_match = re.search(r"Регион:\\s*([^<]+)", raw_description, re.I)
+        salary_match = re.search(
+            r"(?:дохода:\\s*)?(?:от\\s*)?(\\d[\\d\\s\\u00a0]*)(?:\\s*до\\s*(\\d[\\d\\s\\u00a0]*))?\\s*(₽|руб(?:лей|ля|ль)?\\.?|RUB|RUR|USD|\\$|EUR|€)",
+            description, re.I,
+        )
+        salary = None
+        if salary_match:
+            def amount(value):
+                return float(re.sub(r"\\s+", "", value).replace(",", "."))
+            currency = salary_match.group(3).upper()
+            if currency == "₽" or currency.startswith("РУБ"):
+                currency = "RUB"
+            elif currency == "$":
+                currency = "USD"
+            elif currency == "€":
+                currency = "EUR"
+            salary = {"from": amount(salary_match.group(1)),
+                      "to": amount(salary_match.group(2)) if salary_match.group(2) else None,
+                      "currency": currency, "period": "month"}
+        candidate = {
+            "name": title,
+            "title": title,
+            "snippet": {"description": description},
+            "salary": salary,
+        }
+        if not ok(candidate):
+            continue
+        leads.append({
+            "source": "hh",
+            "category": tag,
+            "title": title,
+            "company": html.unescape(company_match.group(1)).strip() if company_match else "",
+            "url": url,
+            "published": item.findtext("pubDate") or "",
+            "salary": salary,
+            "description": description,
+            "location": html.unescape(region_match.group(1)).strip() if region_match else "",
+            "work_format": [],
+            "work_mode": "",
+            "discovery_method": "hh_public_rss",
+        })
+    return leads
 
 
 def _hh_search(tag, q, work_format, area=None, max_pages=6):
@@ -155,14 +238,34 @@ def _hh_search(tag, q, work_format, area=None, max_pages=6):
 
 
 def hh_search(tag, q):
-    """Search HH vacancies for explicit remote work across Russia."""
-    return _hh_search(tag, q, work_format="REMOTE")
+    """Search HH remote vacancies; use public RSS if anonymous API access is blocked."""
+    global _HH_API_DISABLED
+    if _HH_API_DISABLED:
+        return hh_rss_search(tag, q, remote_only=True)
+    try:
+        return _hh_search(tag, q, work_format="REMOTE")
+    except HHAccessUnavailable as exc:
+        if "HTTP 401" not in str(exc) and "HTTP 403" not in str(exc):
+            raise
+        _HH_API_DISABLED = True
+        print("[hh] anonymous vacancy API unavailable; falling back to public Russia-only RSS", flush=True)
+        return hh_rss_search(tag, q, remote_only=True)
 
 
 def hh_search_hybrid(tag, q):
-    """Search hybrid HH vacancies only in Yekaterinburg."""
+    """Search hybrid vacancies only in Yekaterinburg; RSS candidates are rechecked on-page."""
+    global _HH_API_DISABLED
     area_id = hh_yekaterinburg_area_id()
-    return _hh_search(tag, q, work_format="HYBRID", area=area_id, max_pages=2)
+    if _HH_API_DISABLED:
+        return hh_rss_search(tag, q, area=area_id, remote_only=False)
+    try:
+        return _hh_search(tag, q, work_format="HYBRID", area=area_id, max_pages=2)
+    except HHAccessUnavailable as exc:
+        if "HTTP 401" not in str(exc) and "HTTP 403" not in str(exc):
+            raise
+        _HH_API_DISABLED = True
+        print("[hh] anonymous vacancy API unavailable; falling back to Yekaterinburg RSS", flush=True)
+        return hh_rss_search(tag, q, area=area_id, remote_only=False)
 
 
 def remoteok():
