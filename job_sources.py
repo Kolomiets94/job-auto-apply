@@ -55,22 +55,50 @@ def job(source, title, url, description='', **extra):
             'description': clean(description), 'remote': True, **extra}
 
 
+JOBICY_SEARCH_TAGS = ('react', 'frontend', 'typescript', 'html css')
+REMOTIVE_SEARCH_TERMS = ('react', 'frontend')
+
+
 def jobicy():
-    data = response('https://jobicy.com/api/v2/remote-jobs', count=100).json()
-    return [job('jobicy', v.get('jobTitle'), v.get('url'), v.get('jobDescription'),
+    """Search current Jobicy listings by relevant frontend keywords, not the global feed."""
+    out, seen = [], set()
+    for tag in JOBICY_SEARCH_TAGS:
+        data = response('https://jobicy.com/api/jobs', count=100, tag=tag).json()
+        for v in data.get('jobs', []):
+            url = v.get('url')
+            if not url or url in seen:
+                continue
+            seen.add(url)
+            out.append(job(
+                'jobicy', v.get('jobTitle'), url,
+                v.get('jobDescription') or v.get('jobExcerpt'),
                 company=v.get('companyName'), location=v.get('jobGeo'),
-                published=v.get('pubDate'), language='en',
+                published=v.get('pubDate'), experience=v.get('jobLevel'),
+                job_type=v.get('jobType'), language='en',
                 salary={'from': v.get('salaryMin'), 'to': v.get('salaryMax'),
-                        'currency': v.get('salaryCurrency'), 'period': v.get('salaryPeriod')})
-            for v in data.get('jobs', []) if v.get('url')]
+                        'currency': v.get('salaryCurrency'), 'period': v.get('salaryPeriod')},
+            ))
+    return out
 
 
 def remotive():
-    data = response('https://remotive.com/api/remote-jobs').json()
-    return [job('remotive', v.get('title'), v.get('url'), v.get('description'),
+    """Use Remotive's documented title/description search instead of its unfiltered feed."""
+    out, seen = [], set()
+    for term in REMOTIVE_SEARCH_TERMS:
+        data = response(
+            'https://remotive.com/api/remote-jobs', search=term, limit=100
+        ).json()
+        for v in data.get('jobs', []):
+            url = v.get('url')
+            if not url or url in seen:
+                continue
+            seen.add(url)
+            out.append(job(
+                'remotive', v.get('title'), url, v.get('description'),
                 company=v.get('company_name'), location=v.get('candidate_required_location'),
-                published=v.get('publication_date'), language='en')
-            for v in data.get('jobs', []) if v.get('url')]
+                published=v.get('publication_date'), language='en',
+            ))
+    return out
 
 
 def arbeitnow():

@@ -367,7 +367,10 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
             # The entry-level signal may appear in the description rather than
             # the title (common on Russian job boards). Check both, while keeping
             # explicit senior experience limits above as hard blockers.
-            entry_level_signal = is_entry_level(title + " " + details)
+            entry_level_signal = (
+                is_entry_level(title + " " + details)
+                or bool(re.search(r"\b(?:entry|entry-level|entry level)\b", experience))
+            )
             if not entry_level_signal and not (one_year or zero_to_three or no_experience):
                 return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "not Junior or 0-3 years"}
             # A range ending at 3 years is acceptable; "from 3 years" is not.
