@@ -3,6 +3,7 @@ import os, requests
 import math
 import re
 from application_schedule import application_time_allowed
+from application_approval import live_applications_approved
 
 BASE="https://api.freelancehunt.com/v2"
 
@@ -60,6 +61,8 @@ def estimate_quote(lead):
 def add_bid(lead, proposal, days=None):
     if os.getenv("AUTO_FREELANCE_APPLY", "0") != "1":
         return {"status": "SHORTLISTED", "reason": "freelance_apply_disabled"}
+    if not live_applications_approved():
+        return {"status": "SKIPPED", "reason": "auto_apply_not_approved"}
     if not application_time_allowed():
         return {"status": "SKIPPED", "reason": "outside_application_hours"}
     h = _headers()
