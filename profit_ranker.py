@@ -1,7 +1,7 @@
 """Rank leads by expected profitability and resume fit."""
 import re
 from typing import Any, Dict
-from entry_level import has_entry_level_signal, is_entry_level, is_placement
+from entry_level import has_entry_level_signal, is_placement
 from salary_policy import salary_decision
 
 SKILLS = {
@@ -340,8 +340,7 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
             return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "experience above 3 years"}
         # Generic layout titles must still show an entry-level signal.
         if category_for_experience == "layout" and not has_entry_level_signal(title + " " + experience + " " + details):
-            if not has_entry_level_signal(title + " " + experience + " " + details):
-                return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "layout entry level not confirmed"}
+            return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "layout entry level not confirmed"}
         if category_for_experience != "layout":
             one_year = bool(re.search(r"(?:от|from|at least)\s*1\s*(?:год|года|year)|\b1\s*\+?\s*(?:год|года|year)", experience))
             zero_to_three = bool(re.search(r"\b[01]\s*[-–—]\s*3\s*(?:год|года|лет|years?)", experience))
