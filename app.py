@@ -562,7 +562,24 @@ def _start_smtp_self_test():
                 print("[smtp-diagnostic] SMTP server accepted self-test", flush=True)
         except Exception as exc:
             outcome = type(exc).__name__
-            print("[smtp-diagnostic] failed:", type(exc).__name__, flush=True)
+            # Log only structured OS error metadata; never print exception text or secrets.
+            error_number = getattr(exc, "errno", None)
+            try:
+                import errno as errno_module
+                error_code = errno_module.errorcode.get(error_number) if error_number is not None else None
+            except Exception:
+                error_code = None
+            if isinstance(exc, TimeoutError):
+                print("[smtp-diagnostic] failed:", type(exc).__name__, "category=timeout", flush=True)
+            elif error_number is not None:
+                print(
+                    "[smtp-diagnostic] failed:", type(exc).__name__,
+                    "errno=" + str(error_number),
+                    "code=" + str(error_code or "unknown"),
+                    flush=True,
+                )
+            else:
+                print("[smtp-diagnostic] failed:", type(exc).__name__, "errno=unavailable", flush=True)
         finally:
             try:
                 from queue_store import _db
