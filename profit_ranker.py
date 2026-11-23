@@ -364,7 +364,11 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
             one_year = bool(re.search(r"(?:от|from|at least)\s*1\s*(?:год|года|year)|\b1\s*\+?\s*(?:год|года|year)", experience))
             zero_to_three = bool(re.search(r"\b[01]\s*[-–—]\s*3\s*(?:год|года|лет|years?)", experience))
             no_experience = bool(re.search(r"без опыта|не требуется опыт|no experience|entry.level|0\s*[-–—]\s*[12]\s*(?:год|года|лет|years?)", experience + " " + details))
-            if not is_entry_level(title) and not (one_year or zero_to_three or no_experience):
+            # The entry-level signal may appear in the description rather than
+            # the title (common on Russian job boards). Check both, while keeping
+            # explicit senior experience limits above as hard blockers.
+            entry_level_signal = is_entry_level(title + " " + details)
+            if not entry_level_signal and not (one_year or zero_to_three or no_experience):
                 return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "not Junior or 0-3 years"}
             # A range ending at 3 years is acceptable; "from 3 years" is not.
             if re.search(r"(?<![\d–—-])\b[4-9]\s*(?:[-–—]\s*\d+\s*)?(?:год|года|лет|years?)", experience):
