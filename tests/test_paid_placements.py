@@ -7,7 +7,7 @@ class PaidPlacementTests(unittest.TestCase):
     def test_paid_frontend_titles_are_eligible_and_routed(self):
         for title in ("Frontend Intern", "Стажёр React", "Практикант HTML CSS", "Стажировка верстальщик"):
             with self.subTest(title=title):
-                lead = rank_lead({"source": "hh", "title": title, "location": "Россия",
+                lead = rank_lead({"source": "hh", "title": title, "location": "Россия", "work_mode": "REMOTE",
                                   "salary": {"from": 30000, "currency": "RUB"}})
                 self.assertTrue(lead["eligible"], lead.get("rank_reason"))
                 self.assertEqual(lead["opportunity_type"], "paid_placement")
@@ -23,7 +23,7 @@ class PaidPlacementTests(unittest.TestCase):
         for description, salary in cases:
             with self.subTest(description=description, salary=salary):
                 result = rank_lead({"source": "hh", "title": "React Intern",
-                                    "description": description, "salary": salary})
+                                    "description": description, "work_mode": "REMOTE", "salary": salary})
                 self.assertTrue(result["eligible"], result.get("rank_reason"))
                 self.assertFalse(result["salary_review_required"])
         too_high = rank_lead({"source": "hh", "title": "React Intern",
@@ -37,7 +37,7 @@ class PaidPlacementTests(unittest.TestCase):
                                     "salary": {"from": 30000, "currency": "RUB"}})["eligible"])
 
     def test_other_requirements_still_apply(self):
-        base = {"source": "hh", "title": "Paid Frontend Intern", "description": "React", "location": "Россия", "salary": {"from": 15000, "currency": "RUB"}}
+        base = {"source": "hh", "title": "Paid Frontend Intern", "description": "React", "location": "Россия", "work_mode": "REMOTE", "salary": {"from": 15000, "currency": "RUB"}}
         for overrides in ({"title": "Paid Senior Frontend Intern"},
                           {"requirements": "SQL required"}, {"requirements": "Angular required"},
                           {"description": "Must reside in the US. React"}, {"title": "Paid HR Intern"}):
