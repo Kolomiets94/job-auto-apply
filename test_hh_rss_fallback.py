@@ -91,3 +91,31 @@ def test_hh_hybrid_rss_fallback_is_scoped_to_yekaterinburg(monkeypatch):
 
     assert captured == {"text": "junior frontend", "area": "1234"}
     assert "schedule" not in captured
+
+
+def test_hh_rss_candidate_is_enriched_even_without_junior_in_title(monkeypatch):
+    from lead_enrichment import enrich_lead, needs_enrichment
+
+    lead = {
+        "source": "hh",
+        "title": "Frontend-разработчик",
+        "url": "https://hh.ru/vacancy/12345",
+        "description": "Регион: Москва",
+    }
+    assert needs_enrichment(lead)
+
+    class PageResponse:
+        status_code = 200
+        text = (
+            "<html><body><h1>Frontend-разработчик</h1>"
+            "<div>Формат работы: удалённо</div>"
+            "<div>React, TypeScript, HTML, CSS</div>"
+            "</body></html>"
+        )
+        headers = {}
+
+    monkeypatch.setattr("lead_enrichment.requests.get", lambda *args, **kwargs: PageResponse())
+    enriched = enrich_lead(lead)
+
+    assert enriched["enriched"] is True
+    assert "Формат работы: удалённо" in enriched["description"]
