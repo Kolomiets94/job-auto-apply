@@ -38,9 +38,12 @@ class _Text(HTMLParser):
 def needs_enrichment(lead):
     source = str(lead.get('source') or '').lower()
     title = str(lead.get('title') or '')
-    return (source in SOURCE_HOSTS and is_entry_level(title) and
-            (source == 'remote_job_ru' or len(str(lead.get('description') or '')) < 300 or
-             not (lead.get('apply_url') or lead.get('apply_email'))))
+    return (source in SOURCE_HOSTS and
+            (source == 'remote_job_ru' or
+             (source == 'hh' and len(str(lead.get('description') or '')) < 300) or
+             (is_entry_level(title) and
+              (len(str(lead.get('description') or '')) < 300 or
+               not (lead.get('apply_url') or lead.get('apply_email'))))))
 
 
 def enrich_lead(lead):
