@@ -11,11 +11,14 @@ from urllib.parse import urlsplit, unquote
 from email.message import EmailMessage
 
 from application_schedule import application_time_allowed
+from application_approval import live_applications_approved
 from browser_apply import dispatch_browser
 from freelancehunt_adapter import add_bid
 
 
 def _send_email(lead, proposal):
+    if not live_applications_approved():
+        return {"status": "SKIPPED", "reason": "auto_apply_not_approved"}
     email = lead.get("apply_email")
     apply_url = str(lead.get("apply_url") or "")
     if not email and urlsplit(apply_url).scheme == "mailto":
@@ -60,7 +63,7 @@ def _send_email(lead, proposal):
 
 def dispatch(lead, proposal):
     # Defense in depth: direct callers cannot bypass the user's global approval.
-    if os.getenv("AUTO_APPLY_APPROVED", "0").strip().lower() not in ("1", "true", "yes"):
+    if not live_applications_approved():
         return {"status": "SKIPPED", "reason": "auto_apply_not_approved"}
 
     if not application_time_allowed():
