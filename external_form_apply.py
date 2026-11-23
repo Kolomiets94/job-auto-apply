@@ -8,6 +8,7 @@ from urllib.parse import urlsplit
 
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 from application_schedule import application_time_allowed
+from application_approval import live_applications_approved
 
 
 def allowed_host(url):
@@ -26,6 +27,8 @@ def apply_external(lead, proposal):
         return {"status": "NEEDS_CONFIRMATION", "reason": "external_host_not_allowlisted", "apply_url": url}
     if os.getenv("AUTO_BROWSER_APPLY") != "1":
         return {"status": "SHORTLISTED", "reason": "browser_apply_disabled"}
+    if not live_applications_approved():
+        return {"status": "SKIPPED", "reason": "auto_apply_not_approved", "apply_url": url}
     name = os.getenv("REMOTE_JOB_NAME", "").strip()
     email = (os.getenv("REMOTE_JOB_EMAIL") or os.getenv("SMTP_USER") or "").strip()
     phone = os.getenv("REMOTE_JOB_PHONE", "").strip()
