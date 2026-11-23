@@ -17,6 +17,7 @@ from ats_conditions import assess_job_conditions
 from profit_ranker import rank_leads, rank_lead, FREELANCE_SOURCES, ROLE_PRIORITY, _role_category, _work_mode
 from proposal_writer import make_proposal
 from application_dispatcher import dispatch
+from application_approval import live_applications_approved
 from queue_store import enqueue, enqueue_many, set_state, submitted_today, submitted_this_week, was_submitted, queued_leads, save_outreach_drafts, list_outreach, build_outcome_feedback_report
 from notification_rules import format_notification, should_notify
 from telegram_notifier import send_message, send_notification
@@ -377,9 +378,8 @@ def run():
     total_hourly_limit = _application_limit("HOURLY_TOTAL_LIMIT")
     # Real submissions require a separate, explicit user approval.
     # Until AUTO_APPLY_APPROVED=1 is configured, always remain in draft mode.
-    auto_apply_approved = os.getenv("AUTO_APPLY_APPROVED", "0").strip().lower() in ("1", "true", "yes")
     dry_run = (os.getenv("DRY_RUN", "0").strip().lower() in ("1", "true", "yes")
-               or not auto_apply_approved)
+               or not live_applications_approved())
     job_limit = _application_limit("HOURLY_JOB_LIMIT")
     freelance_limit = _application_limit("HOURLY_FREELANCE_LIMIT")
 
