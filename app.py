@@ -241,6 +241,8 @@ def run_hunter():
     # Never allow anonymous internet requests to submit real job applications.
     if not _authorized():
         return jsonify({"error": "unauthorized"}), 401
+    if request.headers.get("X-Hunter-Live-Approval", "") != "APPLY":
+        return jsonify({"error": "explicit_live_approval_required"}), 403
     return jsonify(run_worker())
 
 
