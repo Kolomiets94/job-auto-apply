@@ -37,6 +37,16 @@ class EligibilityRegressionTests(unittest.TestCase):
         self.assertFalse(result["eligible"])
         self.assertEqual(result["rank_reason"], "SQL outside confirmed stack")
 
+    def test_mandatory_business_travel_is_rejected(self):
+        lead = {
+            "source": "hh", "title": "Junior React Developer", "location": "Россия",
+            "experience": "Нет опыта", "salary": {"from": 60000, "to": 60000, "currency": "RUB"},
+            "description": "Готовность к командировкам обязательна.",
+        }
+        result = rank_lead(lead)
+        self.assertFalse(result["eligible"])
+        self.assertEqual(result["rank_reason"], "mandatory business travel")
+
     def test_ats_reads_requirements_even_when_description_exists(self):
         result = review_lead({
             "title": "Junior React Developer",
