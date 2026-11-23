@@ -854,7 +854,9 @@ def run():
     summary_message = (
         "Job Auto Apply — сводка\n"
         f"Найдено объявлений: {stats['found']}\n"
-        f"Подходящих после фильтров: {stats['ranked']}\n"
+        f"Подходящих вакансий после фильтров: {stats.get('job_ranked', 0)}\n"
+        f"Подходящих фриланс-проектов: {stats.get('freelance_ranked', 0)}\n"
+        f"Всего в приоритетном списке: {stats['ranked']}\n"
         f"Отправлено откликов: {stats['submitted']}\n"
         f"Подготовлено черновиков: {stats['drafted']}\n"
         f"Требуется ваше участие: {stats['needs_human'] + stats['needs_confirmation']}\n"
