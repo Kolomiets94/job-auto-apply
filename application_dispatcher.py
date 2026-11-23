@@ -7,10 +7,8 @@ silently accepted or bypassed.
 """
 
 import os
-import smtplib
 import re
 from urllib.parse import urlsplit, unquote
-from email.message import EmailMessage
 
 from application_schedule import application_time_allowed
 from browser_apply import dispatch_browser
@@ -31,33 +29,19 @@ def _send_email(lead, proposal):
     if os.getenv("AUTO_SEND_EMAIL", "0") != "1":
         return {"status": "SHORTLISTED", "reason": "email_send_disabled"}
 
-    host = os.getenv("SMTP_HOST")
-    user = os.getenv("SMTP_USER")
-    password = os.getenv("SMTP_PASSWORD")
-    if not all((host, user, password)):
-        return {"status": "SHORTLISTED", "reason": "smtp_not_configured"}
-
-    msg = EmailMessage()
-    msg["From"] = user
-    msg["To"] = email
+    from gmail_api import is_configured, send_message
+    if not is_configured():
+        return {"status": "SHORTLISTED", "reason": "gmail_api_not_configured"}
     prefix = "Application" if lead.get("language") == "en" else "Отклик"
-    msg["Subject"] = f"{prefix}: {lead.get('title', 'проект')}"
-    msg.set_content(proposal + "\n\nGitHub: https://github.com/Kolomiets94\n"
-                    + str(lead.get("url") or ""))
-
-    with smtplib.SMTP_SSL(
-        host,
-        int(os.getenv("SMTP_PORT") or "465"),
-        timeout=30,
-    ) as smtp:
-        smtp.login(user, password)
-        if not application_time_allowed():
-            return {"status": "SKIPPED", "reason": "outside_application_hours"}
-        rejected = smtp.send_message(msg)
-        if rejected:
-            return {"status": "FAILED", "reason": "email_recipient_rejected"}
-
-    return {"status": "SUBMITTED", "reason": "email_sent"}
+    subject = f"{prefix}: {lead.get('title', 'проект')}"
+    body = proposal + "\n\nGitHub: https://github.com/Kolomiets94\n" + str(lead.get("url") or "")
+    if not application_time_allowed():
+        return {"status": "SKIPPED", "reason": "outside_application_hours"}
+    try:
+        send_message(str(email), subject, body)
+    except Exception as exc:
+        return {"status": "FAILED", "reason": "gmail_api_" + type(exc).__name__}
+    return {"status": "SUBMITTED", "reason": "email_sent_via_gmail_api"}
 
 
 def dispatch(lead, proposal):

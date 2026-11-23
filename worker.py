@@ -165,9 +165,7 @@ def _application_priority(lead):
     if lead.get("paid_bid") is True:
         return 2
     if lead.get("apply_email") or str(lead.get("apply_url") or "").lower().startswith("mailto:"):
-        return 0 if os.getenv("AUTO_SEND_EMAIL") == "1" and all(
-            os.getenv(key) for key in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD")
-        ) else 1
+        return 0 if os.getenv("AUTO_SEND_EMAIL") == "1" and __import__("gmail_api").is_configured() else 1
     source = str(lead.get("source") or "").lower()
     if source == "hh":
         # HH submissions use the authenticated Playwright browser flow, not
@@ -180,7 +178,7 @@ def _application_priority(lead):
     if source == "remote_job_ru":
         return 0 if os.getenv("AUTO_BROWSER_APPLY") == "1" and all(
             os.getenv(key) for key in ("REMOTE_JOB_NAME", "REMOTE_JOB_PHONE")
-        ) and (os.getenv("REMOTE_JOB_EMAIL") or os.getenv("SMTP_USER")) else 1
+        ) and (os.getenv("REMOTE_JOB_EMAIL") or os.getenv("GMAIL_API_USER") or os.getenv("SMTP_USER")) else 1
     if source == "freelancehunt" and lead.get("can_api_bid") and os.getenv("FREELANCEHUNT_TOKEN") and os.getenv("AUTO_FREELANCE_APPLY") == "1":
         return 0
     return 1
@@ -613,10 +611,10 @@ def run():
     stats["freelance_actionable"] = len(freelance_actionable)
     stats["freelance_discovery_only"] = stats["freelance_ranked"] - len(freelance_actionable)
     stats["freelancehunt_token_configured"] = bool(os.getenv("FREELANCEHUNT_TOKEN"))
-    stats["smtp_configured"] = all(os.getenv(key) for key in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD"))
+    stats["gmail_api_configured"] = __import__("gmail_api").is_configured()
     stats["remote_job_identity_configured"] = (
         bool(os.getenv("REMOTE_JOB_NAME")) and bool(os.getenv("REMOTE_JOB_PHONE"))
-        and bool(os.getenv("REMOTE_JOB_EMAIL") or os.getenv("SMTP_USER"))
+        and bool(os.getenv("REMOTE_JOB_EMAIL") or os.getenv("GMAIL_API_USER") or os.getenv("SMTP_USER"))
     )
 
     # Show matching employment vacancies independently of freelance projects.
@@ -764,7 +762,7 @@ def run():
         f"Freelance actionable channels: {stats['freelance_actionable']}\n"
         f"Freelance discovery-only: {stats['freelance_discovery_only']}\n"
         f"Freelancehunt API configured: {stats['freelancehunt_token_configured']}\n"
-        f"SMTP configured: {stats['smtp_configured']}\n"
+        f"Gmail API configured: {stats['gmail_api_configured']}\n"
         f"Remote-job identity configured: {stats['remote_job_identity_configured']}\n"
         f"Freelance configured limit: {_limit_label(freelance_limit)} (HOURLY_FREELANCE_LIMIT)\n"
         f"QA auto-apply: {os.getenv('AUTO_APPLY_QA', '0')}\n"
