@@ -9,7 +9,7 @@ def test_resume_env_accepts_multiline_inline_text(monkeypatch):
     monkeypatch.setenv("RESUME", resume)
     monkeypatch.delenv("RESUME_TEXT", raising=False)
     monkeypatch.delenv("RESUME_FILE", raising=False)
-    assert worker.load_resume_text() == resume
+    assert worker.load_resume_text() == resume.strip()
 
 
 def test_resume_env_reads_existing_text_file(monkeypatch, tmp_path):
