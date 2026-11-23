@@ -71,6 +71,27 @@ class WorkModePolicyTests(unittest.TestCase):
         }
         self.assertFalse(_location_rejected(lead, _text(lead)))
 
+
+    def test_russia_mentioned_in_next_sentence_does_not_prove_eligibility(self):
+        from profit_ranker import _location_rejected, _text
+        lead = {
+            "source": "remoteok",
+            "title": "Junior React Developer",
+            "location": "Worldwide",
+            "description": "We are open to applicants. Russia is mentioned as a market we serve.",
+        }
+        self.assertTrue(_location_rejected(lead, _text(lead)))
+
+    def test_open_to_candidates_in_russia_same_sentence_is_accepted(self):
+        from profit_ranker import _location_rejected, _text
+        lead = {
+            "source": "remoteok",
+            "title": "Junior React Developer",
+            "location": "Worldwide",
+            "description": "We are open to candidates in Russia.",
+        }
+        self.assertFalse(_location_rejected(lead, _text(lead)))
+
     def test_junior_signal_in_description_is_recognized(self):
         lead = {
             "source": "hh",
