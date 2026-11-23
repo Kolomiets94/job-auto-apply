@@ -266,7 +266,7 @@ def _uses_browser(lead):
     return _browser_scope(lead) is not None
 
 
-def run():
+def run(force_dry_run=False):
     from aggregator_origin import reset_origin_diagnostics, origin_diagnostics
     from entry_level import is_placement
     global COLLECTION_RAW_COUNT
@@ -378,7 +378,8 @@ def run():
     total_hourly_limit = _application_limit("HOURLY_TOTAL_LIMIT")
     # Real submissions require a separate, explicit user approval.
     # Until AUTO_APPLY_APPROVED=1 is configured, always remain in draft mode.
-    dry_run = (os.getenv("DRY_RUN", "0").strip().lower() in ("1", "true", "yes")
+    dry_run = (force_dry_run
+               or os.getenv("DRY_RUN", "0").strip().lower() in ("1", "true", "yes")
                or not live_applications_approved())
     job_limit = _application_limit("HOURLY_JOB_LIMIT")
     freelance_limit = _application_limit("HOURLY_FREELANCE_LIMIT")
