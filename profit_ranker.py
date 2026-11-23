@@ -1,7 +1,7 @@
 """Rank leads by expected profitability and resume fit."""
 import re
 from typing import Any, Dict
-from entry_level import is_entry_level, is_placement
+from entry_level import has_entry_level_signal, is_entry_level, is_placement
 from salary_policy import salary_decision
 
 SKILLS = {
@@ -339,18 +339,14 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
         if re.search(r"(?<![\d–—-])\b[4-9]\s*(?:год|года|лет|years?)", experience):
             return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "experience above 3 years"}
         # Generic layout titles must still show an entry-level signal.
-        if category_for_experience == "layout" and not is_entry_level(title):
-            entry_signal = any(term in (experience + " " + details) for term in (
-                "начинающ", "без опыта", "не требуется опыт", "no experience",
-                "entry level", "entry-level",
-            ))
-            if not entry_signal:
+        if category_for_experience == "layout" and not has_entry_level_signal(title + " " + experience + " " + details):
+            if not has_entry_level_signal(title + " " + experience + " " + details):
                 return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "layout entry level not confirmed"}
         if category_for_experience != "layout":
             one_year = bool(re.search(r"(?:от|from|at least)\s*1\s*(?:год|года|year)|\b1\s*\+?\s*(?:год|года|year)", experience))
             zero_to_three = bool(re.search(r"\b[01]\s*[-–—]\s*3\s*(?:год|года|лет|years?)", experience))
             no_experience = bool(re.search(r"без опыта|не требуется опыт|no experience|entry.level|0\s*[-–—]\s*[12]\s*(?:год|года|лет|years?)", experience + " " + details))
-            if not is_entry_level(title) and not (one_year or zero_to_three or no_experience):
+            if not has_entry_level_signal(title + " " + experience + " " + details) and not (one_year or zero_to_three or no_experience):
                 return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "not Junior or 0-3 years"}
             # A range ending at 3 years is acceptable; "from 3 years" is not.
             if re.search(r"(?<![\d–—-])\b[4-9]\s*(?:[-–—]\s*\d+\s*)?(?:год|года|лет|years?)", experience):
