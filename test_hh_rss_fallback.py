@@ -1,0 +1,158 @@
+import main
+
+
+class FakeResponse:
+    status_code = 200
+    headers = {}
+
+    def __init__(self, content):
+        self.content = content
+
+    def raise_for_status(self):
+        return None
+
+
+RSS = b"""<?xml version="1.0"?>
+<rss version="2.0"><channel>
+  <item>
+    <title>Frontend Developer Junior</title>
+    <link>https://hh.ru/vacancy/12345</link>
+    <pubDate>2026-11-23T10:00:00+03:00</pubDate>
+    <description><![CDATA[
+      <p>Вакансия компании: Example LLC</p>
+      <p>Регион: Москва</p>
+      <p>Предполагаемый уровень месячного дохода: от 60 000 ₽</p>
+    ]]></description>
+  </item>
+  <item>
+    <title>Senior Frontend Developer</title>
+    <link>https://hh.ru/vacancy/12346</link>
+    <description><![CDATA[<p>Регион: Москва</p>]]></description>
+  </item>
+  <item>
+    <title>Frontend Developer Junior</title>
+    <link>https://evil.example/vacancy/12347</link>
+    <description><![CDATA[<p>Регион: Москва</p>]]></description>
+  </item>
+</channel></rss>"""
+
+
+def test_hh_rss_search_parses_and_filters_candidates(monkeypatch):
+    captured = {}
+
+    def fake_get(url, **kwargs):
+        captured["url"] = url
+        captured["params"] = kwargs["params"]
+        return FakeResponse(RSS)
+
+    monkeypatch.setattr(main.requests, "get", fake_get)
+    leads = main.hh_rss_search("frontend", "junior frontend")
+
+    assert captured["url"] == "https://hh.ru/search/vacancy/rss"
+    assert captured["params"] == {"text": "junior frontend", "schedule": "remote", "area": "113"}
+    assert len(leads) == 1
+    assert leads[0]["url"] == "https://hh.ru/vacancy/12345"
+    assert leads[0]["company"] == "Example LLC"
+    assert leads[0]["location"] == "Москва"
+    assert leads[0]["salary"] == {
+        "from": 60000.0, "to": None, "currency": "RUB", "period": "month"
+    }
+    assert leads[0]["discovery_method"] == "hh_public_rss"
+    assert leads[0]["work_mode"] == ""
+
+
+def test_hh_search_falls_back_after_anonymous_api_403(monkeypatch):
+    monkeypatch.setattr(main, "_HH_API_DISABLED", False)
+
+    def blocked(*args, **kwargs):
+        raise main.HHAccessUnavailable("HH API HTTP 403; stop queries")
+
+    monkeypatch.setattr(main, "_hh_search", blocked)
+    monkeypatch.setattr(main.requests, "get", lambda *args, **kwargs: FakeResponse(RSS))
+
+    leads = main.hh_search("frontend", "junior frontend")
+
+    assert main._HH_API_DISABLED is True
+    assert len(leads) == 1
+    assert leads[0]["source"] == "hh"
+
+
+def test_hh_hybrid_rss_fallback_is_scoped_to_yekaterinburg(monkeypatch):
+    monkeypatch.setattr(main, "_HH_API_DISABLED", True)
+    monkeypatch.setattr(main, "hh_yekaterinburg_area_id", lambda: "1234")
+    captured = {}
+
+    def fake_get(url, **kwargs):
+        captured.update(kwargs["params"])
+        return FakeResponse(RSS)
+
+    monkeypatch.setattr(main.requests, "get", fake_get)
+    main.hh_search_hybrid("frontend", "junior frontend")
+
+    assert captured == {"text": "junior frontend", "area": "1234"}
+    assert "schedule" not in captured
+
+
+def test_hh_rss_candidate_is_enriched_even_without_junior_in_title(monkeypatch):
+    from lead_enrichment import enrich_lead, needs_enrichment
+
+    lead = {
+        "source": "hh",
+        "title": "Frontend-разработчик",
+        "url": "https://hh.ru/vacancy/12345",
+        "description": "Регион: Москва",
+    }
+    assert needs_enrichment(lead)
+
+    class PageResponse:
+        status_code = 200
+        text = (
+            "<html><body><h1>Frontend-разработчик</h1>"
+            "<div>Формат работы: удалённо</div>"
+            "<div>React, TypeScript, HTML, CSS</div>"
+            "</body></html>"
+        )
+        headers = {}
+
+    monkeypatch.setattr("lead_enrichment.requests.get", lambda *args, **kwargs: PageResponse())
+    enriched = enrich_lead(lead)
+
+    assert enriched["enriched"] is True
+    assert "Формат работы: удалённо" in enriched["description"]
+
+
+def test_mandatory_nextjs_is_not_treated_as_confirmed_skill():
+    from profit_ranker import rank_lead
+
+    lead = {
+        "source": "hh",
+        "title": "Junior Frontend Developer",
+        "location": "Москва",
+        "experience": "Без опыта",
+        "description": "Remote work. No experience required.",
+        "requirements": "Requirements: React and Next.js",
+        "salary": {"from": 60000, "to": 60000, "currency": "RUB", "period": "month"},
+    }
+
+    ranked = rank_lead(lead)
+
+    assert ranked["eligible"] is False
+    assert ranked["rank_reason"] == "mandatory unsupported stack"
+
+
+def test_optional_nextjs_does_not_block_react_vacancy():
+    from profit_ranker import rank_lead
+
+    lead = {
+        "source": "hh",
+        "title": "Junior Frontend Developer",
+        "location": "Москва",
+        "experience": "Без опыта",
+        "description": "Remote work. No experience required.",
+        "requirements": "Requirements: React. Next.js will be a plus.",
+        "salary": {"from": 60000, "to": 60000, "currency": "RUB", "period": "month"},
+    }
+
+    ranked = rank_lead(lead)
+
+    assert ranked["eligible"] is True
