@@ -530,9 +530,16 @@ def _start_smtp_self_test():
             host = os.getenv("SMTP_HOST", "").strip()
             user = os.getenv("SMTP_USER", "").strip()
             password = os.getenv("SMTP_PASSWORD", "").strip()
-            if not all((host, user, password)):
+            missing = [
+                key for key, value in (
+                    ("SMTP_HOST", host),
+                    ("SMTP_USER", user),
+                    ("SMTP_PASSWORD", password),
+                ) if not value
+            ]
+            if missing:
                 outcome = "not_configured"
-                print("[smtp-diagnostic] not configured", flush=True)
+                print("[smtp-diagnostic] not configured; missing=" + ",".join(missing), flush=True)
                 return
             message = EmailMessage()
             message["From"] = user
