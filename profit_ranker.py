@@ -291,6 +291,13 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     local = _is_yekaterinburg(lead)
     if relocation and not local:
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "mandatory nonlocal relocation"}
+    business_travel = re.search(
+        r"готовност[ьи] к командировк\w* обязательн\w*|командировк\w* обязательн\w*|"
+        r"обязательн\w*.{0,35}командировк\w*|business travel required|"
+        r"must travel|willingness to travel required", details, re.I,
+    )
+    if business_travel:
+        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "mandatory business travel"}
     # Keep mandatory unsupported frameworks excluded, while allowing optional mentions.
     requirements = " ".join(str(lead.get(k) or "") for k in ("description", "requirements")).lower()
     required_parts = re.split(r"[\n.!?;]", requirements)
