@@ -51,6 +51,26 @@ class WorkModePolicyTests(unittest.TestCase):
         lead = {"source": "freelancer_com"}
         self.assertIsNone(_work_format_rejection(lead))
 
+    def test_company_based_in_russia_is_not_proof_of_candidate_eligibility(self):
+        from profit_ranker import _location_rejected, _text
+        lead = {
+            "source": "remoteok",
+            "title": "Junior React Developer",
+            "location": "Worldwide",
+            "description": "Our company is based in Russia. Applicants must be located in the EU.",
+        }
+        self.assertTrue(_location_rejected(lead, _text(lead)))
+
+    def test_explicit_candidate_residence_in_russia_is_accepted(self):
+        from profit_ranker import _location_rejected, _text
+        lead = {
+            "source": "remoteok",
+            "title": "Junior React Developer",
+            "location": "Worldwide",
+            "description": "Candidates must be based in Russia.",
+        }
+        self.assertFalse(_location_rejected(lead, _text(lead)))
+
     def test_junior_signal_in_description_is_recognized(self):
         lead = {
             "source": "hh",
