@@ -58,6 +58,7 @@ if __name__ == '__main__':
 
 
 def test_direct_email_sender_requires_global_approval(monkeypatch):
+    from unittest.mock import patch
     from application_dispatcher import _send_email
     monkeypatch.delenv("AUTO_APPLY_APPROVED", raising=False)
     monkeypatch.setenv("AUTO_SEND_EMAIL", "1")
