@@ -251,16 +251,33 @@ def _work_mode(lead: Dict[str, Any]) -> str:
         return "remote"
 
     source = str(lead.get("source") or "").lower()
-    # These sources only publish remote jobs or apply an explicit remote filter.
-    if source == "hh" or source in FREELANCE_SOURCES or source in REMOTE_ONLY_SOURCES:
+    # Only sources whose collection query/filter guarantees remote-only results
+    # may infer remote when the listing omits a structured work-mode field.
+    # HH is deliberately excluded: an absent HH work format is unknown.
+    if source in FREELANCE_SOURCES or source in REMOTE_ONLY_SOURCES:
         return "remote"
     return "unknown"
 
 
 def _work_format_rejection(lead: Dict[str, Any]) -> str | None:
-    # Russian-market search accepts remote, hybrid and office vacancies nationwide.
-    # The detected mode remains metadata; it is not an eligibility gate.
-    return None
+    """Enforce the documented work-mode policy for employment vacancies.
+
+    Remote roles are accepted only when remote is explicit or guaranteed by a
+    remote-only source. Hybrid is limited to Yekaterinburg; office and unknown
+    formats fail closed. Freelance projects use a separate eligibility policy.
+    """
+    source = str(lead.get("source") or "").lower()
+    if source in FREELANCE_SOURCES:
+        return None
+
+    mode = _work_mode(lead)
+    if mode == "remote":
+        return None
+    if mode == "hybrid":
+        return None if _is_yekaterinburg(lead) else "hybrid is allowed only in Yekaterinburg"
+    if mode == "office":
+        return "office work is excluded; fully remote only"
+    return "remote work format is not confirmed"
 
 
 def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
@@ -300,11 +317,16 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
            for part in required_parts):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "mandatory unsupported stack"}
     # SQL is outside the confirmed stack. Clearly optional mentions are allowed.
-    sql_parts = re.split(r"[\n.!?;]", text)
+    sql_parts = re.split(r"[\\n.!?;]", text)
     optional_sql = ("optional", "nice to have", "nice-to-have", "not required",
-                    "не требуется", "необязател", "будет плюсом", "как плюс")
-    if any(re.search(r"\b(?:sql|mysql|postgresql)\b", part) and
-           not any(marker in part for marker in optional_sql) for part in sql_parts):
+                    "not mandatory", "preferred", "would be a plus",
+                    "не требуется", "необязател", "будет плюсом", "как плюс",
+                    "желательно", "приветствуется")
+    sql_mentions = [part for part in sql_parts
+                    if re.search(r"\\b(?:sql|mysql|postgresql)\\b", part)]
+    # Explicitly optional/preferred SQL is not a hard blocker.
+    # SQL without an optional qualifier remains excluded from the confirmed stack.
+    if any(not any(marker in part for marker in optional_sql) for part in sql_mentions):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "SQL outside confirmed stack"}
     # Known stale listing: Thimble.cz remote-job vacancy from September 2023.
     # Do not send a real application to this archived-era posting.
