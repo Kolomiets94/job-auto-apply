@@ -156,3 +156,17 @@ def test_optional_nextjs_does_not_block_react_vacancy():
     ranked = rank_lead(lead)
 
     assert ranked["eligible"] is True
+
+
+def test_hh_query_sets_prioritize_junior_intern_and_layout_terms():
+    remote = {query for _, query in main.QUERIES}
+    hybrid = {query for _, query in main.HYBRID_QUERIES}
+
+    assert {"стажировка frontend", "стажер frontend", "React без опыта",
+            "начинающий React", "практикант frontend"} <= remote
+    assert {"верстальщик удаленно", "HTML CSS удаленно junior",
+            "стажер верстальщик", "практикант верстальщик"} <= remote
+    assert {"стажер React", "React без опыта",
+            "начинающий frontend", "верстальщик Екатеринбург"} <= hybrid
+    assert not any("Next.js" in query or "AI" in query or "LLM" in query
+                   for query in remote | hybrid)
