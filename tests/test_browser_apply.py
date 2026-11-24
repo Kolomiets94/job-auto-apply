@@ -164,3 +164,15 @@ def test_remote_job_direct_handler_requires_global_approval(monkeypatch):
     monkeypatch.delenv("AUTO_APPLY_APPROVED", raising=False)
     result = browser_apply.apply_remote_job({"url": "https://remote-job.ru/vacancy/show/123/test"}, "hello")
     assert result == {"status": "SKIPPED", "reason": "auto_apply_not_approved"}
+
+
+def test_hh_english_level_answer_matches_candidate_profile():
+    assert browser_apply._known_question_answer("Какой у вас уровень английского языка?", "frontend") == "A2 (Elementary)."
+
+def test_hh_technical_skills_answer_uses_only_confirmed_skills():
+    answer = browser_apply._known_question_answer("Какими технологиями владеете: React, TypeScript, CSS?", "frontend")
+    assert "React Router" in answer
+    assert "Axios" in answer
+    assert "Figma" not in answer
+    assert "Vite" not in answer
+    assert "Webpack" not in answer
