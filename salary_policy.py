@@ -3,7 +3,7 @@ import re
 
 REGULAR_MIN_RUB = 50_000
 PLACEMENT_MIN_RUB = 0
-REGULAR_MAX_RUB = 70_000
+REGULAR_MAX_RUB = 80_000
 PLACEMENT_MAX_RUB = 50_000
 _UNPAID = re.compile(r"\bunpaid\b|\bnon[- ]paid\b|\bwithout (?:pay|compensation)\b|неоплачиваем\w*|без\s+оплаты|оплата\s+не\s+предусмотрена|не\s+оплачива", re.I)
 _AMOUNT = re.compile(r"(?P<amount>\d[\d\s\u00a0]*(?:[.,]\d+)?)\s*(?P<currency>₽|руб(?:лей|ля|ль)?\.?|RUB|RUR|USD|\$|EUR|€)", re.I)
