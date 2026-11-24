@@ -174,8 +174,22 @@ def test_junior_plus_frontend_is_included_within_regular_salary_range():
         "title": "Junior+ React Developer",
         "description": "React TypeScript",
         "work_mode": "REMOTE",
-        "salary": {"from": 50000, "to": 70000, "currency": "RUB", "period": "month"},
+        "salary": {"from": 50000, "to": 80000, "currency": "RUB", "period": "month"},
     }
     result = rank_lead(base)
     assert result["eligible"]
     assert not result["salary_review_required"]
+
+
+
+def test_regular_junior_salary_ceiling_is_80000_rub():
+    base = {
+        "source": "hh",
+        "title": "Junior React Developer",
+        "description": "React TypeScript",
+        "work_mode": "REMOTE",
+    }
+    within = rank_lead({**base, "salary": {"from": 80000, "to": 80000, "currency": "RUB", "period": "month"}})
+    above = rank_lead({**base, "salary": {"from": 80001, "to": 80001, "currency": "RUB", "period": "month"}})
+    assert within["eligible"]
+    assert not above["eligible"]
