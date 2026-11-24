@@ -424,3 +424,37 @@ def _start_one_shot_from_deploy():
 
 
 _start_one_shot_from_deploy()
+
+@app.get("/health/application-readiness")
+def application_readiness():
+    """Expose configuration presence only; never return secrets, tokens or resume data."""
+    from application_approval import live_applications_approved
+    hh_session = bool(
+        os.getenv("HH_STORAGE_STATE_JSON", "").strip()
+        or os.getenv("HH_STORAGE_STATE", "").strip()
+    )
+    smtp_configured = all(
+        os.getenv(key, "").strip()
+        for key in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD")
+    )
+    freelancehunt_configured = bool(
+        os.getenv("FREELANCEHUNT_TOKEN", "").strip()
+        and os.getenv("AUTO_FREELANCE_APPLY", "").strip() == "1"
+    )
+    remote_job_configured = all(
+        os.getenv(key, "").strip()
+        for key in ("REMOTE_JOB_NAME", "REMOTE_JOB_PHONE")
+    ) and bool(os.getenv("REMOTE_JOB_EMAIL", "").strip() or os.getenv("SMTP_USER", "").strip())
+    dry_run = os.getenv("DRY_RUN", "0").strip().lower() in ("1", "true", "yes")
+    return jsonify({
+        "dry_run": dry_run,
+        "live_approval": live_applications_approved(),
+        "resume_configured": bool(__import__("worker").load_resume_text().strip()),
+        "hh_browser_enabled": os.getenv("AUTO_BROWSER_APPLY", "").strip() == "1",
+        "hh_session_present": hh_session,
+        "email_enabled": os.getenv("AUTO_SEND_EMAIL", "").strip() == "1",
+        "smtp_configured": smtp_configured,
+        "remote_job_browser_enabled": os.getenv("AUTO_BROWSER_APPLY", "").strip() == "1" and remote_job_configured,
+        "freelancehunt_api_enabled": freelancehunt_configured,
+        "database_configured": bool(os.getenv("DATABASE_URL", "").strip()),
+    })
