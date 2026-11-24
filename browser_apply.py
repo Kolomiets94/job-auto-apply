@@ -170,8 +170,8 @@ def _known_question_answer(question, category):
         )
     if any(x in q for x in ("react", "typescript", "javascript", "redux", "rest api", "html", "css", "scss")):
         return (
-            "Работаю с React, TypeScript, JavaScript ES6+, Redux Toolkit, REST API, "
-            "HTML5, CSS3/SCSS и Git."
+            "Работаю с React, TypeScript, JavaScript, Redux Toolkit, React Router, "
+            "REST API, Axios, HTML5, CSS3/SCSS и Git."
         )
     if category == "qa" and any(x in q for x in ("тестирован", "qa", "баг", "bug", "test case", "чек-лист")):
         return (
