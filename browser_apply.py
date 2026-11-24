@@ -158,7 +158,7 @@ def _known_question_answer(question, category):
     ):
         return "Хочу развиваться в ручном тестировании и применять опыт проверки своих веб-приложений. В геймдеве меня привлекает разнообразие пользовательских сценариев и возможность улучшать качество продукта для пользователей. Готов изучать особенности тестирования игр и начинать с задач уровня Junior."
     if any(x in q for x in ("английск", "english", "уровень языка")):
-        return "B1 (Intermediate): читаю техническую документацию и могу базово общаться в команде."
+        return "A2 (Elementary)."
     if any(x in q for x in ("город", "где вы жив", "где прожива", "локац")):
         return "Екатеринбург. Рассматриваю удалённую работу."
     if any(x in q for x in ("ожидания по зарплат", "зарплатные ожидания", "желаемая зарплат", "salary expectation")):
@@ -171,7 +171,7 @@ def _known_question_answer(question, category):
     if any(x in q for x in ("react", "typescript", "javascript", "redux", "rest api", "html", "css", "scss")):
         return (
             "Работаю с React, TypeScript, JavaScript ES6+, Redux Toolkit, REST API, "
-            "HTML5, CSS3/SCSS, Git, Figma и Vite/Webpack."
+            "HTML5, CSS3/SCSS и Git."
         )
     if category == "qa" and any(x in q for x in ("тестирован", "qa", "баг", "bug", "test case", "чек-лист")):
         return (
