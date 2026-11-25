@@ -16,18 +16,26 @@ WebMCP is experimental and browser support is not universal. The integration fea
 
 ## Visible diagnostic panel
 
-The home page now shows a WebMCP diagnostic panel:
+The home page shows a WebMCP diagnostic panel:
 
 - **API unavailable** — this browser does not expose `document.modelContext`; this is not evidence that the site deployment failed.
 - **Registration pending** — the browser API exists and the page is registering the three tools.
-- **Registration succeeded** — all three `registerTool()` calls resolved. This confirms registration calls completed; use the browser's WebMCP inspector/agent tool list to independently confirm discovery.
+- **Registration confirmed** — all three `registerTool()` promises resolved and `getTools()` returned all three expected names for this page.
+- **Registration check incomplete** — registration calls resolved, but `getTools()` was unavailable or failed.
+- **Registration error** — one or more registration calls failed, or `getTools()` did not return every expected tool.
+
+The code calls `waitForToolsUntil(registration)` when the browser exposes it. This is a documented WebMCP API method that tells tool consumers to wait for asynchronous registration to settle.
+
+Important: `getTools()` confirms the tools registered in the page's model context. It does not independently prove that an external browser agent has discovered them. Use the browser's WebMCP inspector or agent tool list for that final check.
 
 The panel lists the tool names and includes desktop setup instructions. On a desktop Chrome/Chrome Canary build where WebMCP is not enabled, open `chrome://flags/#enable-webmcp-testing`, enable the flag if it is available in that build, restart the browser, and reload the page. Flag availability depends on the browser version/channel. Mobile browsers may not expose the experimental API.
+
+The panel also warns that the prototype's `/api/profile` and `/api/tasks` endpoints currently have no authentication. The profile includes contact information. Do not use the public prototype for sensitive data until authentication and authorization are implemented.
 
 ## Manual verification
 
 1. Open the deployed Cloud Job Assistant home page over HTTPS in a WebMCP-enabled desktop browser.
-2. Confirm the diagnostic panel reports that registration calls for three tools completed successfully.
+2. Confirm the diagnostic panel reports that `getTools()` returned all three expected names.
 3. Use the browser's WebMCP inspector or agent tool list to confirm discovery of `get_candidate_profile`, `list_application_tasks`, and `prepare_application_brief`.
 4. Invoke the two read-only tools and confirm they return profile and task data.
 5. If testing `prepare_application_brief`, use a public job URL and confirm a draft appears in Task history. This does not submit an application.
@@ -36,4 +44,4 @@ The panel lists the tool names and includes desktop setup instructions. On a des
 
 - Application tasks are held in process memory and reset when the service restarts or sleeps.
 - The current backend creates a generic honest draft from the configured profile; it does not fetch or parse the job posting when preparing a brief.
-- The existing `/api/tasks` endpoints are not authenticated. Do not expose this prototype to untrusted users or sensitive candidate data without adding per-user authentication, authorization, CSRF protections where applicable, rate limiting, and persistent storage.
+- The existing `/api/tasks` endpoints are not authenticated, and `/api/profile` exposes configured candidate contact information. Do not expose this prototype to untrusted users or sensitive candidate data without adding per-user authentication, authorization, CSRF protections where applicable, rate limiting, and persistent storage.
