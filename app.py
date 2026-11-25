@@ -563,10 +563,5 @@ def _run_startup_openai_diagnostic():
         print("[openai-diagnostic] failed error=%s" % type(exc).__name__, flush=True)
 
 
-# Run only on Render, not during local development or test imports.
-if os.getenv("RENDER", "").strip().lower() == "true":
-    threading.Thread(
-        target=_run_startup_openai_diagnostic,
-        name="openai-startup-diagnostic",
-        daemon=True,
-    ).start()
+# OpenAI connectivity is checked on demand via the protected /health/openai
+# endpoint. Avoid spending API quota on every Render worker restart.
