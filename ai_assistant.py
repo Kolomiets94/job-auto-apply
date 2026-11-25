@@ -58,9 +58,18 @@ def _ask(instructions: str, data: dict, max_output_tokens: int = 500) -> str | N
             payload = json.loads(response.read().decode("utf-8"))
         result = _response_text(payload)
         return result[:6000] if result else None
-    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError,
-            OSError, ValueError, TypeError, KeyError):
-        # Do not log request bodies, email contents, or credentials.
+    except urllib.error.HTTPError as exc:
+        # Status code is safe to log; never expose the response body or request headers.
+        print("[openai] http_error status=%s" % exc.code, flush=True)
+        return None
+    except urllib.error.URLError:
+        print("[openai] network_error", flush=True)
+        return None
+    except TimeoutError:
+        print("[openai] timeout", flush=True)
+        return None
+    except (OSError, ValueError, TypeError, KeyError):
+        print("[openai] invalid_or_unavailable_response", flush=True)
         return None
 
 
