@@ -30,7 +30,7 @@
     const security = document.createElement("p");
     security.className = "muted";
     security.style.cssText = "margin:10px 0 0;padding:10px;border-radius:8px;background:#fff6df;color:#654b00";
-    security.textContent = "Важно: API прототипа /api/profile и /api/tasks сейчас доступны без авторизации. Профиль содержит контактные данные. Не добавляйте сюда секреты и не используйте публичный сервис для чувствительных данных до внедрения авторизации.";
+    security.textContent = "Доступ к API /api/profile и /api/tasks защищён паролем приложения и сессионной cookie. Не передавайте пароль другим пользователям; используйте HTTPS.";
     const help = document.createElement("details");
     help.style.marginTop = "10px";
     const summary = document.createElement("summary");
