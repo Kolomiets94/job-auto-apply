@@ -29,7 +29,7 @@ textarea{min-height:90px}button{background:#225de6;color:white;border:0;border-r
 .item{border-top:1px solid #e6eaf2;padding:12px 0;overflow-wrap:anywhere}.pill{font-size:12px;background:#e9efff;padding:4px 8px;border-radius:99px}
 @media(max-width:650px){.grid{grid-template-columns:1fr}.wrap{margin:10px;padding:10px}}
 </style><div class="wrap">
-<header><h1>Cloud Job Assistant</h1><p>Prepare and track job-application tasks. This first version validates target URLs and builds a tailored application brief. It does not submit applications or store passwords.</p><span class="pill">Prototype · free-tier friendly</span><p><a href="/assistant">Универсальный помощник →</a> · <a href="/browser">Тест облачного браузера →</a></p></header>
+<header><h1>Cloud Job Assistant</h1><p>Prepare and track job-application tasks. This first version validates target URLs and builds a tailored application brief. It does not submit applications or store passwords.</p><span class="pill">Prototype · free-tier friendly</span><p><a href="/assistant">Универсальный помощник →</a> · <a href="/browser">Тест облачного браузера →</a></p><p id="webmcp-status" class="muted" role="status">Проверка поддержки WebMCP…</p></header>
 <div class="panel"><h2>New application task</h2><form id="task">
 <label>Job posting URL</label><input name="url" type="url" placeholder="https://company.com/careers/job" required>
 <div class="grid"><div><label>Role</label><input name="role" value="Junior Frontend Developer (React / TypeScript)"></div><div><label>Company</label><input name="company" placeholder="Company name"></div></div>
@@ -45,7 +45,7 @@ async function load(){let p=await fetch('/api/profile').then(r=>r.json());$('#pr
 function esc(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 $('#task').addEventListener('submit',async e=>{e.preventDefault();let data=Object.fromEntries(new FormData(e.target));let r=await fetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});let d=await r.json();$('#result').innerHTML='<p><b>'+esc(d.message)+'</b></p><textarea readonly>'+d.brief+'</textarea>';load()});
 $('#refresh').onclick=load;load();
-</script></html>"""
+</script><script src="/static/webmcp.js" defer></script></html>"""
 
 @app.get("/")
 def home():
