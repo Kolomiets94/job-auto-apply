@@ -50,7 +50,7 @@
     if (detail) detail.textContent = message;
     if (panel) {
       panel.dataset.state = state;
-      panel.style.borderColor = state === "ready" ? "#16a34a" : state === "error" ? "#dc2626" : "#d9e1ef";
+      panel.style.borderColor = state === "ready" ? "#16a34a" : state === "error" ? "#dc2626" : state === "warning" ? "#d97706" : "#d9e1ef";
     }
   };
 
@@ -158,7 +158,7 @@
 
       // getTools() verifies this document's registered tool list, not external-agent discovery.
       if (typeof context.getTools !== "function") {
-        setStatus("Вызовы регистрации всех 3 инструментов завершились. getTools() недоступен; обнаружение агентом нужно проверить отдельно.", "ready");
+        setStatus("Вызовы регистрации всех 3 инструментов завершились. getTools() недоступен; обнаружение агентом нужно проверить отдельно.", "warning");
         return;
       }
 
