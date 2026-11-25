@@ -38,7 +38,8 @@ def test_worldwide_does_not_override_explicit_restriction():
 def test_mailto_uses_gmail_api_and_reports_delivery_errors(monkeypatch):
     monkeypatch.setenv('AUTO_SEND_EMAIL', '1')
     lead = {'apply_url': 'mailto:jobs@example.com', 'title': 'Junior Frontend'}
-    with patch('gmail_api.is_configured', return_value=True), \
+    with patch('application_dispatcher.application_time_allowed', return_value=True), \
+         patch('gmail_api.is_configured', return_value=True), \
          patch('gmail_api.send_message') as send:
         assert dispatch(lead, 'Hello')['status'] == 'SUBMITTED'
         send.side_effect = RuntimeError('delivery rejected')
