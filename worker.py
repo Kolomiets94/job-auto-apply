@@ -892,7 +892,7 @@ def run():
 
     summary_message += "\n\nFilters by role:" + "".join(
         f"\n- {role}: found {data['found']}, eligible {data['eligible']}; rejected: " +
-        (", ".join(f"{reason}={count}" for reason, count in data["rejected_reasons"].items()) or "none")
+        (", ".join(f"{reason}={count}" for reason, count in data["first_rejection_reasons"].items()) or "none")
         for role, data in eligibility.items()
     )
     summary_message += "\n\nSources: " + ", ".join(f"{name}: {count}" for name, count in source_counts.items())
