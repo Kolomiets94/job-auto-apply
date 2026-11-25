@@ -30,7 +30,7 @@ Important: `getTools()` confirms the tools registered in the page's model contex
 
 The panel lists the tool names and includes desktop setup instructions. On a desktop Chrome/Chrome Canary build where WebMCP is not enabled, open `chrome://flags/#enable-webmcp-testing`, enable the flag if it is available in that build, restart the browser, and reload the page. Flag availability depends on the browser version/channel. Mobile browsers may not expose the experimental API.
 
-The panel also warns that the prototype's `/api/profile` and `/api/tasks` endpoints currently have no authentication. The profile includes contact information. Do not use the public prototype for sensitive data until authentication and authorization are implemented.
+The app now requires an authenticated session for its pages and every `/api/*` endpoint, including profile, task, assistant, and browser-inspection APIs. Configure `APP_PASSWORD` and `APP_SESSION_SECRET` in the Render service environment before use. `APP_SESSION_SECRET` must be at least 32 characters. The session cookie is Secure, HttpOnly, SameSite=Lax, and expires after seven days. If either setting is missing or invalid, protected pages and APIs fail closed (HTTP 503); unauthenticated API requests receive HTTP 401 and page requests redirect to `/login`. After signing in, same-origin WebMCP fetch calls use the session cookie automatically. Sign out with the button on each app page.\n\nThis is a single shared-password prototype, not per-user identity or role-based authorization. Anyone who knows the password can access the same in-memory profile and task list. Use a unique strong password, keep both values private, and rotate them if exposed. Do not treat this as a substitute for per-user accounts, CSRF defenses on state-changing endpoints, rate limiting, or durable per-user data isolation.
 
 ## Manual verification
 
@@ -44,4 +44,6 @@ The panel also warns that the prototype's `/api/profile` and `/api/tasks` endpoi
 
 - Application tasks are held in process memory and reset when the service restarts or sleeps.
 - The current backend creates a generic honest draft from the configured profile; it does not fetch or parse the job posting when preparing a brief.
-- The existing `/api/tasks` endpoints are not authenticated, and `/api/profile` exposes configured candidate contact information. Do not expose this prototype to untrusted users or sensitive candidate data without adding per-user authentication, authorization, CSRF protections where applicable, rate limiting, and persistent storage.
+- Authentication uses one shared application password; it does not provide individual user accounts or per-user data isolation.
+- Login attempts are not rate-limited in this prototype. Use a strong password and keep the service private.
+- Tasks remain in process memory and are shared by every authenticated user.
