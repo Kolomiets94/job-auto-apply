@@ -216,9 +216,9 @@ def _known_question_answer(question, category):
                 if english else
                 "B1 (Intermediate): читаю техническую документацию и могу базово общаться в команде.")
     if any(x in q for x in ("город", "где вы жив", "где прожива", "локац", "current location", "where are you based", "where are you currently based", "where are you located")):
-        return ("Yekaterinburg, Russia. I am looking for remote work."
+        return ("Yekaterinburg, Russia. I am open to remote work and hybrid roles in Yekaterinburg."
                 if english else
-                "Екатеринбург, Россия. Рассматриваю удалённую работу.")
+                "Екатеринбург, Россия. Рассматриваю удалённую работу и гибридный формат в Екатеринбурге.")
     if any(x in q for x in ("ожидания по зарплат", "зарплатные ожидания", "желаемая зарплат")):
         return "От 60 000 ₽ в месяц для вакансий в России; готов обсуждать условия."
     if any(x in q for x in ("salary expectation", "expected salary", "salary requirements")):
