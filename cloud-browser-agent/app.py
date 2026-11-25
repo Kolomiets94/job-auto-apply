@@ -1,11 +1,69 @@
 import os
-from flask import Flask, request, jsonify, render_template_string
+from datetime import timedelta
+import hmac
+from flask import Flask, request, jsonify, render_template_string, redirect, session
 from pathlib import Path
 from urllib.parse import urlparse
 from browserbase_routes import browserbase_bp
 from assistant_routes import assistant_bp
 
 app = Flask(__name__)
+app.secret_key = os.getenv("APP_SESSION_SECRET")
+app.config.update(
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    PERMANENT_SESSION_LIFETIME=timedelta(days=7),
+)
+APP_PASSWORD = os.getenv("APP_PASSWORD")
+
+
+@app.before_request
+def require_authentication():
+    protected_page = request.path in {"/", "/assistant", "/browser", "/webmcp.js"}
+    protected_api = request.path.startswith("/api/")
+    if not (protected_page or protected_api):
+        return None
+    if not APP_PASSWORD or not app.secret_key or len(app.secret_key) < 32:
+        message = "Authentication is not configured. Set APP_PASSWORD and APP_SESSION_SECRET (at least 32 characters) in the service environment."
+        return (jsonify(error=message), 503) if protected_api else (message, 503)
+    if not session.get("authenticated"):
+        return (jsonify(error="Authentication required."), 401) if protected_api else redirect("/login")
+    return None
+
+
+LOGIN_PAGE = """<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Вход — Cloud Job Assistant</title><style>
+body{font:16px system-ui;background:#f4f6fb;color:#182033;display:grid;place-items:center;min-height:90vh;margin:0}
+main{background:white;border:1px solid #e3e7f0;border-radius:16px;padding:24px;width:min(380px,calc(100% - 48px))}
+input,button{box-sizing:border-box;width:100%;padding:12px;border-radius:9px;font:inherit;margin-top:10px}
+input{border:1px solid #cbd2e1}button{background:#225de6;color:white;border:0;font-weight:700}
+p{color:#596579;font-size:14px}</style><main><h1>Вход</h1><p>Введите пароль приложения, заданный владельцем сервиса.</p>
+<form method="post" action="/login"><label for="password">Пароль</label><input id="password" name="password" type="password" autocomplete="current-password" required autofocus>
+<button type="submit">Войти</button></form></main></html>"""
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if not APP_PASSWORD or not app.secret_key or len(app.secret_key) < 32:
+        return "Authentication is not configured. Set APP_PASSWORD and APP_SESSION_SECRET (at least 32 characters) in the service environment.", 503
+    if request.method == "POST":
+        supplied = request.form.get("password", "")
+        if hmac.compare_digest(supplied, APP_PASSWORD):
+            session.clear()
+            session["authenticated"] = True
+            session.permanent = True
+            return redirect("/")
+        return LOGIN_PAGE.replace("</main>", "<p role='alert'>Неверный пароль.</p></main>"), 401
+    return LOGIN_PAGE
+
+
+@app.post("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
+
+
 app.register_blueprint(browserbase_bp)
 app.register_blueprint(assistant_bp)
 PROFILE = {
@@ -30,7 +88,7 @@ textarea{min-height:90px}button{background:#225de6;color:white;border:0;border-r
 .item{border-top:1px solid #e6eaf2;padding:12px 0;overflow-wrap:anywhere}.pill{font-size:12px;background:#e9efff;padding:4px 8px;border-radius:99px}
 @media(max-width:650px){.grid{grid-template-columns:1fr}.wrap{margin:10px;padding:10px}}
 </style><div class="wrap">
-<header><h1>Cloud Job Assistant</h1><p>Prepare and track job-application tasks. This first version validates target URLs and builds a tailored application brief. It does not submit applications or store passwords.</p><span class="pill">Prototype · free-tier friendly</span><p><a href="/assistant">Универсальный помощник →</a> · <a href="/browser">Тест облачного браузера →</a></p><p id="webmcp-status" class="muted" role="status">Проверка поддержки WebMCP…</p></header>
+<header><h1>Cloud Job Assistant</h1><p>Prepare and track job-application tasks. This first version validates target URLs and builds a tailored application brief. It does not submit applications or store passwords.</p><span class="pill">Prototype · free-tier friendly</span><p><a href="/assistant">Универсальный помощник →</a> · <a href="/browser">Тест облачного браузера →</a></p><form action="/logout" method="post"><button type="submit">Выйти</button></form><p id="webmcp-status" class="muted" role="status">Проверка поддержки WebMCP…</p></header>
 <div class="panel"><h2>New application task</h2><form id="task">
 <label>Job posting URL</label><input name="url" type="url" placeholder="https://company.com/careers/job" required>
 <div class="grid"><div><label>Role</label><input name="role" value="Junior Frontend Developer (React / TypeScript)"></div><div><label>Company</label><input name="company" placeholder="Company name"></div></div>
