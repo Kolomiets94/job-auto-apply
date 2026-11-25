@@ -275,9 +275,8 @@ def _work_format_rejection(lead: Dict[str, Any]) -> str | None:
 def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     text = _text(lead)
     title = str(lead.get("title") or "").lower()
-    # Internships and trainee roles are outside the current target job search.
-    if is_placement(title):
-        return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "internship/trainee excluded"}
+    # Relevant frontend/web internships and trainee roles are valid entry-level targets.
+    # Compensation and the same location/stack filters still apply below.
     if re.search(r"\bqa\b|tester|тестиров|quality assurance|автотест", title, re.I):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "non-target QA role"}
     # Exclude non-Junior roles by title, not incidental descriptions.
