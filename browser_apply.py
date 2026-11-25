@@ -129,10 +129,9 @@ def _norm(value):
 
 
 def _confirm_relocation_warning(page):
+    """Detect a relocation warning; never affirm a relocation commitment automatically."""
     button = page.locator('[data-qa="relocation-warning-confirm"]').first
-    if _visible(button):
-        button.click(timeout=5000)
-        page.wait_for_timeout(500)
+    return _visible(button)
 
 
 def _select_resume(page, category):
@@ -395,7 +394,12 @@ def apply_hh(lead: Dict, proposal: str, storage_state=None) -> Dict[str, str]:
             # until the explicit submit below and the post-submit verification pass.
             respond.click(timeout=10000)
             page.wait_for_timeout(1200)
-            _confirm_relocation_warning(page)
+            if _confirm_relocation_warning(page):
+                return {
+                    "status": "NEEDS_CONFIRMATION",
+                    "reason": "relocation_warning_requires_review",
+                    "apply_url": vacancy_url,
+                }
 
             if _looks_like_challenge(page):
                 return {"status": "NEEDS_HUMAN", "reason": "security_challenge"}
