@@ -35,14 +35,13 @@ def test_worldwide_does_not_override_explicit_restriction():
     assert not rank_lead(lead)['eligible']
 
 
-def test_mailto_uses_real_delivery_and_checks_rejection(monkeypatch):
-    for k,v in {'AUTO_SEND_EMAIL':'1','SMTP_HOST':'smtp.example.com','SMTP_USER':'alex@example.com','SMTP_PASSWORD':'x'}.items():
-        monkeypatch.setenv(k,v)
+def test_mailto_uses_gmail_api_and_reports_delivery_errors(monkeypatch):
+    monkeypatch.setenv('AUTO_SEND_EMAIL', '1')
     lead = {'apply_url': 'mailto:jobs@example.com', 'title': 'Junior Frontend'}
-    with patch('application_dispatcher.smtplib.SMTP_SSL') as smtp:
-        smtp.return_value.__enter__.return_value.send_message.return_value = {}
+    with patch('gmail_api.is_configured', return_value=True), \
+         patch('gmail_api.send_message') as send:
         assert dispatch(lead, 'Hello')['status'] == 'SUBMITTED'
-        smtp.return_value.__enter__.return_value.send_message.return_value = {'jobs@example.com': (550, b'no')}
+        send.side_effect = RuntimeError('delivery rejected')
         assert dispatch(lead, 'Hello')['status'] == 'FAILED'
 
 
