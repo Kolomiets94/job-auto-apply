@@ -68,7 +68,9 @@ def _format_text(value):
 
 def workplace_ok(v):
     """Allow remote everywhere; hybrid only in Yekaterinburg; never office."""
-    area = str((v.get("area") or {}).get("name") or v.get("location") or "").lower()
+    area_value = v.get("area")
+    area_name = _format_text(area_value) if isinstance(area_value, dict) else str(area_value or "")
+    area = str(area_name or v.get("location") or "").lower()
     local = any(x in area for x in ("екатеринбург", "yekaterinburg", "ekaterinburg"))
     title = str(v.get("name") or v.get("title") or "").lower()
     if re.search(r"\boffice\b|офис", title):
