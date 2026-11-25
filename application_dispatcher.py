@@ -56,6 +56,14 @@ def dispatch(lead, proposal):
     if str(lead.get("source") or "").lower() in {"freelancehunt", "fl_ru", "freelance_ru"}:
         return {"status": "SKIPPED", "reason": "freelance_submission_not_authorized"}
 
+    # An explicit mailto/application email is itself the application channel;
+    # do not send it through browser navigation and lose the address.
+    apply_url = str(lead.get("apply_url") or "")
+    if lead.get("apply_email") or urlsplit(apply_url).scheme.lower() == "mailto":
+        email_result = _send_email(lead, proposal)
+        if email_result is not None:
+            return email_result
+
     # The user authorized automatic applications. Prefer clicking through the
     # supported website form (Playwright/Chromium); do not require Gmail/SMTP.
     if lead.get("source") == "freelancehunt" and lead.get("can_api_bid"):
