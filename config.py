@@ -24,7 +24,7 @@ DEFAULT_FILTERS = {
     'exclude_keywords': ['senior', 'lead', 'manager', 'director'],
     'min_salary': 60000,
     'remote_only': True,
-    'hybrid_cities': ['Екатеринбург'],
+    'hybrid_cities': [],
     'office_allowed': False,
     'freelance_fallback_only': True,
     'experience_level': 'junior',
