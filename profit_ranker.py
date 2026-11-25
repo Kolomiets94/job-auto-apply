@@ -265,7 +265,7 @@ def _work_format_rejection(lead: Dict[str, Any]) -> str | None:
     if mode == "remote":
         return None
     if mode == "hybrid":
-        return "hybrid roles are excluded; fully remote is required"
+        return None if _is_yekaterinburg(lead) else "hybrid is allowed only in Yekaterinburg"
     if mode == "office":
         return "office/on-site roles are excluded"
     return "remote work format is not confirmed"
