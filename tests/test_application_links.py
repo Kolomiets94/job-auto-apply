@@ -15,23 +15,22 @@ class ApplicationLinkTests(unittest.TestCase):
         self.assertEqual(submit.call_args.args[0]['url'], 'https://hh.ru/vacancy/123')
         self.assertEqual(submit.call_args.args[1], 'Individual letter')
 
-    def test_mailto_description_reaches_smtp(self):
+    def test_mailto_description_reaches_gmail_api(self):
         import os
         from unittest.mock import patch
         import job_sources
         import application_dispatcher
         lead = job_sources.job('jobicy', 'Junior React Developer', 'https://board.example/job/1',
                                '<a href="mailto:jobs@example.org">Отправьте резюме</a>')
-        with patch.dict(os.environ, {'AUTO_SEND_EMAIL': '1', 'SMTP_HOST': 'smtp.example.org',
-                                     'SMTP_USER': 'candidate@example.org', 'SMTP_PASSWORD': 'dummy'}), \
+        with patch.dict(os.environ, {'AUTO_SEND_EMAIL': '1'}), \
              patch.object(application_dispatcher, 'application_time_allowed', return_value=True), \
-             patch('application_dispatcher.smtplib.SMTP_SSL') as smtp:
-            session = smtp.return_value.__enter__.return_value
-            session.send_message.return_value = {}
+             patch('gmail_api.is_configured', return_value=True), \
+             patch('gmail_api.send_message') as send:
             result = application_dispatcher.dispatch(lead, 'Individual letter')
-            message = session.send_message.call_args.args[0]
+            args = send.call_args.args
         self.assertEqual(result['status'], 'SUBMITTED')
-        self.assertEqual(message['To'], 'jobs@example.org')
+        self.assertEqual(args[0], 'jobs@example.org')
+        self.assertEqual(args[1], 'Отклик: Junior React Developer')
 
     def test_explicit_hh_link_preserves_original_vacancy(self):
         description = '<a href="https://ekaterinburg.hh.ru/vacancy/123?from=board"><b>Откликнуться</b></a>'
