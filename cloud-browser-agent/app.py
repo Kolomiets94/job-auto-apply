@@ -42,9 +42,39 @@ textarea{min-height:90px}button{background:#225de6;color:white;border:0;border-r
 </div>
 <script>
 const $=s=>document.querySelector(s);
-async function load(){let p=await fetch('/api/profile').then(r=>r.json());$('#profile').innerHTML='<b>'+p.name+'</b><p>'+p.skills+'</p><p>'+p.experience+'</p><p><a href="'+p.github+'" target="_blank" rel="noreferrer">GitHub portfolio</a> · '+p.email+'</p>';let t=await fetch('/api/tasks').then(r=>r.json());$('#tasks').innerHTML=t.length?t.slice().reverse().map(x=>'<div class="item"><b>'+esc(x.role||'Frontend role')+'</b> · '+esc(x.company||'Company not specified')+'<p><a href="'+x.url+'" target="_blank" rel="noreferrer">'+esc(x.url)+'</a></p><p>'+esc(x.brief)+'</p><span class="pill">Brief prepared · not submitted</span></div>').join(''):'<p class="muted">No tasks yet.</p>'}
+async function load(){
+  let p=await fetch('/api/profile').then(r=>r.json());
+  const profile=$('#profile');
+  profile.replaceChildren();
+  const name=document.createElement('b'); name.textContent=p.name; profile.append(name);
+  for (const value of [p.skills,p.experience]) {
+    const paragraph=document.createElement('p'); paragraph.textContent=value; profile.append(paragraph);
+  }
+  const links=document.createElement('p');
+  const portfolio=document.createElement('a');
+  portfolio.href=p.github; portfolio.target='_blank'; portfolio.rel='noreferrer'; portfolio.textContent='GitHub portfolio';
+  links.append(portfolio, document.createTextNode(' · '+p.email)); profile.append(links);
+
+  let t=await fetch('/api/tasks').then(r=>r.json());
+  $('#tasks').innerHTML=t.length?t.slice().reverse().map(x=>'<div class="item"><b>'+esc(x.role||'Frontend role')+'</b> · '+esc(x.company||'Company not specified')+'<p><a href="'+esc(x.url)+'" target="_blank" rel="noreferrer">'+esc(x.url)+'</a></p><p>'+esc(x.brief)+'</p><span class="pill">Brief prepared · not submitted</span></div>').join(''):'<p class="muted">No tasks yet.</p>';
+}
 function esc(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
-$('#task').addEventListener('submit',async e=>{e.preventDefault();let data=Object.fromEntries(new FormData(e.target));let r=await fetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});let d=await r.json();$('#result').innerHTML='<p><b>'+esc(d.message)+'</b></p><textarea readonly>'+d.brief+'</textarea>';load()});
+$('#task').addEventListener('submit',async e=>{
+  e.preventDefault();
+  let data=Object.fromEntries(new FormData(e.target));
+  let r=await fetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  let d=await r.json();
+  const result=$('#result');
+  result.replaceChildren();
+  const message=document.createElement('p');
+  const strong=document.createElement('b'); strong.textContent=d.message || d.error || 'Request completed.';
+  message.append(strong); result.append(message);
+  if (d.brief) {
+    const brief=document.createElement('textarea');
+    brief.readOnly=true; brief.value=d.brief; result.append(brief);
+  }
+  load();
+});
 $('#refresh').onclick=load;load();
 </script><script src="/webmcp.js" defer></script></html>"""
 
