@@ -508,3 +508,32 @@ def email_test():
 
 
 
+
+
+@app.get("/health/openai")
+def openai_health():
+    """Read-only OpenAI API connectivity check; sends no personal or job data."""
+    if not _scheduler_authorized():
+        return jsonify({"error": "unauthorized"}), 401
+
+    from ai_assistant import DEFAULT_MODEL, _ask, is_configured
+
+    if not is_configured():
+        response = jsonify({"openai": "not_configured"})
+        response.headers["Cache-Control"] = "no-store"
+        return response, 503
+
+    model = os.getenv("OPENAI_MODEL", DEFAULT_MODEL).strip() or DEFAULT_MODEL
+    result = _ask(
+        "This is a connectivity test. Reply with exactly the two letters OK.",
+        {"test": "connection"},
+        max_output_tokens=10,
+    )
+    if result != "OK":
+        response = jsonify({"openai": "request_failed", "model": model})
+        response.headers["Cache-Control"] = "no-store"
+        return response, 502
+
+    response = jsonify({"openai": "ok", "model": model})
+    response.headers["Cache-Control"] = "no-store"
+    return response, 200
