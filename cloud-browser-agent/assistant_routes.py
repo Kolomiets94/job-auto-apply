@@ -15,7 +15,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f2f5fa;border-radius
 small{color:#596579}.links a{margin-right:12px}
 </style><header><h1>Универсальный облачный помощник</h1>
 <p>Бесплатный MVP: принимает задачу, при необходимости читает публичную веб-страницу и формирует рабочую сводку. Не входит в аккаунты, не нажимает кнопки отправки и не выполняет необратимые действия.</p>
-<div class="links"><a href="/">Задачи</a><a href="/browser">Тест браузера</a></div></header>
+<div class="links"><a href="/">Задачи</a><a href="/browser">Тест браузера</a></div><form action="/logout" method="post"><button type="submit">Выйти</button></form></header>
 <section><form id="form"><label for="goal"><b>Что нужно сделать?</b></label>
 <textarea id="goal" required placeholder="Например: изучи эту страницу и выдели главные условия, сроки и следующие шаги"></textarea>
 <label for="url"><b>Публичная ссылка (необязательно)</b></label><input id="url" type="url" placeholder="https://example.com">
