@@ -59,8 +59,25 @@ def _ask(instructions: str, data: dict, max_output_tokens: int = 500) -> str | N
         result = _response_text(payload)
         return result[:6000] if result else None
     except urllib.error.HTTPError as exc:
-        # Status code is safe to log; never expose the response body or request headers.
-        print("[openai] http_error status=%s" % exc.code, flush=True)
+        # Parse only a tiny allowlisted classification. Never log the body, message,
+        # request headers, identifiers, or any user/job content.
+        category = "other"
+        try:
+            error_payload = json.loads(exc.read().decode("utf-8"))
+            error = error_payload.get("error", {}) if isinstance(error_payload, dict) else {}
+            code = error.get("code") if isinstance(error, dict) else None
+            error_type = error.get("type") if isinstance(error, dict) else None
+            if code in ("insufficient_quota", "billing_hard_limit_reached") or error_type == "insufficient_quota":
+                category = "quota"
+            elif code == "rate_limit_exceeded" or error_type == "rate_limit_error":
+                category = "rate_limit"
+            elif code in ("invalid_api_key", "organization_deactivated", "project_deactivated"):
+                category = "credentials_or_access"
+            elif code == "model_not_found":
+                category = "model_access"
+        except (OSError, UnicodeDecodeError, ValueError, TypeError, AttributeError):
+            pass
+        print("[openai] http_error status=%s category=%s" % (exc.code, category), flush=True)
         return None
     except urllib.error.URLError:
         print("[openai] network_error", flush=True)
