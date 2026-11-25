@@ -22,8 +22,8 @@ def placement_is_paid(lead):
     values += [lead.get("salary_min"), lead.get("salary_max")]
     if any(isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0 for v in values):
         return True
-    if re.search(r"\bpaid\s+(?:[\w/-]+\s+){0,4}(?:internship|intern|trainee|placement)\b|\b(?:internship|intern|trainee|placement)\s*(?:is|:|-)?\s*paid\b|оплачиваем|стажиров\w*\s+оплачива|практик\w*\s+оплачива|\bстипендия\b|\bstipend\b", text):
-        return True
+    # A label such as "paid internship" is not enough by itself: require a
+    # numeric salary/stipend amount so compensation is actually confirmed.
     # Explicit compensation amounts in descriptions or textual salary fields.
     compensation = str(salary or "") + " " + text
     return bool(re.search(r"(?:зарплата|оклад|оплата|salary|compensation|стипендия|stipend)\s*[:—-]?\s*(?:от|from)?\s*[1-9][\d\s.,]*\s*(?:₽|руб|rub|rur|usd|eur|доллар|евро|\$|€)", compensation, re.I))
