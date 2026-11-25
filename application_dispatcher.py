@@ -51,6 +51,11 @@ def dispatch(lead, proposal):
     if lead.get("paid_bid") is True:
         return {"status": "SKIPPED", "reason": "paid_bid"}
 
+    # Freelance bids require a separately reviewed price and scope. Keep them
+    # out of unattended dispatch even if an environment flag/token is present.
+    if str(lead.get("source") or "").lower() in {"freelancehunt", "fl_ru", "freelance_ru"}:
+        return {"status": "SKIPPED", "reason": "freelance_submission_not_authorized"}
+
     # The user authorized automatic applications. Prefer clicking through the
     # supported website form (Playwright/Chromium); do not require Gmail/SMTP.
     if lead.get("source") == "freelancehunt" and lead.get("can_api_bid"):
