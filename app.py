@@ -443,7 +443,7 @@ def _start_telegram_diagnostic():
 
 def _start_gmail_reply_monitor():
     """Poll Gmail for application replies while the Render process is awake."""
-    from gmail_api import is_configured as gmail_is_configured
+    from gmail_api import is_configured as gmail_is_configured, missing_config as gmail_missing_config
     from telegram_notifier import is_configured as telegram_is_configured
 
     gmail_ready = gmail_is_configured()
@@ -455,7 +455,8 @@ def _start_gmail_reply_monitor():
     )
     if not gmail_ready:
         print(
-            "[gmail-replies] monitor disabled: Gmail OAuth configuration is incomplete",
+            "[gmail-replies] monitor disabled: missing Gmail settings: %s"
+            % ", ".join(gmail_missing_config()),
             flush=True,
         )
     if not telegram_ready:
