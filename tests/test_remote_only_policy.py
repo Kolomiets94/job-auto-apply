@@ -38,7 +38,7 @@ class RemoteOnlyPolicyTests(unittest.TestCase):
             "source": "remotive",
             "location": "Worldwide",
             "title": "Junior React Developer",
-            "description": "Remote role. Work authorization information may be requested.",
+            "description": "Remote role; accepts applicants residing in Russia. Work authorization information may be requested.",
         }
         self.assertFalse(_location_rejected(lead, " ".join(lead.values())))
 
