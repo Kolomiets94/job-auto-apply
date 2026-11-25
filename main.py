@@ -22,7 +22,12 @@ QUERIES=[
     ("layout","junior HTML"),
 ]
 
-HYBRID_QUERIES=[]
+HYBRID_QUERIES=[
+    ("frontend","junior frontend гибрид Екатеринбург"),
+    ("frontend","junior React гибрид Екатеринбург"),
+    ("frontend","junior JavaScript гибрид Екатеринбург"),
+    ("layout","junior верстальщик гибрид Екатеринбург"),
+]
 EXCLUDE=("full stack","fullstack","full-stack","vue","angular","react native","react-native","flutter","middle","senior","lead","head of","manager","director")
 UA={"User-Agent":"Mozilla/5.0 (compatible; JobFreelanceHunter/1.2; vacancy-feed)"}
 
@@ -64,6 +69,7 @@ def _format_text(value):
 def workplace_ok(v):
     """Allow remote everywhere; hybrid only in Yekaterinburg; never office."""
     area = str((v.get("area") or {}).get("name") or v.get("location") or "").lower()
+    local = any(x in area for x in ("екатеринбург", "yekaterinburg", "ekaterinburg"))
     title = str(v.get("name") or v.get("title") or "").lower()
     if re.search(r"\boffice\b|офис", title):
         return False
@@ -79,7 +85,7 @@ def workplace_ok(v):
     explicit_mode = _format_text(v.get("work_mode")).lower()
     if explicit_mode:
         if re.search(hybrid, explicit_mode):
-            return False
+            return local
         if re.search(office, explicit_mode) or re.search(
             r"\b(?:on[_ -]?site|onsite|office)\b", explicit_mode
         ):
@@ -93,7 +99,7 @@ def workplace_ok(v):
     ).lower()
     if formats:
         if re.search(hybrid, formats):
-            return False
+            return local
         if re.search(office, formats) or re.search(
             r"\b(?:on[_ -]?site|onsite|office)\b", formats
         ):
@@ -105,7 +111,7 @@ def workplace_ok(v):
     details = " ".join(str(x or "") for x in (v.get("snippet") or {}).values()).lower()
     text = " ".join((title, schedule, details))
     if re.search(hybrid, text):
-        return False
+        return local
     if re.search(office, text):
         return False
     if re.search(remote, text):
