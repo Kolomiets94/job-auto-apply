@@ -1,5 +1,6 @@
 import os
 from flask import Flask, request, jsonify, render_template_string
+from pathlib import Path
 from urllib.parse import urlparse
 from browserbase_routes import browserbase_bp
 from assistant_routes import assistant_bp
@@ -45,11 +46,18 @@ async function load(){let p=await fetch('/api/profile').then(r=>r.json());$('#pr
 function esc(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 $('#task').addEventListener('submit',async e=>{e.preventDefault();let data=Object.fromEntries(new FormData(e.target));let r=await fetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});let d=await r.json();$('#result').innerHTML='<p><b>'+esc(d.message)+'</b></p><textarea readonly>'+d.brief+'</textarea>';load()});
 $('#refresh').onclick=load;load();
-</script><script src="/static/webmcp.js" defer></script></html>"""
+</script><script src="/webmcp.js" defer></script></html>"""
 
 @app.get("/")
 def home():
     return render_template_string(PAGE)
+
+@app.get("/webmcp.js")
+def webmcp_script():
+    script_path = Path(__file__).resolve().parent / "static" / "webmcp.js"
+    if not script_path.is_file():
+        return jsonify(error="WebMCP script is missing"), 404
+    return app.response_class(script_path.read_bytes(), mimetype="application/javascript")
 
 @app.get("/health")
 def health():
