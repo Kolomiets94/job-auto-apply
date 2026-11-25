@@ -1,6 +1,9 @@
 import os
 from datetime import timedelta
 import hmac
+import secrets
+import time
+from collections import defaultdict, deque
 from flask import Flask, request, jsonify, render_template_string, redirect, session
 from pathlib import Path
 from urllib.parse import urlparse
@@ -16,7 +19,39 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=timedelta(days=7),
 )
 APP_PASSWORD = os.getenv("APP_PASSWORD")
+LOGIN_FAILURES = defaultdict(deque)
+LOGIN_LIMIT = 5
+LOGIN_WINDOW_SECONDS = 15 * 60
 
+
+def _csrf_token():
+    token = session.get("csrf_token")
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session["csrf_token"] = token
+    return token
+
+
+@app.before_request
+def enforce_csrf():
+    if request.method not in {"POST", "PUT", "PATCH", "DELETE"}:
+        return None
+    expected = session.get("csrf_token", "")
+    supplied = request.headers.get("X-CSRF-Token") or request.form.get("csrf_token", "")
+    if not expected or not supplied or not hmac.compare_digest(expected, supplied):
+        return jsonify(error="CSRF validation failed. Reload the page and try again."), 403
+    return None
+
+
+@app.after_request
+def add_csrf_meta(response):
+    if response.mimetype == "text/html" and session.get("authenticated"):
+        body = response.get_data(as_text=True)
+        meta = '<meta name="csrf-token" content="' + _csrf_token() + '">'
+        if 'name="csrf-token"' not in body:
+            body = body.replace("<title>", meta + "<title>", 1)
+            response.set_data(body)
+    return response
 
 @app.before_request
 def require_authentication():
@@ -39,7 +74,7 @@ main{background:white;border:1px solid #e3e7f0;border-radius:16px;padding:24px;w
 input,button{box-sizing:border-box;width:100%;padding:12px;border-radius:9px;font:inherit;margin-top:10px}
 input{border:1px solid #cbd2e1}button{background:#225de6;color:white;border:0;font-weight:700}
 p{color:#596579;font-size:14px}</style><main><h1>Вход</h1><p>Введите пароль приложения, заданный владельцем сервиса.</p>
-<form method="post" action="/login"><label for="password">Пароль</label><input id="password" name="password" type="password" autocomplete="current-password" required autofocus>
+<form method="post" action="/login"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label for="password">Пароль</label><input id="password" name="password" type="password" autocomplete="current-password" required autofocus>
 <button type="submit">Войти</button></form></main></html>"""
 
 
@@ -47,15 +82,26 @@ p{color:#596579;font-size:14px}</style><main><h1>Вход</h1><p>Введите 
 def login():
     if not APP_PASSWORD or not app.secret_key or len(app.secret_key) < 32:
         return "Authentication is not configured. Set APP_PASSWORD and APP_SESSION_SECRET (at least 32 characters) in the service environment.", 503
+    ip = request.remote_addr or "unknown"
+    now = time.monotonic()
+    failures = LOGIN_FAILURES[ip]
+    while failures and now - failures[0] >= LOGIN_WINDOW_SECONDS:
+        failures.popleft()
     if request.method == "POST":
+        if len(failures) >= LOGIN_LIMIT:
+            return ("Слишком много попыток входа. Подождите 15 минут.", 429)
         supplied = request.form.get("password", "")
         if hmac.compare_digest(supplied, APP_PASSWORD):
+            LOGIN_FAILURES.pop(ip, None)
             session.clear()
             session["authenticated"] = True
             session.permanent = True
+            _csrf_token()
             return redirect("/")
-        return LOGIN_PAGE.replace("</main>", "<p role='alert'>Неверный пароль.</p></main>"), 401
-    return LOGIN_PAGE
+        failures.append(now)
+        page = LOGIN_PAGE.replace("{{ csrf_token }}", _csrf_token())
+        return page.replace("</main>", "<p role='alert'>Неверный пароль.</p></main>"), 401
+    return LOGIN_PAGE.replace("{{ csrf_token }}", _csrf_token())
 
 
 @app.post("/logout")
@@ -88,7 +134,7 @@ textarea{min-height:90px}button{background:#225de6;color:white;border:0;border-r
 .item{border-top:1px solid #e6eaf2;padding:12px 0;overflow-wrap:anywhere}.pill{font-size:12px;background:#e9efff;padding:4px 8px;border-radius:99px}
 @media(max-width:650px){.grid{grid-template-columns:1fr}.wrap{margin:10px;padding:10px}}
 </style><div class="wrap">
-<header><h1>Cloud Job Assistant</h1><p>Prepare and track job-application tasks. This first version validates target URLs and builds a tailored application brief. It does not submit applications or store passwords.</p><span class="pill">Prototype · free-tier friendly</span><p><a href="/assistant">Универсальный помощник →</a> · <a href="/browser">Тест облачного браузера →</a></p><form action="/logout" method="post"><button type="submit">Выйти</button></form><p id="webmcp-status" class="muted" role="status">Проверка поддержки WebMCP…</p></header>
+<header><h1>Cloud Job Assistant</h1><p>Prepare and track job-application tasks. This first version validates target URLs and builds a tailored application brief. It does not submit applications or store passwords.</p><span class="pill">Prototype · free-tier friendly</span><p><a href="/assistant">Универсальный помощник →</a> · <a href="/browser">Тест облачного браузера →</a></p><form action="/logout" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit">Выйти</button></form><p id="webmcp-status" class="muted" role="status">Проверка поддержки WebMCP…</p></header>
 <div class="panel"><h2>New application task</h2><form id="task">
 <label>Job posting URL</label><input name="url" type="url" placeholder="https://company.com/careers/job" required>
 <div class="grid"><div><label>Role</label><input name="role" value="Junior Frontend Developer (React / TypeScript)"></div><div><label>Company</label><input name="company" placeholder="Company name"></div></div>
@@ -100,6 +146,7 @@ textarea{min-height:90px}button{background:#225de6;color:white;border:0;border-r
 </div>
 <script>
 const $=s=>document.querySelector(s);
+const csrf=()=>document.querySelector('meta[name="csrf-token"]')?.content || '';
 async function load(){
   let p=await fetch('/api/profile').then(r=>r.json());
   const profile=$('#profile');
@@ -120,7 +167,7 @@ function esc(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt
 $('#task').addEventListener('submit',async e=>{
   e.preventDefault();
   let data=Object.fromEntries(new FormData(e.target));
-  let r=await fetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  let r=await fetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf()},body:JSON.stringify(data)});
   let d=await r.json();
   const result=$('#result');
   result.replaceChildren();
@@ -138,7 +185,7 @@ $('#refresh').onclick=load;load();
 
 @app.get("/")
 def home():
-    return render_template_string(PAGE)
+    return render_template_string(PAGE, csrf_token=_csrf_token())
 
 @app.get("/webmcp.js")
 def webmcp_script():
