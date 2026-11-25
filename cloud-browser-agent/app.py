@@ -50,6 +50,7 @@ def add_csrf_meta(response):
         meta = '<meta name="csrf-token" content="' + _csrf_token() + '">'
         if 'name="csrf-token"' not in body:
             body = body.replace("<title>", meta + "<title>", 1)
+            body = body.replace('<form action="/logout" method="post">', '<form action="/logout" method="post"><input type="hidden" name="csrf_token" value="' + _csrf_token() + '">')
             response.set_data(body)
     return response
 
