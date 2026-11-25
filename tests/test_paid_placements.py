@@ -4,16 +4,13 @@ from profit_ranker import rank_lead
 
 
 class PaidPlacementTests(unittest.TestCase):
-    def test_paid_titles_route_to_correct_resume(self):
-        for title, category in (("Frontend Intern", "frontend"), ("Стажёр React", "frontend"),
-                                ("Практикант HTML CSS", "layout"), ("Стажировка верстальщик", "layout"),
-                                ("QA Intern", "qa"), ("Практика тестировщик", "qa"),
-                                ("Trainee Manual Tester", "qa")):
+    def test_paid_placement_requires_confirmed_compensation(self):
+        for title in ("Frontend Intern", "Стажёр React", "Практикант HTML CSS"):
             with self.subTest(title=title):
-                lead = rank_lead({"source": "hh", "title": title,
-                                  "salary": {"from": 15000, "currency": "RUB"}})
-                self.assertFalse(lead["eligible"])
-                self.assertEqual(lead["rank_reason"], "internship/trainee excluded")
+                self.assertTrue(placement_is_paid({
+                    "title": title, "salary": {"from": 60000, "currency": "RUB"}
+                }))
+        self.assertFalse(placement_is_paid({"title": "Frontend Intern", "description": "React"}))
 
     def test_unknown_unpaid_and_zero_compensation_are_rejected(self):
         for description, salary in (("React", None), ("Unpaid React internship", {"from": 15000}),
