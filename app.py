@@ -537,3 +537,36 @@ def openai_health():
     response = jsonify({"openai": "ok", "model": model})
     response.headers["Cache-Control"] = "no-store"
     return response, 200
+
+
+def _run_startup_openai_diagnostic():
+    """Make one minimal, data-free OpenAI request on Render startup and log only its outcome."""
+    from ai_assistant import DEFAULT_MODEL, _ask, is_configured
+
+    model = os.getenv("OPENAI_MODEL", DEFAULT_MODEL).strip() or DEFAULT_MODEL
+    if not is_configured():
+        print("[openai-diagnostic] not_configured", flush=True)
+        return
+    try:
+        result = _ask(
+            "This is a connectivity test. Reply with exactly the two letters OK.",
+            {"test": "connection"},
+            max_output_tokens=10,
+        )
+        if result == "OK":
+            print("[openai-diagnostic] ok model=%s" % model, flush=True)
+        else:
+            # _ask intentionally hides API response details to avoid leaking request data.
+            print("[openai-diagnostic] request_failed model=%s" % model, flush=True)
+    except Exception as exc:
+        # Never log exception text, request headers, or credentials.
+        print("[openai-diagnostic] failed error=%s" % type(exc).__name__, flush=True)
+
+
+# Run only on Render, not during local development or test imports.
+if os.getenv("RENDER", "").strip().lower() == "true":
+    threading.Thread(
+        target=_run_startup_openai_diagnostic,
+        name="openai-startup-diagnostic",
+        daemon=True,
+    ).start()
