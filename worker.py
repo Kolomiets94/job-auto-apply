@@ -389,7 +389,7 @@ def run():
 
             junior_signal = is_entry_level(title) or bool(re.search(
                 r"без опыта|не требуется опыт|no experience|entry.level|"
-                r"начинающ|от 1 года|от 1 года|1\s*[-–—]\s*3\s*(?:год|года|лет|years?)|"
+                r"начинающ|от 1 года|1\s*[-–—]\s*3\s*(?:год|года|лет|years?)|"
                 r"0\s*[-–—]\s*[12]\s*(?:год|года|лет|years?)",
                 experience + " " + requirements,
             ))
@@ -408,6 +408,10 @@ def run():
                 "known stale vacancy (2023)",
                 "excluded job title",
                 "non-target QA role",
+                "experience from 3 years",
+                "experience range above 3 years",
+                "three years required",
+                "experience above 3 years",
             }
             if (
                 first_reason not in hard_rejections
