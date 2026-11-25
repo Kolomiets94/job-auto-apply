@@ -11,8 +11,15 @@ class GmailApiError(RuntimeError):
 def _env(name, fallback=""):
     return os.getenv(name, fallback).strip()
 
+def missing_config():
+    """Return names of missing Gmail settings without exposing secret values."""
+    missing=[k for k in ("GMAIL_CLIENT_ID","GMAIL_CLIENT_SECRET","GMAIL_REFRESH_TOKEN") if not _env(k)]
+    if not _env("GMAIL_API_USER",_env("SMTP_USER")):
+        missing.append("GMAIL_API_USER (or SMTP_USER)")
+    return missing
+
 def is_configured():
-    return all(_env(k) for k in ("GMAIL_CLIENT_ID","GMAIL_CLIENT_SECRET","GMAIL_REFRESH_TOKEN")) and bool(_env("GMAIL_API_USER",_env("SMTP_USER")))
+    return not missing_config()
 
 def _request(url, method="GET", data=None, headers=None):
     req=urllib.request.Request(url,data=data,headers=headers or {},method=method)
