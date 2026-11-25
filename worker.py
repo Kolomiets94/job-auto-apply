@@ -367,9 +367,9 @@ def run():
                 "optional", "nice to have", "nice-to-have", "not required",
                 "не требуется", "необязател", "будет плюсом", "как плюс",
             )
-            sql_parts = re.split(r"[\\n.!?;]", requirements)
+            sql_parts = re.split(r"[\n.!?;]", requirements)
             if any(
-                re.search(r"\\b(?:sql|mysql|postgresql)\\b", part)
+                re.search(r"\b(?:sql|mysql|postgresql)\b", part)
                 and not any(marker in part for marker in optional_markers)
                 for part in sql_parts
             ):
@@ -389,8 +389,8 @@ def run():
 
             junior_signal = is_entry_level(title) or bool(re.search(
                 r"без опыта|не требуется опыт|no experience|entry.level|"
-                r"начинающ|от 1 года|от 1 года|1\\s*[-–—]\\s*3\\s*(?:год|года|лет|years?)|"
-                r"0\\s*[-–—]\\s*[12]\\s*(?:год|года|лет|years?)",
+                r"начинающ|от 1 года|от 1 года|1\s*[-–—]\s*3\s*(?:год|года|лет|years?)|"
+                r"0\s*[-–—]\s*[12]\s*(?:год|года|лет|years?)",
                 experience + " " + requirements,
             ))
             if role in ("frontend", "layout") and not junior_signal:
