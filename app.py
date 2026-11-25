@@ -443,14 +443,27 @@ def _start_telegram_diagnostic():
 
 def _start_gmail_reply_monitor():
     """Poll Gmail for application replies while the Render process is awake."""
-    from gmail_api import is_configured
-    required = (
-        is_configured(),
-        os.getenv("TELEGRAM_BOT_TOKEN"),
-        os.getenv("TELEGRAM_CHAT_ID"),
+    from gmail_api import is_configured as gmail_is_configured
+    from telegram_notifier import is_configured as telegram_is_configured
+
+    gmail_ready = gmail_is_configured()
+    telegram_ready = telegram_is_configured()
+    print(
+        "[integrations] gmail_api_configured=%s telegram_configured=%s"
+        % (gmail_ready, telegram_ready),
+        flush=True,
     )
-    if not all(required):
-        print("[gmail-replies] monitor disabled: Gmail/Telegram credentials are not configured", flush=True)
+    if not gmail_ready:
+        print(
+            "[gmail-replies] monitor disabled: Gmail OAuth configuration is incomplete",
+            flush=True,
+        )
+    if not telegram_ready:
+        print(
+            "[gmail-replies] monitor disabled: Telegram bot token or chat ID is missing",
+            flush=True,
+        )
+    if not (gmail_ready and telegram_ready):
         return
 
     def monitor():
