@@ -63,7 +63,11 @@
   const json = async (url, options = {}) => {
     const response = await fetch(url, {
       ...options,
-      headers: { "Accept": "application/json", ...(options.headers || {}) }
+      headers: {
+        "Accept": "application/json",
+        "X-CSRF-Token": document.querySelector("meta[name=csrf-token]")?.content || "",
+        ...(options.headers || {})
+      }
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) return { error: data.error || `HTTP ${response.status}` };

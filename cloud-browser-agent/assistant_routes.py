@@ -24,7 +24,7 @@ small{color:#596579}.links a{margin-right:12px}
 <script>
 const form=document.querySelector('#form'),status=document.querySelector('#status'),result=document.querySelector('#result');
 form.addEventListener('submit',async e=>{e.preventDefault();status.textContent='Выполняю задачу…';result.textContent='';
-try{const r=await fetch('/api/assistant/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({goal:document.querySelector('#goal').value,url:document.querySelector('#url').value})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Ошибка запроса');status.textContent='Готово';const pre=document.createElement('pre');pre.textContent=d.result;result.appendChild(pre);if(d.page){const p=document.createElement('p');p.textContent='Страница: '+d.page.title+' ('+d.page.url+')';result.prepend(p)}}catch(err){status.textContent='Не удалось выполнить: '+err.message}});
+try{const r=await fetch('/api/assistant/run',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':document.querySelector("meta[name=csrf-token]")?.content||''},body:JSON.stringify({goal:document.querySelector('#goal').value,url:document.querySelector('#url').value})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Ошибка запроса');status.textContent='Готово';const pre=document.createElement('pre');pre.textContent=d.result;result.appendChild(pre);if(d.page){const p=document.createElement('p');p.textContent='Страница: '+d.page.title+' ('+d.page.url+')';result.prepend(p)}}catch(err){status.textContent='Не удалось выполнить: '+err.message}});
 </script></html>"""
 
 def _plan(goal, page_text=""):
