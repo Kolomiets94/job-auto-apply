@@ -337,21 +337,83 @@ def run():
         ranked_jobs + ranked_freelance
     )
     freelance_held_back = bool(ranked_jobs and ranked_freelance)
-    # Diagnose why collected Junior Frontend/layout leads never reach dispatch.
+    # Explain all observed filter signals, not only rank_lead's first rejection.
+    # Review flags are diagnostic only: they never make a lead eligible or trigger an application.
+    import re
     from collections import Counter
+    from entry_level import is_entry_level
     from profit_ranker import rank_lead
     eligibility = {}
     for role in ("frontend", "layout", "qa"):
         relevant = [lead for lead in leads if not is_freelance(lead) and _role_category(lead) == role]
-        rejected = Counter(
-            str(item.get("rank_reason") or "unknown")
-            for item in (rank_lead(lead) for lead in relevant)
-            if not item.get("eligible")
-        )
+        first_rejections = Counter()
+        all_rejections = Counter()
+        review_counts = Counter()
+        review_candidates = []
+        for lead in relevant:
+            ranked_item = rank_lead(lead)
+            if ranked_item.get("eligible"):
+                continue
+            first_reason = str(ranked_item.get("rank_reason") or "unknown")
+            first_rejections[first_reason] += 1
+            reasons = {first_reason}
+
+            requirements = " ".join(
+                str(lead.get(key) or "") for key in ("description", "requirements")
+            ).lower()
+            title = str(lead.get("title") or "")
+            experience = str(lead.get("experience") or "").lower()
+            optional_markers = (
+                "optional", "nice to have", "nice-to-have", "not required",
+                "не требуется", "необязател", "будет плюсом", "как плюс",
+            )
+            sql_parts = re.split(r"[\\n.!?;]", requirements)
+            if any(
+                re.search(r"\\b(?:sql|mysql|postgresql)\\b", part)
+                and not any(marker in part for marker in optional_markers)
+                for part in sql_parts
+            ):
+                reasons.add("SQL outside confirmed stack")
+                review_counts["SQL вне подтверждённого стека — ручная проверка"] += 1
+
+            unsupported = ("vue", "angular", "full stack", "fullstack", "react native", "flutter")
+            required_markers = ("required", "must have", "mandatory", "обязательно", "требуется")
+            if any(
+                any(term in part for term in unsupported)
+                and any(marker in part for marker in required_markers)
+                and not any(marker in part for marker in optional_markers)
+                for part in sql_parts
+            ):
+                reasons.add("mandatory unsupported stack")
+                review_counts["Обязательный неподтверждённый стек — ручная проверка"] += 1
+
+            junior_signal = is_entry_level(title) or bool(re.search(
+                r"без опыта|не требуется опыт|no experience|entry.level|"
+                r"начинающ|от 1 года|от 1 года|1\\s*[-–—]\\s*3\\s*(?:год|года|лет|years?)|"
+                r"0\\s*[-–—]\\s*[12]\\s*(?:год|года|лет|years?)",
+                experience + " " + requirements,
+            ))
+            if role in ("frontend", "layout") and not junior_signal:
+                reasons.add("Junior signal not confirmed")
+                review_counts["Junior-сигнал не подтверждён — ручная проверка"] += 1
+
+            all_rejections.update(reasons)
+            if len(reasons - {first_reason}) or "Junior signal not confirmed" in reasons:
+                review_candidates.append({
+                    "title": lead.get("title"),
+                    "source": lead.get("source"),
+                    "url": lead.get("url"),
+                    "first_rejection": first_reason,
+                    "review_reasons": sorted(reasons - {first_reason}),
+                })
+
         eligibility[role] = {
             "found": len(relevant),
             "eligible": sum(_role_category(lead) == role for lead in ranked_jobs),
-            "rejected_reasons": dict(rejected.most_common(8)),
+            "first_rejection_reasons": dict(first_rejections.most_common(8)),
+            "all_rejection_signals": dict(all_rejections.most_common(12)),
+            "manual_review_signals": dict(review_counts),
+            "manual_review_candidates": review_candidates[:50],
         }
     print(f"[eligibility] {eligibility}", flush=True)
 
