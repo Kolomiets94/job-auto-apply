@@ -6,8 +6,53 @@
 (() => {
   const context = document.modelContext;
   const status = document.getElementById("webmcp-status");
+  const toolNames = [
+    "get_candidate_profile",
+    "list_application_tasks",
+    "prepare_application_brief"
+  ];
+
+  // A visible diagnostic panel helps verify the integration without DevTools.
+  let panel = document.getElementById("webmcp-diagnostics");
+  if (!panel && status) {
+    panel = document.createElement("section");
+    panel.id = "webmcp-diagnostics";
+    panel.style.cssText = "margin-top:12px;padding:14px;border:1px solid #d9e1ef;border-radius:10px;background:#f8faff;color:#182033";
+    const heading = document.createElement("strong");
+    heading.textContent = "Проверка WebMCP";
+    const details = document.createElement("p");
+    details.id = "webmcp-diagnostic-detail";
+    details.className = "muted";
+    details.style.marginBottom = "8px";
+    const list = document.createElement("ul");
+    list.id = "webmcp-tool-list";
+    list.style.cssText = "margin:8px 0 0;padding-left:20px;font-size:13px";
+    const help = document.createElement("details");
+    help.style.marginTop = "10px";
+    const summary = document.createElement("summary");
+    summary.textContent = "Как проверить на компьютере";
+    const instructions = document.createElement("p");
+    instructions.className = "muted";
+    instructions.textContent = "Откройте эту страницу в актуальном Chrome/Chrome Canary на компьютере. Если WebMCP API недоступен, откройте chrome://flags/#enable-webmcp-testing, включите WebMCP Testing (если такой флаг доступен), перезапустите браузер и обновите страницу. После этого статус должен сообщить об успешной регистрации трёх инструментов. На телефонах поддержка может отсутствовать.";
+    help.append(summary, instructions);
+    panel.append(heading, details, list, help);
+    status.insertAdjacentElement("afterend", panel);
+  }
+
+  const detail = panel?.querySelector("#webmcp-diagnostic-detail");
+  const list = panel?.querySelector("#webmcp-tool-list");
+  const setStatus = (message, state) => {
+    if (status) status.textContent = message;
+    if (detail) detail.textContent = message;
+    if (panel) {
+      panel.dataset.state = state;
+      panel.style.borderColor = state === "ready" ? "#16a34a" : state === "error" ? "#dc2626" : "#d9e1ef";
+    }
+  };
+
   if (!context || typeof context.registerTool !== "function") {
-    if (status) status.textContent = "WebMCP недоступен в этом браузере. Обычный интерфейс продолжает работать.";
+    setStatus("WebMCP недоступен в этом браузере. Обычный интерфейс продолжает работать.", "unavailable");
+    if (list) list.textContent = "Инструменты пока не зарегистрированы в этом браузере.";
     return;
   }
 
@@ -89,17 +134,26 @@
     }
   ];
 
+  setStatus("WebMCP API обнаружен. Регистрирую 3 инструмента…", "pending");
+  if (list) {
+    list.replaceChildren(...toolNames.map(name => {
+      const item = document.createElement("li");
+      item.textContent = name;
+      return item;
+    }));
+  }
+
   const registration = Promise.all(tools.map(tool => context.registerTool(tool)));
-  // Let browser agents wait until asynchronous tool registration has settled.
   if (typeof context.waitForToolsUntil === "function") {
     context.waitForToolsUntil(registration);
   }
   registration.then(() => {
-      if (status) status.textContent = "WebMCP активен: зарегистрировано 3 инструмента.";
+      setStatus("WebMCP: вызовы регистрации 3 инструментов завершились успешно. Для проверки обнаружения откройте список инструментов браузерного агента.", "ready");
       document.documentElement.dataset.webmcp = "ready";
     })
     .catch(error => {
-      if (status) status.textContent = "Не удалось зарегистрировать WebMCP-инструменты: " + String(error);
+      setStatus("Ошибка регистрации WebMCP: " + String(error), "error");
+      if (list) list.textContent = "Не удалось зарегистрировать инструменты.";
       console.error("WebMCP registration failed", error);
     });
 })();
