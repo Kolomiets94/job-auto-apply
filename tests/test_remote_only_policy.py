@@ -1,4 +1,4 @@
-"""Regression tests for the candidate's remote-only work-mode policy."""
+"""Regression tests for the candidate's work-mode policy."""
 import unittest
 
 from profit_ranker import _location_rejected, _work_format_rejection
@@ -12,15 +12,17 @@ class RemoteOnlyPolicyTests(unittest.TestCase):
             "work_mode": "remote",
         }))
 
-    def test_hybrid_is_rejected_even_in_yekaterinburg(self):
+    def test_hybrid_is_allowed_in_yekaterinburg_only(self):
+        self.assertIsNone(_work_format_rejection({
+            "source": "hh", "title": "Junior React Developer",
+            "location": "Екатеринбург", "work_mode": "hybrid",
+        }))
         self.assertEqual(
             _work_format_rejection({
-                "source": "hh",
-                "title": "Junior React Developer",
-                "location": "Екатеринбург",
-                "work_mode": "hybrid",
+                "source": "hh", "title": "Junior React Developer",
+                "location": "Москва", "work_mode": "hybrid",
             }),
-            "hybrid roles are excluded; fully remote is required",
+            "hybrid is allowed only in Yekaterinburg",
         )
 
     def test_office_and_unconfirmed_modes_are_rejected(self):
