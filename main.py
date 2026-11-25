@@ -22,14 +22,7 @@ QUERIES=[
     ("layout","junior HTML"),
 ]
 
-HYBRID_QUERIES=[
-    ("frontend","junior frontend"),
-    ("frontend","junior React"),
-    ("frontend","React TypeScript"),
-    ("frontend","junior JavaScript"),
-    ("layout","junior верстальщик"),
-    ("layout","junior HTML CSS"),
-]
+HYBRID_QUERIES=[]
 EXCLUDE=("full stack","fullstack","full-stack","vue","angular","react native","react-native","flutter","middle","senior","lead","head of","manager","director")
 UA={"User-Agent":"Mozilla/5.0 (compatible; JobFreelanceHunter/1.2; vacancy-feed)"}
 
