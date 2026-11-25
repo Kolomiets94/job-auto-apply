@@ -27,15 +27,19 @@
     const list = document.createElement("ul");
     list.id = "webmcp-tool-list";
     list.style.cssText = "margin:8px 0 0;padding-left:20px;font-size:13px";
+    const security = document.createElement("p");
+    security.className = "muted";
+    security.style.cssText = "margin:10px 0 0;padding:10px;border-radius:8px;background:#fff6df;color:#654b00";
+    security.textContent = "Важно: API прототипа /api/profile и /api/tasks сейчас доступны без авторизации. Профиль содержит контактные данные. Не добавляйте сюда секреты и не используйте публичный сервис для чувствительных данных до внедрения авторизации.";
     const help = document.createElement("details");
     help.style.marginTop = "10px";
     const summary = document.createElement("summary");
     summary.textContent = "Как проверить на компьютере";
     const instructions = document.createElement("p");
     instructions.className = "muted";
-    instructions.textContent = "Откройте эту страницу в актуальном Chrome/Chrome Canary на компьютере. Если WebMCP API недоступен, откройте chrome://flags/#enable-webmcp-testing, включите WebMCP Testing (если такой флаг доступен), перезапустите браузер и обновите страницу. После этого статус должен сообщить об успешной регистрации трёх инструментов. На телефонах поддержка может отсутствовать.";
+    instructions.textContent = "Откройте эту страницу в актуальном Chrome/Chrome Canary на компьютере. Если WebMCP API недоступен, откройте chrome://flags/#enable-webmcp-testing, включите WebMCP Testing (если такой флаг доступен), перезапустите браузер и обновите страницу. После регистрации проверьте список инструментов браузерного агента отдельно. На телефонах поддержка может отсутствовать.";
     help.append(summary, instructions);
-    panel.append(heading, details, list, help);
+    panel.append(heading, details, list, security, help);
     status.insertAdjacentElement("afterend", panel);
   }
 
@@ -46,7 +50,7 @@
     if (detail) detail.textContent = message;
     if (panel) {
       panel.dataset.state = state;
-      panel.style.borderColor = state === "ready" ? "#16a34a" : state === "error" ? "#dc2626" : "#d9e1ef";
+      panel.style.borderColor = state === "ready" ? "#16a34a" : state === "error" ? "#dc2626" : state === "warning" ? "#d97706" : "#d9e1ef";
     }
   };
 
@@ -144,16 +148,40 @@
   }
 
   const registration = Promise.all(tools.map(tool => context.registerTool(tool)));
+  // This method is part of the WebMCP API: consumers should wait for async registration.
   if (typeof context.waitForToolsUntil === "function") {
     context.waitForToolsUntil(registration);
   }
-  registration.then(() => {
-      setStatus("WebMCP: вызовы регистрации 3 инструментов завершились успешно. Для проверки обнаружения откройте список инструментов браузерного агента.", "ready");
-      document.documentElement.dataset.webmcp = "ready";
+
+  registration.then(async () => {
+      document.documentElement.dataset.webmcp = "registered";
+
+      // getTools() verifies this document's registered tool list, not external-agent discovery.
+      if (typeof context.getTools !== "function") {
+        setStatus("Вызовы регистрации всех 3 инструментов завершились. getTools() недоступен; обнаружение агентом нужно проверить отдельно.", "warning");
+        return;
+      }
+
+      try {
+        const registeredTools = await context.getTools();
+        const registeredNames = new Set(registeredTools.map(tool => tool.name));
+        const missing = toolNames.filter(name => !registeredNames.has(name));
+        if (missing.length) {
+          setStatus("Регистрация вызвана, но getTools() не подтвердил инструменты: " + missing.join(", "), "error");
+          if (list) list.textContent = "Не подтверждены: " + missing.join(", ");
+          document.documentElement.dataset.webmcp = "error";
+          return;
+        }
+        setStatus("Регистрация успешна: getTools() подтвердил все 3 инструмента в этой странице. Обнаружение внешним браузерным агентом проверяется отдельно.", "ready");
+      } catch (error) {
+        setStatus("Вызовы регистрации завершились, но проверка getTools() не удалась: " + String(error), "warning");
+        document.documentElement.dataset.webmcp = "registered-unverified";
+      }
     })
     .catch(error => {
       setStatus("Ошибка регистрации WebMCP: " + String(error), "error");
       if (list) list.textContent = "Не удалось зарегистрировать инструменты.";
+      document.documentElement.dataset.webmcp = "error";
       console.error("WebMCP registration failed", error);
     });
 })();
