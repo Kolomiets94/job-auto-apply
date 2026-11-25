@@ -89,8 +89,12 @@
     }
   ];
 
-  Promise.all(tools.map(tool => context.registerTool(tool)))
-    .then(() => {
+  const registration = Promise.all(tools.map(tool => context.registerTool(tool)));
+  // Let browser agents wait until asynchronous tool registration has settled.
+  if (typeof context.waitForToolsUntil === "function") {
+    context.waitForToolsUntil(registration);
+  }
+  registration.then(() => {
       if (status) status.textContent = "WebMCP активен: зарегистрировано 3 инструмента.";
       document.documentElement.dataset.webmcp = "ready";
     })
