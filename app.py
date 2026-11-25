@@ -527,7 +527,7 @@ def openai_health():
     result = _ask(
         "This is a connectivity test. Reply with exactly the two letters OK.",
         {"test": "connection"},
-        max_output_tokens=10,
+        max_output_tokens=32,
     )
     if result != "OK":
         response = jsonify({"openai": "request_failed", "model": model})
@@ -551,7 +551,7 @@ def _run_startup_openai_diagnostic():
         result = _ask(
             "This is a connectivity test. Reply with exactly the two letters OK.",
             {"test": "connection"},
-            max_output_tokens=10,
+            max_output_tokens=32,
         )
         if result == "OK":
             print("[openai-diagnostic] ok model=%s" % model, flush=True)
