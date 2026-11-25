@@ -129,7 +129,6 @@ def _location_rejected(lead: Dict[str, Any], text: str) -> bool:
             return True
 
         if any(term in eligibility_text for term in (
-            "work authorization", "work authorisation",
             "visa sponsorship is not available", "no visa sponsorship",
         )):
             return True
@@ -266,7 +265,7 @@ def _work_format_rejection(lead: Dict[str, Any]) -> str | None:
     if mode == "remote":
         return None
     if mode == "hybrid":
-        return None if _is_yekaterinburg(lead) else "hybrid is allowed only in Yekaterinburg"
+        return "hybrid roles are excluded; fully remote is required"
     if mode == "office":
         return "office/on-site roles are excluded"
     return "remote work format is not confirmed"
