@@ -398,13 +398,27 @@ def run():
                 review_counts["Junior-сигнал не подтверждён — ручная проверка"] += 1
 
             all_rejections.update(reasons)
-            if len(reasons - {first_reason}) or "Junior signal not confirmed" in reasons:
+            hard_rejections = {
+                "salary below configured floor",
+                "office/on-site roles are excluded",
+                "hybrid is allowed only in Yekaterinburg",
+                "explicit location/work-authorization restriction",
+                "mandatory nonlocal relocation",
+                "remote work format is not confirmed",
+                "known stale vacancy (2023)",
+                "excluded job title",
+                "non-target QA role",
+            }
+            if (
+                first_reason not in hard_rejections
+                and (len(reasons - {first_reason}) or "Junior signal not confirmed" in reasons)
+            ):
                 review_candidates.append({
                     "title": lead.get("title"),
                     "source": lead.get("source"),
                     "url": lead.get("url"),
                     "first_rejection": first_reason,
-                    "review_reasons": sorted(reasons - {first_reason}),
+                    "review_reasons": sorted(reasons),
                 })
 
         eligibility[role] = {
