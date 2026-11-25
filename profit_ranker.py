@@ -276,6 +276,9 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     title = str(lead.get("title") or "").lower()
     # Relevant frontend/web internships and trainee roles are valid entry-level targets.
     # Compensation and the same location/stack filters still apply below.
+    if is_placement(title) and not placement_is_paid({**lead, "title": title}):
+        return {**lead, "profit_score": 0, "eligible": False,
+                "rank_reason": "internship/trainee compensation not confirmed"}
     if re.search(r"\bqa\b|tester|тестиров|quality assurance|автотест", title, re.I):
         return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "non-target QA role"}
     # Exclude non-Junior roles by title, not incidental descriptions.
