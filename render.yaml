@@ -13,15 +13,15 @@ services:
       - key: PYTHONUNBUFFERED
         value: "1"
       - key: DRY_RUN
-        value: "0"
-      - key: ALLOW_SCHEDULED_LIVE_APPLY
         value: "1"
+      - key: ALLOW_SCHEDULED_LIVE_APPLY
+        value: "0"
       - key: DAILY_TOTAL_LIMIT
         value: "10"
       - key: APPLICATION_TIMEZONE
         value: Asia/Yekaterinburg
       - key: AUTO_BROWSER_APPLY
-        value: "1"
+        value: "0"
       - key: AUTO_SEND_EMAIL
         value: "0"
       - key: AUTO_FREELANCE_APPLY
