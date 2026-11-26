@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, request
 import hmac
 import os
+import re
 import threading
 from datetime import datetime, timezone
 from main import collect
@@ -129,6 +130,37 @@ def queue():
     if not _authorized():
         return jsonify({"error": "unauthorized"}), 401
     return jsonify({"items":list_queue()})
+
+
+@app.get("/health/scheduled-queue")
+def scheduled_queue_health():
+    """Authenticated, read-only scheduler diagnostics; never expose task payloads or worker IDs."""
+    if not _authorized():
+        return jsonify({"error": "unauthorized"}), 401
+    enabled = os.getenv("HUNTER_SCHEDULED_QUEUE_ENABLED", "").strip().lower() in ("1", "true", "yes")
+    if not enabled:
+        return jsonify({
+            "queue_enabled": False,
+            "mode": "legacy",
+            "message": "Durable scheduled queue is disabled; no queue tasks are expected.",
+        })
+    try:
+        from scheduled_tasks import scheduled_task_summary
+        summary = scheduled_task_summary(limit=10)
+        for task in summary["recent_tasks"]:
+            error = str(task.pop("last_error", "") or "")
+            if error:
+                error = re.sub(r"(?i)\bBearer\s+\S+", "Bearer [redacted]", error)
+                error = re.sub(
+                    r"(?i)\b(password|secret|token|api[_-]?key|authorization)\b\s*[:=]\s*([^\s,;]+)",
+                    r"\1=[redacted]", error,
+                )
+                error = re.sub(r"https?://\S+", "[url]", error)
+            task["last_error"] = error[:160] if error else None
+        return jsonify({"queue_enabled": True, **summary})
+    except Exception:
+        app.logger.warning("Scheduled queue diagnostics unavailable", exc_info=True)
+        return jsonify({"queue_enabled": True, "status": "unavailable"}), 503
 
 @app.get("/outreach")
 def outreach():
