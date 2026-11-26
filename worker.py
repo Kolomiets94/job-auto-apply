@@ -13,7 +13,7 @@ from freelance_sources import (
 )
 from freelancehunt_adapter import collect_freelancehunt
 from job_matcher import JobMatcher
-from ats_evaluator import review_lead, build_market_report, build_filter_report
+from ats_evaluator import review_lead, build_market_report, build_filter_report, build_manual_review_report
 from ats_conditions import assess_job_conditions
 from profit_ranker import rank_leads, rank_lead, FREELANCE_SOURCES, ROLE_PRIORITY, _role_category, _work_mode
 from proposal_writer import make_proposal
@@ -973,7 +973,8 @@ def run(force_dry_run=False):
     summary_message = (
         "Job Auto Apply — сводка\n"
         f"Найдено объявлений: {stats['found']}\n"
-        f"Подходящих после фильтров: {stats['ranked']}\n"
+        f"Подходящих вакансий: {stats['job_ranked']}\n"
+        f"Подходящих фриланс-проектов (резерв): {stats['freelance_ranked']}\n"
         f"Отправлено откликов: {stats['submitted']}\n"
         f"Подготовлено черновиков: {stats['drafted']}\n"
         f"Требуется ваше участие: {stats['needs_human'] + stats['needs_confirmation']}\n"
@@ -1014,6 +1015,7 @@ def run(force_dry_run=False):
     summary_message += "Черновики не отправлены."
     summary_message += "\n\n" + build_market_report(job_leads)
     summary_message += "\n\n" + build_filter_report(job_leads)
+    summary_message += "\n\n" + build_manual_review_report(job_leads)
     manual_review_items = build_manual_review_list(job_leads, limit=10)
     if manual_review_items:
         summary_message += "\n\nПОГРАНИЧНЫЕ ВАКАНСИИ — РУЧНАЯ ПРОВЕРКА (НЕ ОТКЛИКАТЬСЯ АВТОМАТИЧЕСКИ):"
