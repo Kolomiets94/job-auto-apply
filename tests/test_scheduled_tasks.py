@@ -73,3 +73,17 @@ def test_task_ids_are_validated(monkeypatch, tmp_path):
         tasks.enqueue_scheduled_task("")
     with pytest.raises(ValueError):
         tasks.enqueue_scheduled_task("x" * 201)
+
+
+def test_summary_reports_counts_and_recent_metadata_without_payload(monkeypatch, tmp_path):
+    _db_path(monkeypatch, tmp_path)
+    tasks.enqueue_scheduled_task("summary-1", {"private": "do-not-return"})
+    tasks.enqueue_scheduled_task("summary-2")
+    claimed = tasks.claim_scheduled_task(worker_id="private-worker-id")
+    assert claimed["id"] == "summary-1"
+    summary = tasks.scheduled_task_summary(limit=1)
+    assert summary["total"] == 2
+    assert summary["status_counts"] == {"pending": 1, "running": 1}
+    assert len(summary["recent_tasks"]) == 1
+    assert "payload" not in summary["recent_tasks"][0]
+    assert "worker_id" not in summary["recent_tasks"][0]
