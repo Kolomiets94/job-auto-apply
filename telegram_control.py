@@ -37,6 +37,7 @@ def _help_text():
     return (
         "Управление журналом Job Hunter\n"
         "/outreach — последние 10 обращений\n"
+        "/scheduled_queue — состояние очереди планировщика\n"
         "/set ID STATUS — изменить статус\n"
         "/set ID REJECTED REASON — отказ с категорией причины\n\n"
         "Статусы: " + ", ".join(OUTREACH_STATES) + "\n"
