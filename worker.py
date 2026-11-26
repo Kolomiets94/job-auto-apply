@@ -297,6 +297,8 @@ def build_job_source_diagnostics(candidates, enriched, assessed):
         "enrichment_errors": Counter(),
         "assessed_count": 0,
         "eligible_count": 0,
+        "manual_review_count": 0,
+        "manual_review_reasons": Counter(),
         "rejected_reasons": Counter(),
         "roles": Counter(),
     })
@@ -323,6 +325,9 @@ def build_job_source_diagnostics(candidates, enriched, assessed):
             item["eligible_count"] += 1
         else:
             item["rejected_reasons"][str(ranked.get("rank_reason") or "unknown")] += 1
+            if ranked.get("manual_review_required"):
+                item["manual_review_count"] += 1
+                item["manual_review_reasons"][str(ranked.get("manual_review_reason") or "unspecified")] += 1
 
     result = {}
     for source, item in sorted(by_source.items()):
@@ -333,6 +338,8 @@ def build_job_source_diagnostics(candidates, enriched, assessed):
             "enrichment_errors": dict(item["enrichment_errors"].most_common(5)),
             "assessed_count": item["assessed_count"],
             "eligible_count": item["eligible_count"],
+            "manual_review_count": item["manual_review_count"],
+            "manual_review_reasons": dict(item["manual_review_reasons"].most_common(5)),
             "rejected_reasons": dict(item["rejected_reasons"].most_common(8)),
             "roles": dict(item["roles"]),
         }
@@ -421,14 +428,20 @@ def run(force_dry_run=False):
     eligibility = {}
     for role in ("frontend", "layout", "qa"):
         relevant = [lead for lead in leads if not is_freelance(lead) and _role_category(lead) == role]
+        role_ranked = [rank_lead(lead) for lead in relevant]
         rejected = Counter(
             str(item.get("rank_reason") or "unknown")
-            for item in (rank_lead(lead) for lead in relevant)
-            if not item.get("eligible")
+            for item in role_ranked if not item.get("eligible")
+        )
+        manual_review = Counter(
+            str(item.get("manual_review_reason") or "unspecified")
+            for item in role_ranked if item.get("manual_review_required")
         )
         eligibility[role] = {
             "found": len(relevant),
             "eligible": sum(_role_category(lead) == role for lead in ranked_jobs),
+            "manual_review_count": sum(manual_review.values()),
+            "manual_review_reasons": dict(manual_review.most_common(5)),
             "rejected_reasons": dict(rejected.most_common(8)),
         }
     print(f"[eligibility] {eligibility}", flush=True)
