@@ -346,26 +346,6 @@ def build_job_source_diagnostics(candidates, enriched, assessed):
     return result
 
 
-def build_manual_review_list(assessed, limit=10):
-    """Return bounded, linkable borderline vacancies; never make them eligible."""
-    items = []
-    for lead in assessed:
-        ranked = rank_lead(lead)
-        if not ranked.get("manual_review_required"):
-            continue
-        url = str(lead.get("url") or "").strip()
-        if not url:
-            continue
-        items.append({
-            "title": str(lead.get("title") or "Вакансия")[:100],
-            "source": str(lead.get("source") or "?")[:40],
-            "url": url,
-            "reason": str(ranked.get("manual_review_reason") or ranked.get("rank_reason") or "Требуется проверка")[:120],
-            "ats_score": lead.get("ats_score"),
-        })
-    return items[:max(0, int(limit))]
-
-
 def run(force_dry_run=False):
     from aggregator_origin import reset_origin_diagnostics, origin_diagnostics
     from entry_level import is_placement
@@ -1016,16 +996,6 @@ def run(force_dry_run=False):
     summary_message += "\n\n" + build_market_report(job_leads)
     summary_message += "\n\n" + build_filter_report(job_leads)
     summary_message += "\n\n" + build_manual_review_report(job_leads)
-    manual_review_items = build_manual_review_list(job_leads, limit=10)
-    if manual_review_items:
-        summary_message += "\n\nПОГРАНИЧНЫЕ ВАКАНСИИ — РУЧНАЯ ПРОВЕРКА (НЕ ОТКЛИКАТЬСЯ АВТОМАТИЧЕСКИ):"
-        for item in manual_review_items:
-            ats = f" — ATS {item['ats_score']}/100" if isinstance(item.get("ats_score"), (int, float)) else ""
-            summary_message += (
-                f"\n- {item['title']} [{item['source']}]{ats}"
-                f"\nПричина: {item['reason']}"
-                f"\n{item['url']}"
-            )
     summary_message += "\n\n" + build_outcome_feedback_report()
     if salary_review_jobs:
         summary_message += "\n\nРучная проверка зарплаты — отклики НЕ отправляются:"
