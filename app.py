@@ -272,16 +272,19 @@ def run_scheduled():
         slot = hour_utc
         run_id = ""
 
-    # Opt in only after a separately supervised worker is deployed with the same
-    # DATABASE_URL and DRY_RUN=1. The default path remains unchanged.
+    # Optional durable queue. On the free web-service plan, the web process
+    # consumes one task in a daemon thread; a later scheduled trigger can reclaim
+    # an expired lease if Render restarts or spins the service down.
     if os.getenv("HUNTER_SCHEDULED_QUEUE_ENABLED", "").strip().lower() in ("1", "true", "yes"):
         try:
             from scheduled_tasks import enqueue_scheduled_task
+            from scheduled_worker import start_one_task
             inserted = enqueue_scheduled_task(
                 slot, {"run_id": run_id, "event_name": claims.get("event_name", "schedule")}
             )
+            start_one_task(run_worker)
         except Exception:
-            app.logger.exception("Could not enqueue scheduled run")
+            app.logger.exception("Could not enqueue or start scheduled run")
             return jsonify({"error": "schedule_queue_unavailable"}), 503
         status = "queued" if inserted else "already_queued"
         print("[scheduled] persisted task", slot, status, flush=True)
