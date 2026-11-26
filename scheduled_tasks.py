@@ -159,3 +159,16 @@ def scheduled_task_status(task_id):
         ("id", "status", "attempts", "created_at", "updated_at", "lease_until", "last_error"),
         row,
     ))
+
+
+def renew_scheduled_task_lease(task_id, worker_id, lease_seconds=900):
+    """Extend a live lease; a worker that lost ownership cannot renew it."""
+    now = _now()
+    with _db() as connection:
+        result = connection.execute(
+            """UPDATE hunter_run_tasks SET updated_at=?,lease_until=?
+               WHERE id=? AND status='running' AND worker_id=?""",
+            (_iso(now), _iso(now + timedelta(seconds=max(30, int(lease_seconds)))),
+             task_id, worker_id),
+        )
+    return result.rowcount == 1
