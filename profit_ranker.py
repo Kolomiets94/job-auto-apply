@@ -280,6 +280,26 @@ def _work_format_rejection(lead: Dict[str, Any]) -> str | None:
     return "remote work format is not confirmed"
 
 
+
+def _manual_review_metadata(lead: Dict[str, Any], reason: str) -> Dict[str, Any]:
+    """Mark borderline role/level mismatches for review without making them eligible."""
+    title = str(lead.get("title") or "").lower()
+    details = " ".join(str(lead.get(k) or "") for k in ("description", "requirements", "experience")).lower()
+    target_in_title = any(term in title for term in TARGET_TITLE_TERMS)
+    target_in_details = any(term in details for term in TARGET_TITLE_TERMS)
+    borderline = (
+        (reason == "job title outside target roles" and target_in_details)
+        or (reason == "not Junior or 0-3 years" and target_in_title)
+        or (reason == "layout entry level not confirmed" and _role_category(lead) == "layout")
+    )
+    if not borderline:
+        return {}
+    return {
+        "manual_review_required": True,
+        "manual_review_reason": reason,
+        "eligible": False,
+    }
+
 def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     text = _text(lead)
     title = str(lead.get("title") or "").lower()
@@ -341,7 +361,7 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
         if any(x in title for x in NON_TARGET_TITLE_TERMS):
             return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "non-target job title"}
         if not any(x in title for x in TARGET_TITLE_TERMS):
-            return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "job title outside target roles"}
+            return {**lead, **_manual_review_metadata(lead, "job title outside target roles"), "profit_score": 0, "eligible": False, "rank_reason": "job title outside target roles"}
         experience = re.sub(r"\s*([–—-])\s*", r"\1", str(lead.get("experience") or "").lower())
         category_for_experience = _role_category(lead)
         if re.search(r"(?:от|from|at least|minimum|min\.?|не менее)\s*[3-9]\s*(?:год|года|лет|years?)", experience):
@@ -359,7 +379,7 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
                 "entry level", "entry-level",
             ))
             if not entry_signal:
-                return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "layout entry level not confirmed"}
+                return {**lead, **_manual_review_metadata(lead, "layout entry level not confirmed"), "profit_score": 0, "eligible": False, "rank_reason": "layout entry level not confirmed"}
         if category_for_experience != "layout":
             one_year = bool(re.search(r"(?:от|from|at least)\s*1\s*(?:год|года|year)|\b1\s*\+?\s*(?:год|года|year)", experience))
             zero_to_three = bool(re.search(r"\b[01]\s*[-–—]\s*3\s*(?:год|года|лет|years?)", experience))
@@ -372,7 +392,7 @@ def rank_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
                 or bool(re.search(r"\b(?:entry|entry-level|entry level)\b", experience))
             )
             if not entry_level_signal and not (one_year or zero_to_three or no_experience):
-                return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "not Junior or 0-3 years"}
+                return {**lead, **_manual_review_metadata(lead, "not Junior or 0-3 years"), "profit_score": 0, "eligible": False, "rank_reason": "not Junior or 0-3 years"}
             # A range ending at 3 years is acceptable; "from 3 years" is not.
             if re.search(r"(?<![\d–—-])\b[4-9]\s*(?:[-–—]\s*\d+\s*)?(?:год|года|лет|years?)", experience):
                 return {**lead, "profit_score": 0, "eligible": False, "rank_reason": "experience above 3 years"}
