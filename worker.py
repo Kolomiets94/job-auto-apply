@@ -251,6 +251,35 @@ def deliver_notifications(notifications):
     ]
 
 
+def _enrich_with_progress(leads, enrich_lead, stage="jobs", max_workers=3):
+    """Enrich a batch concurrently while logging bounded, privacy-safe progress."""
+    total = len(leads)
+    if not total:
+        print(f"[enrichment] {stage}: no candidates", flush=True)
+        return []
+
+    print(
+        f"[enrichment] {stage}: starting candidates={total} workers={max_workers}",
+        flush=True,
+    )
+    results = [None] * total
+    completed = 0
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = {
+            pool.submit(enrich_lead, lead): index
+            for index, lead in enumerate(leads)
+        }
+        for future in as_completed(futures):
+            results[futures[future]] = future.result()
+            completed += 1
+            if completed % 10 == 0 or completed == total:
+                print(
+                    f"[enrichment] {stage}: progress={completed}/{total}",
+                    flush=True,
+                )
+    print(f"[enrichment] {stage}: complete={total}", flush=True)
+    return results
+
 def _application_limit(name):
     """Zero or an unset limit means no application-count cap."""
     value = int(os.getenv(name, "0") or "0")
@@ -368,8 +397,9 @@ def run(force_dry_run=False):
     merged_jobs = {_lead_key(lead): lead for lead in queued if not is_freelance(lead)}
     merged_jobs.update({_lead_key(lead): lead for lead in fresh_jobs})
     job_candidates = [lead for lead in merged_jobs.values() if is_new_publication(lead)]
-    with ThreadPoolExecutor(max_workers=3) as pool:
-        enriched_jobs = list(pool.map(enrich_lead, job_candidates))
+    enriched_jobs = _enrich_with_progress(
+        job_candidates, enrich_lead, stage="jobs", max_workers=3
+    )
     enqueue_many(enriched_jobs)
     job_leads = apply_resume_matching([
         lead for lead in enriched_jobs
@@ -406,8 +436,9 @@ def run(force_dry_run=False):
             lead for lead in merged_freelance.values()
             if is_new_publication(lead)
         ]
-        with ThreadPoolExecutor(max_workers=3) as pool:
-            enriched_freelance = list(pool.map(enrich_lead, freelance_candidates))
+        enriched_freelance = _enrich_with_progress(
+            freelance_candidates, enrich_lead, stage="freelance", max_workers=3
+        )
         enqueue_many(enriched_freelance)
         freelance_leads = apply_resume_matching([
             lead for lead in enriched_freelance
