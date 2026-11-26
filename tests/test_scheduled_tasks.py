@@ -87,3 +87,9 @@ def test_summary_reports_counts_and_recent_metadata_without_payload(monkeypatch,
     assert len(summary["recent_tasks"]) == 1
     assert "payload" not in summary["recent_tasks"][0]
     assert "worker_id" not in summary["recent_tasks"][0]
+
+
+def test_summary_initializes_empty_queue(monkeypatch, tmp_path):
+    _db_path(monkeypatch, tmp_path)
+    summary = tasks.scheduled_task_summary()
+    assert summary == {"total": 0, "status_counts": {}, "recent_tasks": []}

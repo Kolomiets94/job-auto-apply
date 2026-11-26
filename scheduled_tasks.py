@@ -177,6 +177,8 @@ def renew_scheduled_task_lease(task_id, worker_id, lease_seconds=900):
 def scheduled_task_summary(limit=10):
     """Read-only aggregate and recent task metadata; never returns payloads or worker IDs."""
     limit = max(1, min(int(limit), 50))
+    # Diagnostics must also work before the first scheduled task is enqueued.
+    ensure_scheduled_task_table()
     with _db() as connection:
         counts = connection.execute(
             "SELECT status,COUNT(*) FROM hunter_run_tasks GROUP BY status"
