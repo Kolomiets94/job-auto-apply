@@ -172,3 +172,35 @@ def renew_scheduled_task_lease(task_id, worker_id, lease_seconds=900):
              task_id, worker_id),
         )
     return result.rowcount == 1
+
+
+def scheduled_task_summary(limit=10):
+    """Read-only aggregate and recent task metadata; never returns payloads or worker IDs."""
+    limit = max(1, min(int(limit), 50))
+    with _db() as connection:
+        counts = connection.execute(
+            "SELECT status,COUNT(*) FROM hunter_run_tasks GROUP BY status"
+        ).fetchall()
+        recent = connection.execute(
+            """SELECT id,status,attempts,created_at,updated_at,lease_until,last_error
+               FROM hunter_run_tasks ORDER BY created_at DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+    status_counts = {str(status): int(count) for status, count in counts}
+    tasks = [
+        {
+            "id": row[0],
+            "status": row[1],
+            "attempts": int(row[2]),
+            "created_at": row[3],
+            "updated_at": row[4],
+            "lease_until": row[5],
+            "last_error": row[6],
+        }
+        for row in recent
+    ]
+    return {
+        "total": sum(status_counts.values()),
+        "status_counts": status_counts,
+        "recent_tasks": tasks,
+    }
