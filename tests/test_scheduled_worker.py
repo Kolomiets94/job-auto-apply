@@ -30,3 +30,32 @@ def test_supervised_worker_fails_closed_without_dry_run(monkeypatch, tmp_path):
     status = scheduled_tasks.scheduled_task_status("unsafe-run")
     assert status["status"] == "pending"
     assert status["attempts"] == 1
+
+
+
+def test_free_tier_trigger_starts_one_task_in_background(monkeypatch):
+    calls = []
+
+    class ImmediateThread:
+        def __init__(self, target, name, daemon):
+            self.target = target
+            self.name = name
+            self.daemon = daemon
+
+        def start(self):
+            self.target()
+
+    monkeypatch.setattr(scheduled_worker.threading, "Thread", ImmediateThread)
+    monkeypatch.setattr(
+        scheduled_worker, "process_one",
+        lambda worker_id, run_worker: calls.append((worker_id, run_worker)),
+    )
+    run_callback = lambda: None
+
+    thread = scheduled_worker.start_one_task(run_callback)
+
+    assert thread.name == "hunter-queued-task"
+    assert thread.daemon is True
+    assert len(calls) == 1
+    assert calls[0][0]
+    assert calls[0][1] is run_callback
