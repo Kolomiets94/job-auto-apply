@@ -248,11 +248,7 @@ def run_hunter():
 
 @app.post("/run/scheduled")
 def run_scheduled():
-    """A fast, idempotent trigger for a free external HTTP scheduler.
-
-    The endpoint is intentionally draft-only until live sending, persistent
-    storage, and the application channels have been reviewed together.
-    """
+    """Persist an authenticated draft-only trigger before acknowledging it."""
     claims = _scheduler_claims()
     if not claims:
         return jsonify({"error": "unauthorized"}), 401
@@ -271,52 +267,25 @@ def run_scheduled():
     else:
         slot = hour_utc
         run_id = ""
+
     try:
-        from queue_store import _db
-        with _db() as connection:
-            connection.execute(
-                "CREATE TABLE IF NOT EXISTS hunter_scheduled_runs "
-                "(id TEXT PRIMARY KEY, started_at TEXT NOT NULL, "
-                "completed_at TEXT, outcome TEXT)"
-            )
-            claim = connection.execute(
-                "INSERT INTO hunter_scheduled_runs (id, started_at) "
-                "VALUES (?, ?) ON CONFLICT (id) DO NOTHING",
-                (slot, datetime.now(timezone.utc).isoformat()),
-            )
-            claimed = claim.rowcount == 1
+        from scheduled_run_queue import enqueue_run, start_worker
+        created = enqueue_run(slot)
     except Exception:
-        app.logger.exception("Could not claim scheduled run")
+        app.logger.exception("Could not enqueue scheduled run")
         return jsonify({"error": "schedule_store_unavailable"}), 503
-    if not claimed:
+    if not created:
         return jsonify({"status": "already_started", "hour_utc": slot}), 200
 
-    def work():
-        outcome = "failed"
-        try:
-            report = run_worker()
-            stats = report.get("stats", {})
-            print("[scheduled] complete", {
-                key: stats.get(key) for key in
-                ("found", "ranked", "drafted", "submitted", "notifications_sent")
-            }, flush=True)
-            outcome = "completed"
-        except Exception:
-            app.logger.exception("Scheduled draft run failed")
-        finally:
-            try:
-                from queue_store import _db
-                with _db() as connection:
-                    connection.execute(
-                        "UPDATE hunter_scheduled_runs SET completed_at=?,outcome=? WHERE id=?",
-                        (datetime.now(timezone.utc).isoformat(), outcome, slot),
-                    )
-            except Exception:
-                app.logger.exception("Could not record scheduled run outcome")
+    try:
+        start_worker(run_worker)
+    except Exception:
+        app.logger.exception("Could not start durable scheduled worker")
+        # The task remains persisted and will be picked up after a service restart.
+        return jsonify({"status": "queued", "hour_utc": slot}), 202
 
-    threading.Thread(target=work, name="hunter-scheduled", daemon=True).start()
-    print("[scheduled] claimed", slot, flush=True)
-    response = {"status": "started", "hour_utc": hour_utc}
+    print("[scheduled] queued durable task", slot, flush=True)
+    response = {"status": "queued", "hour_utc": hour_utc}
     if run_id:
         response["run_id"] = run_id
     return jsonify(response), 202
@@ -458,3 +427,10 @@ def application_readiness():
         "freelancehunt_api_enabled": freelancehunt_configured,
         "database_configured": bool(os.getenv("DATABASE_URL", "").strip()),
     })
+
+# Recover queued or lease-expired draft tasks after a Gunicorn process starts.
+try:
+    from scheduled_run_queue import start_worker
+    start_worker(run_worker)
+except Exception:
+    app.logger.exception("Could not start durable scheduled worker at startup")
