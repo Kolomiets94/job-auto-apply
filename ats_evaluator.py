@@ -143,6 +143,63 @@ def build_market_report(leads):
     return "\n".join(lines)
 
 
+def build_manual_review_report(leads, limit=15):
+    """List borderline and strong-ATS employment vacancies rejected by the internal ranker."""
+    from profit_ranker import rank_lead
+
+    candidates = []
+    for lead in list(leads or []):
+        url = str(lead.get("url") or "").strip()
+        if not url:
+            continue
+        decision = rank_lead(lead)
+        if decision.get("eligible"):
+            continue
+        manual_review = bool(decision.get("manual_review_required"))
+        strong_ats = lead.get("ats_verdict") == "strong_match"
+        if not (manual_review or strong_ats):
+            continue
+        score = lead.get("ats_score")
+        reason = (
+            decision.get("manual_review_reason")
+            if manual_review else decision.get("rank_reason")
+        ) or decision.get("rank_reason") or "Причина не указана"
+        candidates.append({
+            "title": str(lead.get("title") or "Вакансия")[:100],
+            "source": str(lead.get("source") or "unknown")[:40],
+            "url": url,
+            "score": score if isinstance(score, (int, float)) else -1,
+            "manual_review": manual_review,
+            "reason": str(reason)[:180],
+        })
+
+    candidates.sort(key=lambda item: (item["score"], item["manual_review"]), reverse=True)
+    manual_count = sum(item["manual_review"] for item in candidates)
+    strong_count = sum(item["score"] >= 80 for item in candidates)
+    lines = [
+        "РУЧНАЯ ПРОВЕРКА: ПОГРАНИЧНЫЕ И СИЛЬНЫЕ ATS-ВАКАНСИИ",
+        f"Найдено кандидатов для просмотра: {len(candidates)} "
+        f"(пограничных: {manual_count}; ATS 80+: {strong_count}).",
+        "Все вакансии в списке остаются исключёнными из автоматических откликов.",
+    ]
+    if not candidates:
+        lines.append("В этой выборке таких вакансий нет.")
+        return "\n".join(lines)
+
+    shown = candidates[:max(0, int(limit))]
+    for number, item in enumerate(shown, 1):
+        score_label = f"{item['score']}/100" if item["score"] >= 0 else "н/д"
+        kind = "ручная проверка" if item["manual_review"] else "сильный ATS, отказ ранкера"
+        lines.extend([
+            f"{number}. {item['title']} [{item['source']}] — ATS {score_label}; {kind}.",
+            f"   Причина: {item['reason']}",
+            f"   {item['url']}",
+        ])
+    if len(candidates) > len(shown):
+        lines.append(f"Показаны первые {len(shown)} из {len(candidates)}.")
+    return "\n".join(lines)
+
+
 ROLE_TERMS = ("frontend", "front-end", "front end", "react", "фронтенд", "фронтэнд", "веб-разработчик")
 JUNIOR_TERMS = ("junior", "entry-level", "entry level", "intern", "trainee", "без опыта", "начинающ")
 
