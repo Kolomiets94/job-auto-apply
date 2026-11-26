@@ -64,3 +64,57 @@ def test_telegram_webhook_requires_secret(monkeypatch):
         "X-Telegram-Bot-Api-Secret-Token": "wrong",
     })
     assert response.status_code == 401
+
+
+def test_telegram_scheduled_queue_command_reports_disabled_mode(monkeypatch):
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "12345")
+    monkeypatch.delenv("HUNTER_SCHEDULED_QUEUE_ENABLED", raising=False)
+    sent = []
+    monkeypatch.setattr(telegram_control, "_reply", sent.append)
+
+    result = telegram_control.handle_update(_update("12345", "/scheduled_queue"))
+
+    assert result == {"status": "replied", "command": "scheduled_queue"}
+    assert "выключена" in sent[0]
+    assert "legacy" in sent[0]
+
+
+def test_telegram_scheduled_queue_command_reports_safe_summary(monkeypatch):
+    import scheduled_tasks
+
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "12345")
+    monkeypatch.setenv("HUNTER_SCHEDULED_QUEUE_ENABLED", "1")
+    monkeypatch.setattr(
+        scheduled_tasks,
+        "scheduled_task_summary",
+        lambda limit: {
+            "total": 3,
+            "status_counts": {"pending": 2, "failed": 1},
+            "recent_tasks": [
+                {"id": "scheduled-run-123456", "status": "pending", "attempts": 0,
+                 "payload": {"private": "must-not-leak"}, "worker_id": "internal-worker"},
+            ],
+        },
+    )
+    sent = []
+    monkeypatch.setattr(telegram_control, "_reply", sent.append)
+
+    telegram_control.handle_update(_update("12345", "/scheduled_queue"))
+
+    assert "Всего задач: 3" in sent[0]
+    assert "pending=2" in sent[0]
+    assert "failed=1" in sent[0]
+    assert "scheduled-ru" in sent[0]
+    assert "must-not-leak" not in sent[0]
+    assert "internal-worker" not in sent[0]
+
+
+def test_telegram_scheduled_queue_command_is_restricted_to_configured_chat(monkeypatch):
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "12345")
+    sent = []
+    monkeypatch.setattr(telegram_control, "_reply", sent.append)
+
+    result = telegram_control.handle_update(_update("99999", "/scheduled_queue"))
+
+    assert result["status"] == "ignored"
+    assert sent == []
