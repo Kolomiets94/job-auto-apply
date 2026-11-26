@@ -4,6 +4,7 @@ import sqlite3
 
 import app as service
 import queue_store
+import scheduled_run_queue
 
 
 def _claims(event_name="schedule", run_id="12345", run_attempt="1"):
@@ -18,13 +19,7 @@ def test_scheduled_trigger_is_authenticated_draft_only_and_idempotent(monkeypatc
     monkeypatch.setattr(queue_store, "_db", lambda: sqlite3.connect(path))
     runs = []
 
-    class ImmediateThread:
-        def __init__(self, target, **kwargs):
-            self.target = target
-        def start(self):
-            self.target()
-
-    monkeypatch.setattr(service.threading, "Thread", ImmediateThread)
+    monkeypatch.setattr(scheduled_run_queue, "start_worker", lambda run_worker: True)
     monkeypatch.setattr(service, "run_worker", lambda: runs.append(True) or {"stats": {}})
     client = service.app.test_client()
     monkeypatch.setattr(service, "_scheduler_claims", lambda: None)
@@ -32,7 +27,12 @@ def test_scheduled_trigger_is_authenticated_draft_only_and_idempotent(monkeypatc
     monkeypatch.setattr(service, "_scheduler_claims", lambda: _claims())
     assert client.post("/run/scheduled").status_code == 202
     assert client.post("/run/scheduled").json["status"] == "already_started"
-    assert runs == [True]
+    assert runs == []
+    with sqlite3.connect(path) as connection:
+        row = connection.execute(
+            "SELECT status, attempts FROM hunter_scheduled_runs"
+        ).fetchone()
+    assert row == ("queued", 0)
     monkeypatch.setenv("DRY_RUN", "0")
     assert client.post("/run/scheduled").status_code == 409
     assert runs == [True]
@@ -46,13 +46,7 @@ def test_manual_dispatch_runs_are_unique_within_same_hour(monkeypatch, tmp_path)
     monkeypatch.setattr(queue_store, "_db", lambda: sqlite3.connect(path))
     runs = []
 
-    class ImmediateThread:
-        def __init__(self, target, **kwargs):
-            self.target = target
-        def start(self):
-            self.target()
-
-    monkeypatch.setattr(service.threading, "Thread", ImmediateThread)
+    monkeypatch.setattr(scheduled_run_queue, "start_worker", lambda run_worker: True)
     monkeypatch.setattr(service, "run_worker", lambda: runs.append(True) or {"stats": {}})
     client = service.app.test_client()
     first = client.post("/run/scheduled")
@@ -63,7 +57,12 @@ def test_manual_dispatch_runs_are_unique_within_same_hour(monkeypatch, tmp_path)
     second = client.post("/run/scheduled")
     assert second.status_code == 202
     assert second.json["run_id"] == "9002"
-    assert runs == [True, True]
+    assert runs == []
+    with sqlite3.connect(path) as connection:
+        rows = connection.execute(
+            "SELECT id, status FROM hunter_scheduled_runs ORDER BY id"
+        ).fetchall()
+    assert rows == [("manual:9001:1", "queued"), ("manual:9002:1", "queued")]
 
 
 def test_manual_dispatch_requires_verified_run_identity(monkeypatch):
