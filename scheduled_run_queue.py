@@ -138,7 +138,7 @@ def process_run(run_id, run_worker):
     heartbeat_thread.start()
     outcome = "failed"
     try:
-        report = run_worker()
+        report = run_worker(force_dry_run=True)
         stats = report.get("stats", {})
         print(
             "[scheduled] complete",
