@@ -78,8 +78,8 @@ def claim_scheduled_task(worker_id=None, lease_seconds=900):
                            (status='running' AND lease_until IS NOT NULL AND lease_until <= ?)
                        )
                        ORDER BY created_at ASC
-                       FOR UPDATE SKIP LOCKED
                        LIMIT 1
+                       FOR UPDATE SKIP LOCKED
                    )
                    UPDATE hunter_run_tasks
                    SET status='running', attempts=attempts+1, updated_at=?,
