@@ -42,8 +42,16 @@ def test_process_run_persists_success_and_failure(monkeypatch, tmp_path):
     assert scheduled_run_queue.claim_next_run() == "success"
     assert scheduled_run_queue.claim_next_run() == "failure"
 
-    scheduled_run_queue.process_run("success", lambda **kwargs: {"stats": {"found": 3}})
-    scheduled_run_queue.process_run("failure", lambda **kwargs: (_ for _ in ()).throw(RuntimeError("boom")))
+    success_calls = []
+    scheduled_run_queue.process_run(
+        "success",
+        lambda **kwargs: success_calls.append(kwargs) or {"stats": {"found": 3}},
+    )
+    scheduled_run_queue.process_run(
+        "failure",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+    assert success_calls == [{"force_dry_run": True}]
 
     with sqlite3.connect(path) as connection:
         rows = dict(connection.execute(
