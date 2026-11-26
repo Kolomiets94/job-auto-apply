@@ -104,7 +104,7 @@ def test_telegram_scheduled_queue_command_reports_safe_summary(monkeypatch):
     assert "Всего задач: 3" in sent[0]
     assert "pending=2" in sent[0]
     assert "failed=1" in sent[0]
-    assert "scheduled-run" in sent[0]
+    assert "scheduled-ru" in sent[0]
     assert "must-not-leak" not in sent[0]
     assert "internal-worker" not in sent[0]
 
