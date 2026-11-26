@@ -21,9 +21,9 @@ LEASE_SECONDS = max(60, int(os.getenv("HUNTER_TASK_LEASE_SECONDS", "900")))
 STOP = threading.Event()
 
 
-def _heartbeat(task_id, worker_id, lost_lease):
+def _heartbeat(task_id, worker_id, lost_lease, heartbeat_stop):
     interval = max(10, LEASE_SECONDS // 3)
-    while not STOP.wait(interval):
+    while not heartbeat_stop.wait(interval):
         try:
             if not renew_scheduled_task_lease(task_id, worker_id, LEASE_SECONDS):
                 lost_lease.set()
@@ -40,8 +40,10 @@ def process_one(worker_id, run_worker):
         return False
 
     lost_lease = threading.Event()
+    heartbeat_stop = threading.Event()
     heartbeat = threading.Thread(
-        target=_heartbeat, args=(task["id"], worker_id, lost_lease), daemon=True
+        target=_heartbeat,
+        args=(task["id"], worker_id, lost_lease, heartbeat_stop), daemon=True
     )
     heartbeat.start()
     try:
@@ -56,9 +58,8 @@ def process_one(worker_id, run_worker):
             fail_scheduled_task(task["id"], worker_id, exc)
         raise
     finally:
-        STOP.set()
+        heartbeat_stop.set()
         heartbeat.join(timeout=2)
-        STOP.clear()
     return True
 
 
