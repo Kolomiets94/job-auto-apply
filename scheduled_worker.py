@@ -1,6 +1,6 @@
 """Supervised polling process for persistent scheduled hunter runs.
 
-Run as a separate Render Background Worker, not inside Gunicorn.
+Can run separately, or consume one task inside the free web process.
 """
 import os
 import signal
@@ -61,6 +61,23 @@ def process_one(worker_id, run_worker):
         heartbeat_stop.set()
         heartbeat.join(timeout=2)
     return True
+
+
+def start_one_task(run_worker):
+    """Kick one queued task from the existing web process (free-tier mode)."""
+    worker_id = os.getenv("HUNTER_WORKER_ID") or (
+        f"{socket.gethostname()}:{uuid.uuid4().hex[:12]}"
+    )
+
+    def _run():
+        try:
+            process_one(worker_id, run_worker)
+        except Exception:
+            print("[scheduled-worker] queued task failed; a later trigger may retry", flush=True)
+
+    thread = threading.Thread(target=_run, name="hunter-queued-task", daemon=True)
+    thread.start()
+    return thread
 
 
 def main():
