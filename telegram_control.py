@@ -61,6 +61,39 @@ def _outreach_text():
     return "\\n".join(lines)
 
 
+def _scheduled_queue_text():
+    enabled = os.getenv("HUNTER_SCHEDULED_QUEUE_ENABLED", "").strip().lower() in ("1", "true", "yes")
+    if not enabled:
+        return "Очередь планировщика выключена. Сейчас используется legacy-режим."
+    try:
+        from scheduled_tasks import scheduled_task_summary
+        summary = scheduled_task_summary(limit=5)
+    except Exception:
+        return "Не удалось прочитать очередь планировщика. Подробности доступны в логах сервиса."
+    counts = summary.get("status_counts") or {}
+    lines = [
+        "Очередь планировщика: включена",
+        "Всего задач: " + str(int(summary.get("total", 0))),
+    ]
+    if counts:
+        lines.append("Статусы: " + ", ".join(
+            f"{str(status)[:24]}={int(count)}"
+            for status, count in sorted(counts.items())
+        ))
+    else:
+        lines.append("Задач пока нет.")
+    recent = summary.get("recent_tasks") or []
+    if recent:
+        lines.append("Последние задачи:")
+        for task in recent[:5]:
+            lines.append(
+                f"{str(task.get('id') or '')[:12]} · "
+                f"{str(task.get('status') or 'UNKNOWN')[:16]} · "
+                f"попыток: {int(task.get('attempts', 0))}"
+            )
+    return "\n".join(lines)
+
+
 def handle_update(update):
     """Process a Telegram webhook update from the configured chat only."""
     configured_chat = os.getenv("TELEGRAM_CHAT_ID", "").strip() or os.getenv("CHAT_ID", "").strip()
@@ -84,6 +117,9 @@ def handle_update(update):
     if command == "/outreach":
         _reply(_outreach_text())
         return {"status": "replied", "command": "outreach"}
+    if command in ("/scheduled_queue", "/queue_status"):
+        _reply(_scheduled_queue_text())
+        return {"status": "replied", "command": "scheduled_queue"}
     if command != "/set":
         _reply("Неизвестная команда. Используйте /help.")
         return {"status": "replied", "command": "unknown"}
