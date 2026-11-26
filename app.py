@@ -271,6 +271,25 @@ def run_scheduled():
     else:
         slot = hour_utc
         run_id = ""
+
+    # Opt in only after a separately supervised worker is deployed with the same
+    # DATABASE_URL and DRY_RUN=1. The default path remains unchanged.
+    if os.getenv("HUNTER_SCHEDULED_QUEUE_ENABLED", "").strip().lower() in ("1", "true", "yes"):
+        try:
+            from scheduled_tasks import enqueue_scheduled_task
+            inserted = enqueue_scheduled_task(
+                slot, {"run_id": run_id, "event_name": claims.get("event_name", "schedule")}
+            )
+        except Exception:
+            app.logger.exception("Could not enqueue scheduled run")
+            return jsonify({"error": "schedule_queue_unavailable"}), 503
+        status = "queued" if inserted else "already_queued"
+        print("[scheduled] persisted task", slot, status, flush=True)
+        response = {"status": status, "task_id": slot, "hour_utc": hour_utc}
+        if run_id:
+            response["run_id"] = run_id
+        return jsonify(response), 202 if inserted else 200
+
     try:
         from queue_store import _db
         with _db() as connection:
