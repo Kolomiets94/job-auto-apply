@@ -17,11 +17,11 @@ from proposal_writer import make_proposal
 )
 def test_generated_drafts_do_not_invent_quantified_impact(lead):
     draft = make_proposal(lead)
-    assert not re.search(r"\\b\\d+(?:[.,]\\d+)?\\s*%", draft)
+    assert not re.search(r"\b\d+(?:[.,]\d+)?\s*%", draft)
     assert not re.search(
         r"(?i)(?:increased revenue|reduced bugs|improved uptime|"
         r"снизил(?:а)? количество ошибок|увеличил(?:а)? выручку|"
-        r"повысил(?:а)? отказоустойчивость|ускорил(?:а)? на\\s*\\d)",
+        r"повысил(?:а)? отказоустойчивость|ускорил(?:а)? на\s*\d)",
         draft,
     )
 
