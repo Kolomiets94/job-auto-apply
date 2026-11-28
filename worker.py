@@ -25,6 +25,7 @@ from telegram_notifier import send_message, send_notification
 from publication_filter import is_new_publication
 from direct_outreach import build_outreach_drafts
 from resume_parser import extract_resume_text, ResumeParseError
+from stage_result import make_stage_result
 
 DEFAULT_RESUME_TEXT = ""  # Never invent skills or project history when no verified resume is configured.
 
@@ -848,6 +849,31 @@ def run(force_dry_run=False):
         1 for item in deliveries if item.get("status") == "SENT"
     )
     stats["dry_run"] = dry_run
+
+    # Privacy-safe stage summaries: counts and stable reason codes only.
+    from collections import Counter
+    import re
+    def _stage_reason_code(value):
+        code = re.sub(r"[^a-z0-9_.-]+", "_", str(value or "").lower()).strip("_.-")
+        return (code or "unknown")[:80]
+
+    collection_reasons = Counter(_stage_reason_code(item.get("source")) for item in COLLECTION_ERRORS)
+    enrichment_reasons = Counter(_stage_reason_code(lead.get("enrichment_error")) for lead in enriched if lead.get("enrichment_error"))
+    unavailable_count = sum(bool(lead.get("unavailable")) for lead in enriched)
+    rejected_reasons = Counter()
+    for lead in leads:
+        ranked_item = rank_lead(lead)
+        if not ranked_item.get("eligible"):
+            rejected_reasons[_stage_reason_code(ranked_item.get("rank_reason"))] += 1
+    draft_outcomes = Counter(_stage_reason_code(item.get("status")) for item in results)
+    stage_results = [
+        make_stage_result("collect", 0, len(fresh), reason_counts=collection_reasons, error_count=len(COLLECTION_ERRORS)),
+        make_stage_result("enrich", len(candidates), len(enriched), reason_counts=enrichment_reasons, error_count=sum(1 for lead in enriched if lead.get("enrichment_error"))),
+        make_stage_result("assess", len(enriched), len(leads), reason_counts={"unavailable": unavailable_count} if unavailable_count else {}),
+        make_stage_result("rank", len(leads), len(ranked_jobs) + len(ranked_freelance), reason_counts=rejected_reasons),
+        make_stage_result("draft", len(ranked), stats["drafted"], reason_counts=draft_outcomes),
+    ]
+    stats["stage_results"] = [item.to_dict() for item in stage_results]
     stats["daily_total_limit"] = total_daily_limit
     stats["hourly_total_limit"] = total_hourly_limit
     stats["daily_application_limit"] = daily_limit
