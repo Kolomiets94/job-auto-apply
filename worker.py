@@ -376,6 +376,45 @@ def build_job_source_diagnostics(candidates, enriched, assessed):
     return result
 
 
+
+def build_rejection_reason_summary(eligibility, limit=6):
+    """Aggregate first-fired ranker rejection reasons for the concise Telegram report."""
+    from collections import Counter
+
+    reasons = Counter()
+    for role_data in (eligibility or {}).values():
+        reasons.update(role_data.get("rejected_reasons") or {})
+
+    labels = {
+        "excluded employer": "исключённый работодатель",
+        "non-target QA role": "QA — не целевая роль",
+        "excluded job title": "исключённая должность",
+        "hybrid is allowed only in Yekaterinburg": "гибрид не в Екатеринбурге",
+        "office work is excluded; fully remote only": "офисный формат",
+        "remote work format is not confirmed": "удалёнка не подтверждена",
+        "mandatory nonlocal relocation": "обязательный переезд",
+        "mandatory unsupported stack": "обязательный неподдерживаемый стек",
+        "SQL outside confirmed stack": "SQL вне подтверждённого стека",
+        "known stale vacancy (2023)": "устаревшая вакансия",
+        "explicit location/work-authorization restriction": "географические/визовые ограничения",
+        "non-target job title": "название не соответствует целевым ролям",
+        "job title outside target roles": "название вне целевых ролей",
+        "experience from 3 years": "требуется от 3 лет опыта",
+        "experience range above 3 years": "диапазон опыта выше 3 лет",
+        "three years required": "требуется 3 года опыта",
+        "experience above 3 years": "опыт выше 3 лет",
+        "layout entry level not confirmed": "уровень Junior для вёрстки не подтверждён",
+        "not Junior or 0-3 years": "не подтверждён уровень Junior / 0–3 года",
+        "freelance title outside demonstrated stack": "фриланс вне подтверждённого стека",
+        "freelance title requires unsupported technology": "фриланс требует неподдерживаемую технологию",
+        "freelance project too complex/out of scope": "слишком сложный фриланс-проект",
+        "salary outside configured range": "зарплата вне заданного диапазона",
+    }
+    return [
+        (labels.get(reason, reason), count)
+        for reason, count in reasons.most_common(max(0, int(limit)))
+    ]
+
 def run(force_dry_run=False):
     from aggregator_origin import reset_origin_diagnostics, origin_diagnostics
     from entry_level import is_placement
@@ -1019,6 +1058,15 @@ def run(force_dry_run=False):
         f"Ошибок: {stats['failed']}\n"
         "Вакансии — приоритет. Фриланс используется только если подходящих вакансий нет."
     )
+    rejection_summary = build_rejection_reason_summary(eligibility)
+    if rejection_summary:
+        summary_message += "\\n\\nПричины отказа (первые сработавшие фильтры):"
+        summary_message += "".join(
+            f"\\n- {reason}: {count}" for reason, count in rejection_summary
+        )
+    else:
+        summary_message += "\\n\\nПричины отказа: нет отклонённых вакансий по проверенным ролям."
+
     # Work-format visibility: compare all checked employment leads with those
     # surviving the ranker, and count drafts separately when DRY_RUN is active.
     from collections import Counter
