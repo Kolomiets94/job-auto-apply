@@ -25,6 +25,7 @@ from telegram_notifier import send_message, send_notification
 from publication_filter import is_new_publication
 from direct_outreach import build_outreach_drafts
 from resume_parser import extract_resume_text, ResumeParseError
+from pipeline_observability import build_pipeline_stage_results
 
 DEFAULT_RESUME_TEXT = ""  # Never invent skills or project history when no verified resume is configured.
 
@@ -247,8 +248,7 @@ def deliver_notifications(notifications):
     # Retain notification counts for diagnostics, but never send per-vacancy alerts.
     return [
         {"title": item.get("title"), "status": "SKIPPED", "reason": "summary_only_mode"}
-        for item in notifications
-    ]
+        for item in notifications    ]
 
 
 def _enrich_with_progress(leads, enrich_lead, stage="jobs", max_workers=3):
@@ -497,8 +497,7 @@ def run(force_dry_run=False):
     weekly_total_limit = _application_limit("WEEKLY_TOTAL_LIMIT")
     weekly_submitted_count = submitted_this_week()
     total_hourly_limit = _application_limit("HOURLY_TOTAL_LIMIT")
-    # Real submissions require a separate, explicit user approval.
-    # Until AUTO_APPLY_APPROVED=1 is configured, always remain in draft mode.
+    # Real submissions require a separate, explicit user approval.    # Until AUTO_APPLY_APPROVED=1 is configured, always remain in draft mode.
     dry_run = (force_dry_run
                or os.getenv("DRY_RUN", "0").strip().lower() in ("1", "true", "yes")
                or not live_applications_approved())
@@ -747,8 +746,7 @@ def run(force_dry_run=False):
         lead for lead in ranked_freelance
         if _application_priority(lead) == 0
     ]
-    stats["freelance_actionable"] = len(freelance_actionable)
-    stats["freelance_discovery_only"] = stats["freelance_ranked"] - len(freelance_actionable)
+    stats["freelance_actionable"] = len(freelance_actionable)    stats["freelance_discovery_only"] = stats["freelance_ranked"] - len(freelance_actionable)
     stats["freelancehunt_token_configured"] = bool(os.getenv("FREELANCEHUNT_TOKEN"))
     stats["smtp_configured"] = all(os.getenv(key) for key in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD"))
     stats["remote_job_identity_configured"] = (
@@ -997,8 +995,7 @@ def run(force_dry_run=False):
     # surviving the ranker, and count drafts separately when DRY_RUN is active.
     from collections import Counter
     format_labels = {
-        "remote": "удалёнка",
-        "hybrid": "гибрид",
+        "remote": "удалёнка",        "hybrid": "гибрид",
         "office": "офис",
         "unknown": "формат не указан",
     }
@@ -1054,6 +1051,20 @@ def run(force_dry_run=False):
         summary_message += "\n\nФриланс — резервный вариант:"
         for lead in freelance_review[:5]:
             summary_message += f"\n- {str(lead.get('title') or 'Заказ')[:90]} [{lead.get('source') or '?'}]\n{lead.get('url') or ''}"
+    pipeline_stages = build_pipeline_stage_results(
+        candidates, enriched, leads, ranked, results,
+        collection_errors=COLLECTION_ERRORS,
+    )
+    stats["pipeline_stages"] = pipeline_stages
+    summary_message += "\n\nЭтапы pipeline:"
+    for stage in pipeline_stages:
+        reasons = ", ".join(
+            f"{code}={count}" for code, count in stage["reason_counts"].items()
+        ) or "нет"
+        summary_message += (
+            f"\n- {stage['stage']}: {stage['status']} "
+            f"({stage['input_count']} → {stage['output_count']}); причины: {reasons}"
+        )
     try:
         summary_delivery = send_message(summary_message)
     except Exception as exc:
@@ -1076,4 +1087,3 @@ def run(force_dry_run=False):
 if __name__ == "__main__":
     import json
     print(json.dumps(run(), ensure_ascii=False, indent=2))
-
