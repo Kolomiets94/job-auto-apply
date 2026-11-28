@@ -10,6 +10,11 @@ from salary_policy import salary_decision
 HH_API="https://api.hh.ru/vacancies"
 QUERIES=[
     ("frontend","junior frontend"),
+    ("frontend","Frontend Developer"),
+    ("frontend","JavaScript Developer"),
+    ("frontend","TypeScript Developer"),
+    ("frontend","Web Developer React"),
+    ("frontend","UI Developer"),
     ("frontend","junior React"),
     ("frontend","React разработчик"),
     ("frontend","React TypeScript"),
@@ -44,6 +49,11 @@ QUERIES=[
 # Hybrid is searched separately and only inside Yekaterinburg.
 HYBRID_QUERIES=[
     ("frontend","junior frontend"),
+    ("frontend","Frontend Developer"),
+    ("frontend","JavaScript Developer"),
+    ("frontend","TypeScript Developer"),
+    ("frontend","Web Developer React"),
+    ("frontend","UI Developer"),
     ("frontend","junior React"),
     ("frontend","React TypeScript"),
     ("frontend","junior JavaScript"),
