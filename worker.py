@@ -1060,12 +1060,12 @@ def run(force_dry_run=False):
     )
     rejection_summary = build_rejection_reason_summary(eligibility)
     if rejection_summary:
-        summary_message += "\\n\\nПричины отказа (первые сработавшие фильтры):"
+        summary_message += "\n\nПричины отказа (первые сработавшие фильтры):"
         summary_message += "".join(
-            f"\\n- {reason}: {count}" for reason, count in rejection_summary
+            f"\n- {reason}: {count}" for reason, count in rejection_summary
         )
     else:
-        summary_message += "\\n\\nПричины отказа: нет отклонённых вакансий по проверенным ролям."
+        summary_message += "\n\nПричины отказа: нет отклонённых вакансий по проверенным ролям."
 
     # Work-format visibility: compare all checked employment leads with those
     # surviving the ranker, and count drafts separately when DRY_RUN is active.
@@ -1087,7 +1087,7 @@ def run(force_dry_run=False):
         _work_mode(lead) for lead in ranked_jobs
         if str(lead.get("url") or "") in drafted_urls
     )
-    summary_message += "\n\\nФОРМАТ РАБОТЫ (вакансии):"
+    summary_message += "\n\nФОРМАТ РАБОТЫ (вакансии):"
     for mode in ("remote", "hybrid", "office", "unknown"):
         label = format_labels[mode]
         summary_message += (
