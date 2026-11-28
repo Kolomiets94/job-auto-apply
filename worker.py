@@ -23,6 +23,7 @@ from queue_store import enqueue, enqueue_many, set_state, submitted_today, submi
 from notification_rules import format_notification, should_notify
 from telegram_notifier import send_message, send_notification
 from publication_filter import is_new_publication
+from publication_diagnostics import build_freshness_report
 from direct_outreach import build_outreach_drafts
 from resume_parser import extract_resume_text, ResumeParseError
 from stage_result import make_stage_result
@@ -1098,6 +1099,7 @@ def run(force_dry_run=False):
     summary_message += "\nУдалёнка, гибрид и офис учитываются по всей России; "
     summary_message += "формат не указан — отдельно, без автоматического приравнивания к удалёнке. "
     summary_message += "Черновики не отправлены."
+    summary_message += "\n\n" + build_freshness_report(job_leads)
     summary_message += "\n\n" + build_market_report(job_leads)
     summary_message += "\n\n" + build_filter_report(job_leads)
     summary_message += "\n\n" + build_manual_review_report(job_leads)
