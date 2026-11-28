@@ -25,6 +25,7 @@ from telegram_notifier import send_message, send_notification
 from publication_filter import is_new_publication
 from direct_outreach import build_outreach_drafts
 from resume_parser import extract_resume_text, ResumeParseError
+from pipeline_observability import build_pipeline_stage_results
 
 DEFAULT_RESUME_TEXT = ""  # Never invent skills or project history when no verified resume is configured.
 
@@ -1054,6 +1055,20 @@ def run(force_dry_run=False):
         summary_message += "\n\nФриланс — резервный вариант:"
         for lead in freelance_review[:5]:
             summary_message += f"\n- {str(lead.get('title') or 'Заказ')[:90]} [{lead.get('source') or '?'}]\n{lead.get('url') or ''}"
+    pipeline_stages = build_pipeline_stage_results(
+        candidates, enriched, leads, ranked, results,
+        collection_errors=COLLECTION_ERRORS,
+    )
+    stats["pipeline_stages"] = pipeline_stages
+    summary_message += "\n\nЭтапы pipeline:"
+    for stage in pipeline_stages:
+        reasons = ", ".join(
+            f"{code}={count}" for code, count in stage["reason_counts"].items()
+        ) or "нет"
+        summary_message += (
+            f"\n- {stage['stage']}: {stage['status']} "
+            f"({stage['input_count']} → {stage['output_count']}); причины: {reasons}"
+        )
     try:
         summary_delivery = send_message(summary_message)
     except Exception as exc:
