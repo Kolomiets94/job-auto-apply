@@ -370,3 +370,27 @@ def test_build_job_source_diagnostics_reports_funnel_and_rejection_reasons():
     assert result["jobicy"]["assessed_count"] == 0
     assert "description" not in str(result)
     assert "url" not in str(result)
+
+
+def test_build_rejection_reason_summary_aggregates_roles_and_limits_output():
+    result = worker.build_rejection_reason_summary({
+        "frontend": {"rejected_reasons": {
+            "office work is excluded; fully remote only": 4,
+            "not Junior or 0-3 years": 2,
+        }},
+        "layout": {"rejected_reasons": {
+            "office work is excluded; fully remote only": 3,
+            "layout entry level not confirmed": 1,
+        }},
+        "qa": {"rejected_reasons": {"non-target QA role": 5}},
+    }, limit=3)
+
+    assert result == [
+        ("офисный формат", 7),
+        ("QA — не целевая роль", 5),
+        ("не подтверждён уровень Junior / 0–3 года", 2),
+    ]
+
+
+def test_build_rejection_reason_summary_handles_empty_diagnostics():
+    assert worker.build_rejection_reason_summary({}) == []
